@@ -41,8 +41,10 @@ word_size <- docx_dim(Input_Doc)
 width <- word_size$page['width'] - word_size$margins['left'] - word_size$margins['right']
 border_style = officer::fp_border(color="black", width=1)
 
-
-
+#testing purposes
+display_table <- function(name, directory){
+  print(prep_table(name))
+}
 
 
 apply_flextable_defaults <- function(ft) {
@@ -62,15 +64,15 @@ apply_flextable_defaults <- function(ft) {
 
 
 # Set up function to add table
-add_table <- function(x, bookmark, value){
+add_table <- function(x, bookmark, value,jmp_tbl){
   tic("cursor")
   x <- x %>%
-    cursor_to_bookmark(bm_jmptbl,bookmark)
+    cursor_to_bookmark(jmp_tbl,bookmark)
   #x <- cursor_bookmarks(x, bookmark)
   #x <- cursor_begin(x)
   toc()
   tic("table")
-  x <-  body_add_flextable(x = x, value = value, align = "center", pos = "after")
+  x <-  body_add_flextable(x = x, value = value, align = "center", pos = "on")
   toc()
   x
 }
@@ -102,6 +104,7 @@ update_word <- function(input_doc, input_sheet){
 
   new_doc <- input_doc
 
+  #generates jumptable of all bookmarks
   bm_jmptbl <- find_all_bookmarks(input_doc)
 
   #calculate number of standard format tables
@@ -131,14 +134,14 @@ update_word <- function(input_doc, input_sheet){
 
 
   for(i in 1:n_standard[1]){
-    tic(str_glue("Table {i}"))
+
 
     new_doc <- new_doc %>%
-      add_table(std_bookmarks[i], prep_table(std_names[i],std_orientations[i]))
+      add_table(std_bookmarks[i], prep_table(std_names[i],std_orientations[i]),bm_jmptbl)
 
-    #print(prep_table(std_names[i],std_orientations[i]))
+    print(prep_table(std_names[i],std_orientations[i]))
     log_info("Table {i}: {std_names[i]} inserted at bookmark: {std_bookmarks[i]}", namespace = "Houdini Logs")
-    toc()
+
   }
 
   new_doc
@@ -150,7 +153,7 @@ prep_table <- function(table_name, landscape = FALSE){
   #pull raw data from .sas7bdat file
   raw_data <- str_c(location, table_name, "") %>%
     read_sas() %>%
-    dplyr::select(-starts_with(c("ROWORD", "PAGE"))) %>%
+    #dplyr::select(-starts_with(c("ROWORD", "PAGE"))) %>%
     mutate(across(where(is.character), ~ gsub("\\|n", "\n", .))) # replaces |n with \n in data columns
 
 

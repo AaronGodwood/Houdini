@@ -2,37 +2,39 @@
 #taken in to test speed as this function is the main bottleneck
 library(xml2)
 
-x <- input_doc
+
 #my attempt to rewrite the code
 #creates jumptable to all bookmarks in doc
 find_all_bookmarks <- function(x){
-  tic("Jumptable Creation")
 
-  doc_xml <- x$doc_obj$get()
 
-  bm_starts <- xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]")
+  doc_xml <- x$doc_obj$get() #gets the word doc in xml format
+
+  bm_starts <- xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]") #attaints all boomarks that start without _ (unhidden ones)
 
   nodes_with_text <- xml_find_all(
     doc_xml,
-    "/w:document/w:body/*|/w:ftr/*|/w:hdr/*")
+    "/w:document/w:body/*|/w:ftr/*|/w:hdr/*") #gets all sections within the document
 
+  #gets xml locations of all sections that conatin bookmarks
   matches <- sapply(bm_starts, function(node){
-    ancestors <- xml_parents(node)
+    ancestors <- xml_parents(node) #gets ancestors of each bookmark node
     for(i in 1:length(nodes_with_text)){
-      if(any(xml_path(nodes_with_text[i]) == xml_path(ancestors))){
-        index <- i
+      if(any(xml_path(nodes_with_text[i]) == xml_path(ancestors))){ #checks if a section is an ancestor of the bookmark node
+        index <- i #returns the section number
         break
       }
     }
-    index
+    index #returns section number
   })
 
+  #names section numbers appropriately with bookmark names
   bm_jmptbl <- set_names(matches, sapply(bm_starts,function(node) xml_attr(node, "name")))
 
 
 
-  toc()
-  bm_jmptbl
+
+  bm_jmptbl #returns 'jumptable' of bookmark names and their xml locations
 }
 
 cursor_to_bookmark <- function(x,jmp_tbl,id){
@@ -107,6 +109,4 @@ cursor_bookmarks <- function(x, id) {
 }
 
 
-doc <- input_doc
-add_table(doc,std_bookmarks[1],sas_data)
-print("done")
+
