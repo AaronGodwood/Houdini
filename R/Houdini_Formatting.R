@@ -13,7 +13,7 @@ replace_labels <- function(data, new_labels, add = FALSE){ #can maybe make this 
 
 
   for(i in seq_along(new_labels)){
-    if(!is.null(labels[[i]]) | add == TRUE)  #checks if the current label is empty or user wants to add a label regardless
+    if((!is.null(labels[[i]]) )| add == TRUE)  #checks if the current label is empty or user wants to add a label regardless
       attr(data[[i]], "label") <- new_labels[[i]] #replaces old label with new one
     else
       attr(data[[i]], "label") <- "" #replaces null labels with empty_string so the df name doesn't row e.g(COL3)
@@ -31,7 +31,7 @@ apply_flextable_defaults <- function(ft) {
     bold(part = "header") %>%  # set header to bold
     padding(padding = 0) %>%            # Set padding to 0
     line_spacing(space = 1) %>%          # Set line spacing to 1
-    set_table_properties(layout = "autofit")  # Autofit the table layout
+    set_table_properties(width = 1,layout = "autofit")  # Autofit the table layout
   return(ft)
 }
 
@@ -41,6 +41,19 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
   labels <- data %>%
     lapply(function(x) attr(x, "label")) # gets current labels
 
+
+
+  cols_added <- 0
+  for(i in 2:(length(data)-1)){
+    col_name = sprintf("BUFFER%i",i)
+    data <- data %>%
+      add_column(!!col_name := NA , .after = i+cols_added) #adds empty buffer column after data columns - cols_added accounts for added new ones
+
+    labels <- labels %>%
+      append(" ", after = i+cols_added) #adds new blank column label to buffer columns
+
+    cols_added <- cols_added + 1
+  }
 
 
   first_col <- data[[1]]
@@ -54,6 +67,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
       rows_added <- rows_added + 1
     }
   }
+
 
   data <- data %>%
     replace_labels(labels, add = TRUE)
