@@ -40,10 +40,11 @@ find_all_bookmarks <- function(x){
 cursor_to_bookmark <- function(x,jmp_tbl,id){
   if(id %in% names(jmp_tbl))
   {
-    print("were good")
+    x$officer_cursor$which <- jmp_tbl[id]
   }
+  else
+    stop("Cannot find bookmark in jumptable")
 
-  x$officer_cursor$which <- jmp_tbl[id]
   x
 }
 
@@ -76,6 +77,14 @@ cursor_bookmarks <- function(x, id) {
   tic("section 3")
   print(bm_id)
   print(bm_start)
+  test_start <- sapply(nodes_with_text, function(node) {
+    ancestors <- xml_parents(node)
+
+    any(sapply(nodes_with_text, function(section){
+      any(xml_path(nodes_with_text[i]) == xml_path(ancestors))
+    }))
+
+  })
   test_start <- sapply(nodes_with_text, function(node) {
     #tic("Section 3.1")
     expr <- sprintf("/descendant::w:bookmarkStart[@w:id='%s']", bm_id)
