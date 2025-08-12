@@ -35,17 +35,22 @@ apply_flextable_defaults <- function(ft) {
   return(ft)
 }
 
+get_labels <- function(data){
+  data %>%
+    lapply(function(x) attr(x, "label")) # gets current labels
+}
+
 
 add_buffers <- function(data){ # having issues with dropping labels - got a work around but its not ideal
 
   labels <- data %>%
-    lapply(function(x) attr(x, "label")) # gets current labels
+    get_labels()
 
-
+  groups <- get_groups(data)
 
   cols_added <- 0
-  for(i in 2:(length(data)-1)){
-    col_name = sprintf("BUFFER%i",i)
+  for(i in groups){
+    col_name = sprintf("BUFFER%i",cols_added+1)
     data <- data %>%
       add_column(!!col_name := NA , .after = i+cols_added) #adds empty buffer column after data columns - cols_added accounts for added new ones
 
@@ -54,6 +59,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
 
     cols_added <- cols_added + 1
   }
+
 
 
   first_col <- data[[1]]
@@ -73,5 +79,37 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
     replace_labels(labels, add = TRUE)
   data
 }
+
+#returns a vector that represnts the column in which a group ends
+get_groups <- function(data){
+
+  group = c()
+
+  labels <- data %>%
+    get_labels() #gets label attribute for each column
+
+  #gets second layer of headers by delimiter
+  second_headers <- labels %>%
+    sapply(function(x){
+      if(grepl(separator,x)){
+        strsplit(x,separator, fixed = FALSE)[[1]][1]
+      }
+      else
+        ""
+    })
+
+  prev_header <- second_headers[1]
+  for(i in 2:length(labels)){
+    if(second_headers[i] != prev_header || (prev_header == "" && second_headers[i] == "")){
+      group <- group %>%
+        append(i-1)
+
+    }
+    prev_header <- second_headers[i]
+  }
+  group
+}
+
+
 
 

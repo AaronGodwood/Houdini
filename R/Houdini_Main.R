@@ -18,7 +18,8 @@ library(tictoc)
 
 #location for some tables
 location <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_01_02_01_t_demog.sas7bdat"
+table_name <- "t_14_03_01_06_01_t_sae_soc_pt.sas7bdat"
+table_names <- list.files(location)
 
 # Set up location of SAS datasets
 location <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
@@ -96,8 +97,11 @@ update_word <- function(input_doc, input_sheet){
 
   for(i in 1:n_standard[1]){
 
+
+
     new_doc <- tryCatch(
       {
+
         log_info("Table {i}: {std_names[i]} inserted at bookmark: {std_bookmarks[i]}", namespace = "Houdini Logs")
         new_doc %>%
           add_table(std_bookmarks[i], prep_table(std_names[i],std_orientations[i]),bm_jmptbl)
@@ -109,33 +113,19 @@ update_word <- function(input_doc, input_sheet){
         new_doc
       }
     )
-
-
-    #print(prep_table(std_names[i],std_orientations[i]))
+    print(prep_table(std_names[i],FALSE))
 
 
   }
+
+  # for(i in 1:length(table_names))
+  # {
+  #   print(prep_table(table_names[i],FALSE))
+  # }
 
   new_doc
 }
 
-raw_data_processing <- function(raw_data){
-  raw_data <- raw_data %>%
-    remove_dupes("")
-}
-
-remove_dupes <- function(col,prev_value){
-  if(is_empty(col)){
-    c()
-  }
-  if(col[1] == prev_value){
-    c("",remove_dupes(col[-1],prev_value))
-  }
-  else{
-    prev_value <- col[1]
-    c(col[1],remove_dupes(col[-1],prev_value))
-  }
-}
 
 
 prep_table <- function(table_name, landscape = FALSE){
@@ -148,18 +138,22 @@ prep_table <- function(table_name, landscape = FALSE){
 
 
   new_labels <- raw_data %>%
-    lapply(function(x) attr(x, "label")) %>% #gets label attribute for each column
+    get_labels() %>% #gets label attribute for each column
     lapply(function(x) gsub("\\|n", "\n", x)) #replaces |n with \n in each label
 
   #replaces old labels with new cleaned ones
   raw_data <- raw_data %>%
     replace_labels(new_labels)
 
+  if(!is.null(raw_data$ROWLBL1))
+  {
+    raw_data <- raw_data %>%
+      relocate(ROWLBL1)
+  }
 
-  #gets descriptor columns
-  chr_cols <- raw_data %>%
-    select(where( ~ any(grepl("[A-Za-z]", .)))) %>%
-    names()
+
+
+
 
   if(landscape == TRUE){
     raw_data <- raw_data %>%
@@ -169,14 +163,9 @@ prep_table <- function(table_name, landscape = FALSE){
 
   # Format table - left aligns descriptor columns - this whole section can be cleaned up nicely later
   sas_data <- raw_data %>%
-    #mutate(across(everything(), ~ gsub("\\|n\\b", "\n", .x))) %>%
-    relocate(ROWLBL1) %>%
-    add_buffers() %>%
-    dplyr::select(-starts_with(c("ROWORD", "PAGE"))) %>%
-    flextable() %>%
-    align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
-    align(align = c("left"), part = "all", j = chr_cols) %>% #aligns descriptor columns to the left
-    apply_flextable_defaults() #applies default formatting - times new roman(10), bold header, etc.
+    #relocate(ROWLBL1) %>%
+    #add_buffers() %>%                   #adds buffer column and rows for better readability
+    standard_format() #applies default formatting - times new roman(10), bold header, etc.
 
   if(landscape == TRUE){
     chr_rows <- which(names(new_labels) %in% chr_cols) - 1
