@@ -30,7 +30,7 @@ apply_second_header <- function(data,second_labels,code){
 
 standard_format <- function(data){
 
-
+  separator <- "\\^\\*\\^"
 
   #gets descriptor columns
   chr_cols <- data %>%
@@ -42,9 +42,12 @@ standard_format <- function(data){
     names() %>%
     setdiff(chr_cols)
 
+
   data <- data %>%
     apply_second_header(std_labels,code) %>%
     add_buffers()
+
+
 
 
   labels <- data %>%
@@ -76,11 +79,6 @@ standard_format <- function(data){
     dplyr::select(-starts_with(c("ROWORD", "PAGE"))) %>%
     flextable() %>%
     apply_flextable_defaults() %>%
-    # add_header_row(values = std_labels,colwidths = c(1,2,2,1), top = TRUE ) %>%
-    # border_remove() %>%
-    # hline(j=c(2,3,4,5),border = header_border,part = "header") %>%
-    # hline(i = 2,part = "header", border = header_border) %>%
-    # hline_bottom(part = "body" , border = header_border) %>%
     lift_headers(separator = "\\^\\*\\^",second_headers) %>%
     align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
     align(align = c("left"), part = "all", j = chr_cols)  #aligns descriptor columns to the left
@@ -109,7 +107,8 @@ lift_headers <- function(ft,separator,second_headers){
     border_remove() %>%
     hline(j=border_cols,border = header_border,part = "header") %>%
     hline(i = 2,part = "header", border = header_border) %>%
-    hline_bottom(part = "body" , border = header_border)
+    hline_bottom(part = "body" , border = header_border) %>%
+    merge_h(part = "header")
 
   ft
 }

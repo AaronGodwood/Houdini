@@ -55,7 +55,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
       add_column(!!col_name := NA , .after = i+cols_added) #adds empty buffer column after data columns - cols_added accounts for added new ones
 
     labels <- labels %>%
-      append(" ", after = i+cols_added) #adds new blank column label to buffer columns
+      append("   ", after = i+cols_added) #adds new blank column label to buffer columns
 
     cols_added <- cols_added + 1
   }
@@ -83,6 +83,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
 #returns a vector that represnts the column in which a group ends
 get_groups <- function(data){
 
+  separator = "\\^\\*\\^" # will probably be passed as para, in future
   group = c()
 
   labels <- data %>%

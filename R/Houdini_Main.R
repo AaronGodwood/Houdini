@@ -138,13 +138,14 @@ prep_table <- function(table_name, landscape = FALSE){
 
 
   new_labels <- raw_data %>%
-    get_labels() %>% #gets label attribute for each column
+    get_labels %>% #gets label attribute for each column
     lapply(function(x) gsub("\\|n", "\n", x)) #replaces |n with \n in each label
 
   #replaces old labels with new cleaned ones
   raw_data <- raw_data %>%
     replace_labels(new_labels)
 
+  #makes sure the descriptor row is first if it exists
   if(!is.null(raw_data$ROWLBL1))
   {
     raw_data <- raw_data %>%
@@ -161,10 +162,8 @@ prep_table <- function(table_name, landscape = FALSE){
   }
 
 
-  # Format table - left aligns descriptor columns - this whole section can be cleaned up nicely later
+  # Format table
   sas_data <- raw_data %>%
-    #relocate(ROWLBL1) %>%
-    #add_buffers() %>%                   #adds buffer column and rows for better readability
     standard_format() #applies default formatting - times new roman(10), bold header, etc.
 
   if(landscape == TRUE){
