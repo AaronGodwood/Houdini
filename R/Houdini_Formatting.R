@@ -9,7 +9,7 @@
 replace_labels <- function(data, new_labels, add = FALSE){ #can maybe make this functional - faster/less memory
 
   labels <- data %>%
-    lapply(function(x) attr(x, "label")) # gets current labels
+    get_labels() # gets current labels
 
 
   for(i in seq_along(new_labels)){
@@ -52,7 +52,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
   for(i in groups){
     col_name = sprintf("BUFFER%i",cols_added+1)
     data <- data %>%
-      add_column(!!col_name := NA , .after = i+cols_added) #adds empty buffer column after data columns - cols_added accounts for added new ones
+      tibble::add_column(!!col_name := NA , .after = i+cols_added) #adds empty buffer column after data columns - cols_added accounts for added new ones
 
     labels <- labels %>%
       append("   ", after = i+cols_added) #adds new blank column label to buffer columns
@@ -68,7 +68,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
     if(!grepl("^\\s\\s", first_col[i])){
 
       data <- data %>%
-        add_row(.before = i+rows_added)
+        tibble::add_row(.before = i+rows_added)
 
       rows_added <- rows_added + 1
     }
@@ -79,6 +79,7 @@ add_buffers <- function(data){ # having issues with dropping labels - got a work
     replace_labels(labels, add = TRUE)
   data
 }
+
 
 #returns a vector that represnts the column in which a group ends
 get_groups <- function(data){

@@ -31,10 +31,8 @@ find_all_bookmarks <- function(x){
   #names section numbers appropriately with bookmark names
   bm_jmptbl <- set_names(matches, sapply(bm_starts,function(node) xml_attr(node, "name")))
 
-
-
-
-  bm_jmptbl #returns 'jumptable' of bookmark names and their xml locations
+  #returns 'jumptable' of bookmark names and their xml locations
+  bm_jmptbl
 }
 
 cursor_to_bookmark <- function(x,jmp_tbl,id){
