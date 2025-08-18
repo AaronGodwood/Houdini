@@ -136,7 +136,7 @@ prep_table <- function(table_name, format , landscape = FALSE, header_code = NUL
 
   if(format != "Standard"){
     raw_data <- raw_data %>%
-      change_from_baseline()
+      non_standard_format()
   }
 
   #same as transpose bit below
@@ -146,7 +146,7 @@ prep_table <- function(table_name, format , landscape = FALSE, header_code = NUL
   # }
 
   #Applies default formatting - times new roman(10), bold header, etc.
-  sas_data <- raw_data %>%
+  ft <- raw_data %>%
     standard_format(header_code)
 
   #This doesn't really work right now, leaving it in to come back to it
@@ -159,7 +159,7 @@ prep_table <- function(table_name, format , landscape = FALSE, header_code = NUL
   # }
 
   #returns sas_data
-  sas_data
+  ft
 }
 
 apparate <- function(input_doc,input_sheet,file_location){
@@ -269,7 +269,7 @@ setup_log <- function()
 
 #location for some tables
 location <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_03_05_03_02_t_swc_ctcae_c.sas7bdat"
+table_name <- "t_14_03_01_01_t_teae_ovrl.sas7bdat"
 table_names <- list.files(location)
 
 # Set up location of SAS datasets
@@ -285,7 +285,7 @@ input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 #border_style = officer::fp_border(color="black", width=1)
 
 
-apparate(input_doc,input_sheet,location)
+#apparate(input_doc,input_sheet,location)
 
 
 
