@@ -24,19 +24,7 @@ display_table <- function(name, directory){
 
 
 
-# Set up function to add table
-add_table <- function(x, bookmark, value,jmp_tbl){
 
-  #sets cursor to each bookmark
-  x <- x %>%
-    cursor_to_bookmark(jmp_tbl,bookmark)
-
-  #adds table at that cursor point
-  x <-  body_add_flextable(x = x, value = value, align = "center", pos = "on")
-
-  #returns changed doc
-  x
-}
 
 
 
@@ -110,6 +98,17 @@ update_word <- function(input_doc, input_sheet){
 
 
 
+#' Reads in raw data from .sas7bdat file and converts it to a formatted table
+#'
+#' @param table_name a string representing the file name of a dataset
+#' @param format a string that says weather the dataset is in standard format or not
+#' @param landscape a Boolean that says weather a table should be landscape <might get removed>
+#' @param header_code a header code for adding headers missing from data sets
+#'
+#' @return a formatted table
+#' @export
+#'
+#' @examples
 prep_table <- function(table_name, format , landscape = FALSE, header_code = NULL){
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
@@ -162,6 +161,16 @@ prep_table <- function(table_name, format , landscape = FALSE, header_code = NUL
   ft
 }
 
+#' Performs full Houdini operation
+#'
+#' @param input_doc a string stating the file name for a word document populated with bookmarks fro table insertion
+#' @param input_sheet a string stating the file name for a an excel sheet with information about what tables to insert and where to insert them
+#' @param file_location a string representing the file path that the data sets reside in
+#'
+#' @return
+#' @export
+#'
+#' @examples
 apparate <- function(input_doc,input_sheet,file_location){
   #testing
   tic("Start-Finish")
@@ -222,12 +231,12 @@ apparate <- function(input_doc,input_sheet,file_location){
 
     new_doc <- tryCatch(
       {
-        #logs a success if table is added correctly
         tic(str_glue("Table{i}"))
-        log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
         #returns updated doc with table added
         test <- prep_table(dataset_names[i],formats[i],orientations[i],header_codes[[i]])
         print(test)
+        #logs a success if table is added correctly
+        log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
         toc()
         new_doc %>%
           add_table(bookmarks[i],test ,bm_jmptbl)
@@ -256,6 +265,12 @@ apparate <- function(input_doc,input_sheet,file_location){
 }
 
 #sets up log output file and log level
+#' Sets up log output file and log levels
+#'
+#' @return
+#' @export
+#'
+#' @examples
 setup_log <- function()
 {
   #sets up log output file
@@ -285,7 +300,7 @@ input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 #border_style = officer::fp_border(color="black", width=1)
 
 
-#apparate(input_doc,input_sheet,location)
+apparate(input_doc,input_sheet,location)
 
 
 

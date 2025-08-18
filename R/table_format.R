@@ -4,6 +4,14 @@ header_border = officer::fp_border(color = "black" , width = 1.5)
 
 
 
+#' Applies default formatting to a table
+#'
+#' @param ft a flextable for formatting to be applied to
+#'
+#' @return a flextable with formatting applied
+#' @export
+#'
+#' @examples
 apply_flextable_defaults <- function(ft) {
   ft <- ft %>%
     fontsize(size = 10) %>%             # Set font size to 10
@@ -18,6 +26,16 @@ apply_flextable_defaults <- function(ft) {
 }
 
 
+#' Formats standard formatted data sets into tables
+#'
+#' @param data a data frame that represents a standard format dataset
+#' @param header_code a header code for if the dataset is missing a layer of headers
+#' @param delimiter a delimiter fro splitting flattened headers back into layered ones
+#'
+#' @return a formatted table representing the data from the data frame
+#' @export
+#'
+#' @examples
 standard_format <- function(data,header_code, delimiter = "\\^\\*\\^"){
 
   #gets descriptor columns
@@ -76,6 +94,14 @@ standard_format <- function(data,header_code, delimiter = "\\^\\*\\^"){
 
 
 
+#' Formats non-standard formatted data sets into standard formatted ones
+#'
+#' @param data a data frame that represents the non-standard formatted dataset
+#'
+#' @return a data frame that represents a standard formatted dataset
+#' @export
+#'
+#' @examples
 non_standard_format <- function(data){
 
   #gets all the row label columns

@@ -1,26 +1,34 @@
 #This is code from https://github.com/davidgohel/officer/blob/master/R/docx_cursor.R
 #taken in to test speed as this function is the main bottleneck
-library(xml2)
 
 
-#my attempt to rewrite the code
+
+
 #creates jumptable to all bookmarks in doc
+#' Creates a jumptable for all bookmarks in a word document
+#'
+#' @param x a word document
+#'
+#' @return a list that acts as a jumptable for bookmark names and XML node values
+#' @export
+#'
+#' @examples
 find_all_bookmarks <- function(x){
 
 
   doc_xml <- x$doc_obj$get() #gets the word doc in xml format
 
-  bm_starts <- xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]") #attaints all boomarks that start without _ (unhidden ones)
+  bm_starts <- xml2::xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]") #attaints all boomarks that start without _ (unhidden ones)
 
-  nodes_with_text <- xml_find_all(
+  nodes_with_text <- xml2::xml_find_all(
     doc_xml,
     "/w:document/w:body/*|/w:ftr/*|/w:hdr/*") #gets all sections within the document
 
   #gets xml locations of all sections that conatin bookmarks
   matches <- sapply(bm_starts, function(node){
-    ancestors <- xml_parents(node) #gets ancestors of each bookmark node
+    ancestors <- xml2::xml_parents(node) #gets ancestors of each bookmark node
     for(i in 1:length(nodes_with_text)){
-      if(any(xml_path(nodes_with_text[i]) == xml_path(ancestors))){ #checks if a section is an ancestor of the bookmark node
+      if(any(xml2::xml_path(nodes_with_text[i]) == xml2::xml_path(ancestors))){ #checks if a section is an ancestor of the bookmark node
         index <- i #returns the section number
         break
       }
@@ -29,12 +37,22 @@ find_all_bookmarks <- function(x){
   })
 
   #names section numbers appropriately with bookmark names
-  bm_jmptbl <- set_names(matches, sapply(bm_starts,function(node) xml_attr(node, "name")))
+  bm_jmptbl <- set_names(matches, sapply(bm_starts,function(node) xml2::xml_attr(node, "name")))
 
   #returns 'jumptable' of bookmark names and their xml locations
   bm_jmptbl
 }
 
+#' Moves the cursor in a word document to a name bookmark
+#'
+#' @param x a word document in which you want to move the cursor
+#' @param jmp_tbl a list that behaves as a jumptable for bookmark from finf_all_bookmarks()
+#' @param id a string that is the name of a bookmark
+#'
+#' @return a word doc with a moved cursor
+#' @export
+#'
+#' @examples
 cursor_to_bookmark <- function(x,jmp_tbl,id){
   if(id %in% names(jmp_tbl))
   {
@@ -49,7 +67,30 @@ cursor_to_bookmark <- function(x,jmp_tbl,id){
 
 
 
+# Set up function to add table
+#' Inserts a table into a word document at a bookmark
+#'
+#' @param x a word document that the table is to be inserted into
+#' @param bookmark a string that is the id of the bookmark
+#' @param value a flextable object to insert into the document
+#' @param jmp_tbl a list representing a jumptable for bookmark ids and xmml nodes
+#'
+#' @return a word document with the table inserted at the specified bookmark
+#' @export
+#'
+#' @examples
+add_table <- function(x, bookmark, value,jmp_tbl){
 
+  #sets cursor to each bookmark
+  x <- x %>%
+    cursor_to_bookmark(jmp_tbl,bookmark)
+
+  #adds table at that cursor point
+  x <-  body_add_flextable(x = x, value = value, align = "center", pos = "on")
+
+  #returns changed doc
+  x
+}
 
 
 
