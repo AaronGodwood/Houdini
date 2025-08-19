@@ -71,22 +71,22 @@ cursor_to_bookmark <- function(x,jmp_tbl,id){
 #' Inserts a table into a word document at a bookmark
 #'
 #' @param x a word document that the table is to be inserted into
-#' @param bookmark a string that is the id of the bookmark
-#' @param value a flextable object to insert into the document
-#' @param jmp_tbl a list representing a jumptable for bookmark ids and xmml nodes
+#' @param bookmark a string that is the id of the bookmark where the table is to be inserted
+#' @param table a flextable object to insert into the document
+#' @param jmp_tbl a list representing a jumptable for bookmark ids and XML nodes
 #'
 #' @return a word document with the table inserted at the specified bookmark
 #' @export
 #'
 #' @examples
-add_table <- function(x, bookmark, value,jmp_tbl){
+add_table <- function(x, bookmark, table, jmp_tbl){
 
   #sets cursor to each bookmark
   x <- x %>%
     cursor_to_bookmark(jmp_tbl,bookmark)
 
   #adds table at that cursor point
-  x <-  body_add_flextable(x = x, value = value, align = "center", pos = "on")
+  x <-  body_add_flextable(x = x, value = table, align = "center", pos = "on")
 
   #returns changed doc
   x
@@ -94,66 +94,25 @@ add_table <- function(x, bookmark, value,jmp_tbl){
 
 
 
+#' Title
+#'
+#' @param x a word document that the figure is to be inserted into
+#' @param bookmark a string that is the id of the bookmark where the table is to be inserted
+#' @param image
+#' @param jmp_tbl a list representing a jumptable for bookmark ids and XML nodes
+#' @param width the width of the image in the document (defaults to 6.5in the width of a doc with standard margins)
+#' @param height the width of the image in the document
+#'
+#' @return
+#' @export
+#'
+#' @examples
+add_figure <- function(x, bookmark, image, jmp_tbl, width = 6.5, height = 6.5){
+  x <- x %>%
+    cursor_to_bookmark(jmp_tbl,bookmark)
 
-#code taken from github
-cursor_bookmarks <- function(x, id) {
-  #tic("section 1")
-  xpath_ <- sprintf("//w:bookmarkStart[@w:name='%s']", id)
-  bm_start <- xml_find_first(x$doc_obj$get(), xpath_)
 
-  if (inherits(bm_start, "xml_missing")) {
-    stop("cannot find bookmark ", shQuote(id), call. = FALSE)
-  }
-  #toc()
-  #tic("section 2")
-  bm_id <- xml_attr(bm_start, "id")
-
-  nodes_with_text <- xml_find_all(
-    x$doc_obj$get(),
-    "/w:document/w:body/*|/w:ftr/*|/w:hdr/*"
-  )
-  #toc()
-  tic("section 3")
-  print(bm_id)
-  print(bm_start)
-  test_start <- sapply(nodes_with_text, function(node) {
-    ancestors <- xml_parents(node)
-
-    any(sapply(nodes_with_text, function(section){
-      any(xml_path(nodes_with_text[i]) == xml_path(ancestors))
-    }))
-
-  })
-  test_start <- sapply(nodes_with_text, function(node) {
-    #tic("Section 3.1")
-    expr <- sprintf("/descendant::w:bookmarkStart[@w:id='%s']", bm_id)
-    #toc()
-    tic("Section 3.2")
-    match_node <- xml_child(node, expr)
-    tic("Section 3.3")
-    !inherits(match_node, "xml_missing")
-  })
-  if (!any(test_start)) {
-    stop("bookmark ", shQuote(id), " has not been found in the document", call. = FALSE)
-  }
-  toc()
-  tic("section 4")
-  test_end <- sapply(nodes_with_text, function(node) {
-    expr <- sprintf("/descendant::w:bookmarkEnd[@w:id='%s']", bm_id)
-    match_node <- xml_child(node, expr)
-    !inherits(match_node, "xml_missing")
-  })
-  toc()
-  tic("section 5")
-  on_same_par <- test_start == test_end
-  if (!all(on_same_par)) {
-    stop("bookmark ", shQuote(id), " does not end in the same paragraph (or is on the whole paragraph)", call. = FALSE)
-  }
-  print("HERE:")
-  print(which(test_start)[1])
-  x$officer_cursor$which <- which(test_start)[1]
-  toc()
-  x
+  x <- body_add_img(x = x,width = width, height = height, src = image, pos = "on")
 }
 
 

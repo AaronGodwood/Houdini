@@ -31,6 +31,32 @@ fill_gaps <- function(data){
   data <- rep(unique_data, length.out = length(data))
 }
 
+is_table <- function(name){
+  name %>%
+    startsWith("Table")
+}
+
+get_png_size <- function(image_path){
+  con <- file(image_path,"rb")
+  on.exit(close(con))
+
+  readBin(con, "raw", 8)
+  chunk_length <- readBin(con, "integer", 1, size = 4, endian = "big")
+  chunk_type <- readBin(con, "character",1,size = 4)
+
+  if(chunk_type == "IHDR"){
+    width <- readBin(con, "integer", 1, size =4, endian = "big")
+    height <- readBin(con, "integer", 1, size =4, endian = "big")
+    c(width = (width/256), height = (height/256))
+  }
+  else
+  {
+    stop("Not a png")
+  }
+
+}
+
+
 
 #returns a vector that represents the column in which a group ends
 get_groups <- function(data){
