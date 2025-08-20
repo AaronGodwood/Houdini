@@ -56,12 +56,13 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
     lubridate::setdiff(chr_cols)
 
 
-  #formats data with secondary headers and buffer rows/cols
+  #formats data with secondary headers and buffer rows/cols and orders the data
   data <- data %>%
     order_cols() %>%
     apply_second_header(std_labels,header_code) %>%
     add_col_buffers() %>%
-    add_row_buffers()
+    add_row_buffers() %>%
+    add_page_column()
 
 
   buffer_cols <- data %>%
@@ -98,9 +99,17 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
   data <- data %>%
     replace_labels(first_headers)
 
+  #gets column names without the pages so they don't show later on
+  colkeys <- data %>%
+    names()
+  colkeys <- colkeys[-length(colkeys)]
+  second_headers <- second_headers[-length(second_headers)]
+
+
+
   ft <- data %>%
-    dplyr::select(-starts_with(c("ROWORD", "PAGE"))) %>%
-    flextable() %>%
+    dplyr::select(-starts_with(c("ROWORD"))) %>%
+    flextable(col_keys = colkeys) %>%
     apply_flextable_defaults() %>%
     lift_headers(second_headers) %>%
     align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally

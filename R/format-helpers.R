@@ -128,3 +128,37 @@ add_col_buffers <- function(data){ # having issues with dropping labels - got a 
     replace_labels(labels, add = TRUE)
   data
 }
+
+add_page_column <- function(data){
+
+  labels <- data %>%
+    get_labels()
+
+  labels <- labels %>%
+    append("PAGE")
+
+  first_col = data[[1]]
+  PAGE <- c()
+  page_num <- 1
+  for(i in 1:length(first_col)){
+    if(is.na(first_col[i])){
+      PAGE <- PAGE %>%
+        append(NA)
+      page_num <- page_num + 1
+    }
+    else
+    {
+      PAGE <- PAGE %>%
+        append(page_num)
+    }
+  }
+
+  data <- data %>%
+    cbind(PAGE)
+
+  data <- data %>%
+    replace_labels(labels, add = TRUE)
+
+  data
+
+}

@@ -11,6 +11,19 @@ houdini_default_settings <- list(
 houdini_global$defaults <- houdini_default_settings
 
 
+#' Sets the default options for the Houdini package
+#'
+#' @param rowlbls.name the name that the columns containing row labels/descriptors are called in standard data sets
+#' @param cols.name the name that the data columns are called in standard data sets
+#' @param colvars.name the name of the columns containing data column headers in non-standard data sets
+#' @param cellvalcs.name the name of the column containing data points in non-standard data sets
+#' @param delimiter the split delimiter used for splitting header rows and footer rows (IMPORTANT: use regex escape characters (\\) infront of special characters)
+#' @param delimiter.non.regex the split delimiter used for splitting header rows and footer rows without regex escape characters
+#'
+#' @return
+#' @export
+#'
+#' @examples
 set_houdini_defaults <- function(
     rowlbls.name = NULL,
     cols.name = NULL,
@@ -51,6 +64,12 @@ set_houdini_defaults <- function(
   invisible(x)
 }
 
+#' Restores Houdini package options to the defaults
+#'
+#' @return
+#' @export
+#'
+#' @examples
 init_houdini_defaults <- function(){
   x <- houdini_default_settings
   houdini_global$defaults <- x
@@ -58,6 +77,13 @@ init_houdini_defaults <- function(){
   invisible(x)
 }
 
+
+#' Returns the default settings for the Houdini package
+#'
+#' @return
+#' @export
+#'
+#' @examples
 get_houdini_defaults <- function(){
   x <- houdini_default_settings
   class(x) <- "houdini_defaults"

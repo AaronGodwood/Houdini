@@ -100,6 +100,7 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, foot
   ft <- raw_data %>%
     standard_format(header_code = header_code, doc_width = doc_width) %>%
     add_footnote(footnotes) %>%
+    paginate(hdr_ftr = TRUE,group = "PAGE", group_def = "rle") %>%
     apply_flextable_defaults()
 
 
@@ -192,6 +193,7 @@ apparate <- function(input_doc,input_sheet,file_location){
 
     if(i == 11)
       next
+
     new_doc <- tryCatch(
       {
         if(is_table(bookmarks[i]))
