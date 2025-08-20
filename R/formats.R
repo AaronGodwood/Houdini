@@ -14,10 +14,10 @@ header_border = officer::fp_border(color = "black" , width = 1.5)
 #' @examples
 apply_flextable_defaults <- function(ft) {
   ft <- ft %>%
-    fontsize(size = 10) %>%             # Set font size to 10
-    fontsize(size = 10, part = "header") %>%
-    font(font = "Times New Roman") %>%   # Set font to Times New Roman
-    font(font = "Times New Roman", part = "header") %>%   # Set font to Times New Roman
+    #fontsize(size = 10) %>%             # Set font size to 10
+    fontsize(size = 10, part = "all") %>%
+    #font(font = "Times New Roman") %>%   # Set font to Times New Roman
+    font(font = "Times New Roman", part = "all") %>%   # Set font to Times New Roman
     bold(part = "header") %>%  # set header to bold
     padding(padding = 0) %>%            # Set padding to 0
     line_spacing(space = 1) #%>%          # Set line spacing to 1
@@ -36,10 +36,12 @@ apply_flextable_defaults <- function(ft) {
 #' @export
 #'
 #' @examples
-standard_format <- function(data, header_code = NULL, doc_width = 6.5, delimiter = "\\^\\*\\^"){
+standard_format <- function(data, header_code = NULL, doc_width = 6.5){
+
+  delimiter <- houdini_global$defaults$delimiter
 
   data <- data %>%
-    dplyr::select(starts_with(c("COL", "ROWLBL"))) # this should probably be moved at some point when i've worked out what filtering i will do
+    dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name ))) # this should probably be moved at some point when i've worked out what filtering i will do
 
   data$ROWLBL1 <- data$ROWLBL1 %>%
     separate_data()
@@ -54,13 +56,13 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, delimiter
     lubridate::setdiff(chr_cols)
 
 
-
   #formats data with secondary headers and buffer rows/cols
   data <- data %>%
     order_cols() %>%
     apply_second_header(std_labels,header_code) %>%
+    add_col_buffers() %>%
+    add_row_buffers()
 
-    add_buffers()
 
   buffer_cols <- data %>%
     names() %>%
@@ -103,65 +105,18 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, delimiter
     lift_headers(second_headers) %>%
     align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
     align(align = c("left"), part = "all", j = chr_cols) %>% #aligns descriptor columns to the left
-    set_table_properties(width = 1,layout = "autofit") %>% # Autofit the table layout
-    width(j = chr_cols, width = (col_width*desciptor_col_ratio)) %>%
-    width(j = buffer_cols, width = (col_width* 0.2)) %>%
-    width(j = data_cols, width = col_width)
+    set_table_properties(width = 1,layout = "autofit")  # Autofit the table layout
+    #width(j = chr_cols, width = (col_width*desciptor_col_ratio)) %>%
+    #width(j = buffer_cols, width = (col_width* 0.2)) %>%
+    #width(j = data_cols, width = col_width)
   ft
 
 }
 
-order_cols <- function(data){
-  ROWLBLs <- data %>%
-    select(grep("^ROWLBL[0-9]$",names(.)))
-  COLs <- data %>%
-    select(grep("^COL[0-9]$",names(.)))
-  for(i in length(COLs):1){
-    column_name <- sprintf("COL%s",i)
-    data <- data %>%
-      relocate(column_name)
-  }
-  for(i in length(ROWLBLs):1){
-    column_name <- sprintf("ROWLBL%s",i)
-    data <- data %>%
-      relocate(column_name)
-  }
-  data
-}
-
-separate_data <- function(col){
-  if(length(col) < 2)
-  {
-    col
-  }
-  else
-  {
-    prev_elem <- col[1]
-    for(i in 2:length(col)){
-      if(col[i] != "")
-      {
-        if(col[i] == prev_elem)
-          col[i] <- ""
-        else
-          prev_elem <- col[i]
-      }
-    }
-    col
-  }
 
 
-}
 
 
-format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
-
-  desciptor_col_ratio <- 2
-
-  col_width <- doc_width / (length(chr_cols)*desciptor_col_ratio + length(data_cols) + (length(buffer_cols))*0.2)
-
-  descriptor_col_width <- col_width
-
-}
 
 #' Formats non-standard formatted data sets into standard formatted ones
 #'
@@ -175,7 +130,7 @@ non_standard_format <- function(data){
 
   #gets all the row label columns
   ROWLBLs <- data %>%
-    select(grep("^ROWLBL[0-9]$",names(.)))
+    get_col_names(houdini_global$defaults$rowlbls.name)
 
   #gets the column labels from the row label columns
   labels <- ROWLBLs %>%
@@ -195,15 +150,17 @@ non_standard_format <- function(data){
   }
 
   headers <- data %>%
-    select(grep("^COLVAR[0-9]$",names(.)))
+    get_col_names(houdini_global$defaults$colvars.name)
+
   #gets rows of headers
   first_headers <- headers %>%
     dplyr::select(dplyr::last_col())
   first_headers <- first_headers[[1]] %>%
     fill_gaps()
   if(length(headers) > 1){
-    second_headers <- data$COLVAR1
-    new_headers <- merge_columns(second_headers,first_headers, separator = "^*^") %>%
+    col_name <- sprintf("%s1", houdini_global$defaults$colvars.name)
+    second_headers <- data$COLVAR1 #needs to be chnaged
+    new_headers <- merge_columns(second_headers,first_headers, separator = houdini_global$defaults$delimiter.non.regex ) %>%
       unique()
   }
   else
@@ -214,7 +171,7 @@ non_standard_format <- function(data){
 
 
   CELLVALs <- data %>%
-    dplyr::select(starts_with(c("CELLVALC")))
+    dplyr::select(starts_with( c( houdini_global$defaults$cellvalcs.name )))
   CELLVALs <- CELLVALs[[1]]
   n_points <- new_headers %>%
     length()
@@ -224,22 +181,22 @@ non_standard_format <- function(data){
   for(i in 1:n_points)
   {
     if(i <= n_lbls){
-      col_name <- col_name <- sprintf("ROWLBL%s", i)
+      col_name <- col_name <- sprintf("%s%s", houdini_global$defaults$rowlbls.name , i)
       new_data[col_name] = character()
     }
-    col_name <- sprintf("COL%s", i)
+    col_name <- sprintf("%s%s", houdini_global$defaults$cols.name , i)
     new_data[col_name] = character()
   }
   for(i in seq(1,length(rownames(data)),by = n_points)){
     new_row = list()
 
     for(j in 0:(n_lbls-1)){
-      col_name <- sprintf("ROWLBL%s", j+1)
+      col_name <- sprintf("%s%s", houdini_global$defaults$rowlbls.name ,j+1)
       new_row[col_name] <- ROWLBLs[[col_name]][i+j]
     }
 
     for(j in 0:(n_points-1)){
-      col_name <- sprintf("COL%s", j+1)
+      col_name <- sprintf("%s%s", houdini_global$defaults$cols.name , j+1)
       new_row[col_name] <- CELLVALs[i+j]
     }
     new_data <- new_data %>%
@@ -249,6 +206,8 @@ non_standard_format <- function(data){
   new_data <- new_data %>%
     replace_labels(labels, add = TRUE)
 }
+
+
 
 
 

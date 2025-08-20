@@ -52,19 +52,21 @@ display_tables <- function(names, directory){
 #' @param format a string that says weather the dataset is in standard format or not
 #' @param landscape a Boolean that says weather a table should be landscape <might get removed>
 #' @param header_code a header code for adding headers missing from data sets
-#' @param doc_width a float that represnts the total width the table needs to be
+#' @param doc_width a float that represents the total width the table needs to be
 #'
 #' @return a formatted table
 #' @export
 #'
 #' @examples
-prep_table <- function(table_name, format = "Standard" , landscape = FALSE, header_code = NULL, doc_width = 6.5){
+prep_table <- function(table_name, format = "Standard" , landscape = FALSE, footnotes = "", header_code = NULL, doc_width = 6.5){
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
   raw_data <- stringr::str_c(location, table_name, "") %>%
     haven::read_sas() %>%
-    dplyr::select(-starts_with(c("ROWORD", "PAGE"))) %>%
+    dplyr::select(-starts_with(c("ROWORD","PAGE"))) %>%
     dplyr::mutate(dplyr::across(dplyr::where(is.character), ~ gsub("\\|n", "\n", .))) # replaces |n with \n in data columns
+
+
 
   #gets new, well formatted labels
   new_labels <- raw_data %>%
@@ -96,7 +98,10 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, head
 
   #Applies default formatting - times new roman(10), bold header, etc.
   ft <- raw_data %>%
-    standard_format(header_code = header_code, doc_width = doc_width)
+    standard_format(header_code = header_code, doc_width = doc_width) %>%
+    add_footnote(footnotes) %>%
+    apply_flextable_defaults()
+
 
   #This doesn't really work right now, leaving it in to come back to it - not actually sure its needed as what i interpreted as 'landscape' may not be
   # if(landscape == TRUE){
@@ -172,6 +177,9 @@ apparate <- function(input_doc,input_sheet,file_location){
   dataset_names <- Input_Sheet$Dataset
   #gets formats of tables
   formats <- Input_Sheet$Format
+  #gets footnotes of a table
+  footnotes <- Input_Sheet$Footnotes %>%
+    replace(is.na(.),"")
   #gets header data - this functionality may not be needed later
   header_codes <- Input_Sheet$Header %>%
     replace(is.na(.), "") %>%
@@ -190,7 +198,7 @@ apparate <- function(input_doc,input_sheet,file_location){
         {
           tic(str_glue("Table {i}"))
           #returns updated doc with table added
-          test <- prep_table(dataset_names[i],formats[i],orientations[i],header_codes[[i]])
+          test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
           print(test)
           #logs a success if table is added correctly
           log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
@@ -252,7 +260,7 @@ setup_log <- function()
 
 #location for some tables
 location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_03_01_05_t_teae_disc.sas7bdat"
+table_name <- "t_14_03_05_04_t_elft.sas7bdat"
 table_names <- list.files(location2)
 table_names <- table_names[startsWith(table_names,"t")]
 

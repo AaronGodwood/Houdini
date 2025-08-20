@@ -31,10 +31,19 @@ fill_gaps <- function(data){
   data <- rep(unique_data, length.out = length(data))
 }
 
+get_col_names <- function(data, col_type){
+  pattern <- sprintf("^%s[0-9]$",col_type)
+  data %>%
+    select(grep(pattern,names(.)))
+}
+
+
 is_table <- function(name){
   name %>%
     startsWith("Table")
 }
+
+
 
 get_png_size <- function(image_path){
   con <- file(image_path,"rb")
@@ -61,7 +70,7 @@ get_png_size <- function(image_path){
 #returns a vector that represents the column in which a group ends
 get_groups <- function(data){
 
-  separator = "\\^\\*\\^" # will probably be passed as para, in future
+  delimiter <- houdini_global$defaults$delimiter
   group = c()
 
   labels <- data %>%
@@ -70,8 +79,8 @@ get_groups <- function(data){
   #gets second layer of headers by delimiter
   second_headers <- labels %>%
     sapply(function(x){
-      if(grepl(separator,x)){
-        strsplit(x,separator, fixed = FALSE)[[1]][1]
+      if(grepl(delimiter,x)){
+        strsplit(x,delimiter, fixed = FALSE)[[1]][1]
       }
       else
         ""
