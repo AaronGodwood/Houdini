@@ -38,13 +38,17 @@ apply_flextable_defaults <- function(ft) {
 #' @examples
 standard_format <- function(data, header_code = NULL, doc_width = 6.5){
 
+  #gets dilimiter for splitting headers and footers from global Houdini settings
   delimiter <- houdini_global$defaults$delimiter
 
+  #gets only columns that are descriptor column or data columns
   data <- data %>%
     dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name ))) # this should probably be moved at some point when i've worked out what filtering i will do
 
+  #removes repeated row labels within the same "chunk"
   data$ROWLBL1 <- data$ROWLBL1 %>%
     separate_data()
+
   #gets descriptor columns
   chr_cols <- data %>%
     dplyr::select(dplyr::where( ~ any(grepl("[A-Za-z]", .)))) %>%
@@ -56,7 +60,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
     lubridate::setdiff(chr_cols)
 
 
-  #formats data with secondary headers and buffer rows/cols and orders the data
+  #formats data with secondary headers and buffer rows/cols and orders the data and adds a PAGE column that describes the "chunks" the rows belong to
   data <- data %>%
     order_cols() %>%
     apply_second_header(std_labels,header_code) %>%
@@ -65,6 +69,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
     add_page_column()
 
 
+  #gets the buffer columns
   buffer_cols <- data %>%
     names() %>%
     lubridate::setdiff(union(chr_cols,data_cols))
@@ -85,6 +90,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
       else
         ""
     })
+
   #gets first row of headers without second row appended
   first_headers <- labels %>%
     sapply(function(x){
@@ -103,15 +109,16 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
   colkeys <- data %>%
     names()
   colkeys <- colkeys[-length(colkeys)]
+  #removes PAGE label from second headers
   second_headers <- second_headers[-length(second_headers)]
 
 
 
   ft <- data %>%
     dplyr::select(-starts_with(c("ROWORD"))) %>%
-    flextable(col_keys = colkeys) %>%
-    apply_flextable_defaults() %>%
-    lift_headers(second_headers) %>%
+    flextable(col_keys = colkeys) %>% #turns data into a flextable with all columns but page showing
+    apply_flextable_defaults() %>% #apply s default formatting settings to flextable
+    lift_headers(second_headers) %>% #splits headers into multiple layers
     align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
     align(align = c("left"), part = "all", j = chr_cols) %>% #aligns descriptor columns to the left
     set_table_properties(width = 1,layout = "autofit")  # Autofit the table layout
