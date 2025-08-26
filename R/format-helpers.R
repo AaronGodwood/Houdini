@@ -80,25 +80,27 @@ format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
 
 add_row_buffers <- function(data){
 
+  if(nrow(data) < 2)
+    data
+
   labels <- data %>%
     get_labels()
 
 
   col_label <- sprintf("%s1", houdini_global$defaults$rowlbls.name)
   first_col <- data[[col_label]]
-  groups <- c()
-  prev_elem <- ""
-  prev_indent <- 0
-  for(i in 1:length(first_col)){
-    indent_count <- first_col[i] %>%
+  groups <- prev_apply(first_col, "", f = function(elem, prev_elem, counter){
+    elem_indent <- elem %>%
       stringr::str_count("^\\s+")
-    if((prev_elem == "" && first_col[i] != "") || (indent_count < prev_indent) || (prev_indent == 0 && indent_count == 0 && first_col[i] != "" && prev_elem != first_col[i])){
-      groups <- groups %>%
-        append(i)
+    prev_indent <- prev_elem %>%
+      stringr::str_count("^\\s+")
+    if((prev_elem == "" && elem != "") || (elem_indent < prev_indent) || (prev_indent == 0 && elem_indent == 0 && elem != "" && prev_elem != elem)){
+      counter
     }
-    prev_elem <- first_col[i]
-    prev_indent <- indent_count
-  }
+    else
+      c()
+  })
+
   rows_added = 0
   for(i in groups){
     data <- data %>%
@@ -157,12 +159,12 @@ add_page_column <- function(data){
   first_col = data[[1]]
 
   PAGE <- c()
-  page_num <- 1
+  page_num <- 0
   for(i in 1:length(first_col)){ #iterates through each row of first column
     if(is.na(first_col[i])){ #if it reaches a buffer row place a buffer in the new column and increment the page number
-      PAGE <- PAGE %>%
-        append(NA)
       page_num <- page_num + 1
+      PAGE <- PAGE %>%
+        append(page_num)
     }
     else #otherwise just append the current page number to the new column
     {
@@ -182,3 +184,33 @@ add_page_column <- function(data){
   data
 
 }
+
+
+parameter_filtering <- function(data, parameter){
+  data <- data %>%
+    filter(.data[[houdini_global$defaults$param.name]] == parameter) #%>%		# its likely the column will change
+    #mutate(!!sym(houdini_global$defaults$param.name) = NULL)
+  data
+}
+
+timeline_filtering <- function(data, parameter){
+  if(is.null(parameter))
+  {
+    print("ITSNULL")
+    return(data)
+  }
+
+
+  first_col_name <- sym(sprintf("%s1", houdini_global$defaults$rowlbls.name))
+
+  page_group <- data %>%
+    filter(.data[[first_col_name]] %in% parameter) %>%
+    with(PAGE)
+
+  data <- data %>%
+    filter(PAGE %in% page_group)
+
+  data
+}
+
+

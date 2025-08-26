@@ -87,11 +87,23 @@ add_table <- function(x, bookmark, table, jmp_tbl){
 
   #adds table at that cursor point
   x <-  body_add_flextable(x = x, value = table, align = "center", pos = "on")
-
+  log_info("{bookmark} inserted", namespace = "Houdini Logs")
   #returns changed doc
   x
 }
 
+
+add_xml_table <- function(x, bookmark, table, jmp_tbl){
+
+  x <- x %>%
+    cursor_to_bookmark(jmp_tbl,bookmark)
+
+  #adds table at that cursor point
+  x <-  body_add_xml(x = x, table, pos = "on")
+  log_info("{bookmark} inserted", namespace = "Houdini Logs")
+  #returns changed doc
+  x
+}
 
 
 #' Title
@@ -113,6 +125,12 @@ add_figure <- function(x, bookmark, image, jmp_tbl, width = 6.5, height = 6.5){
 
 
   x <- body_add_img(x = x,width = width, height = height, src = image, pos = "on")
+  log_info("{bookmark} inserted", namespace = "Houdini Logs")
+  x
+}
+
+compile_xml <- function(ft){
+  flextable:::gen_raw_wml(ft)
 }
 
 

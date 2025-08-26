@@ -58,7 +58,8 @@ display_tables <- function(names, directory){
 #' @export
 #'
 #' @examples
-prep_table <- function(table_name, format = "Standard" , landscape = FALSE, footnotes = "", header_code = NULL, doc_width = 6.5){
+prep_table <- function(table_name, format = "Standard" , landscape = FALSE, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
+
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
   raw_data <- stringr::str_c(location, table_name, "") %>%
@@ -78,17 +79,17 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, foot
     replace_labels(new_labels)
 
 
-  if(format != "Standard"){
-    raw_data <- raw_data %>%
-      non_standard_format()
-  }
-
-  #will be removed post-testing
-  # if(is.null(raw_data$COL1))
-  # {
+  # if(format != "Standard"){
   #   raw_data <- raw_data %>%
   #     non_standard_format()
   # }
+  #
+  #will be removed post-testing
+  if(is.null(raw_data$COL1))
+  {
+    raw_data <- raw_data %>%
+      non_standard_format()
+  }
 
   #same as transpose bit below
   # if(landscape == TRUE){
@@ -98,7 +99,8 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, foot
 
   #Applies default formatting - times new roman(10), bold header, etc.
   ft <- raw_data %>%
-    standard_format(header_code = header_code, doc_width = doc_width) %>%
+    #parameter_filtering(filters) %>%
+    standard_format(header_code = header_code, doc_width = doc_width, filters = filters) %>%
     add_footnote(footnotes) %>%
     paginate(hdr_ftr = TRUE,group = "PAGE", group_def = "rle") %>%
     apply_flextable_defaults()
@@ -152,7 +154,7 @@ apparate <- function(input_doc,input_sheet,file_location){
   tryCatch(
     {
       log_info("Sucessfully read document: {input_sheet}", namespace = "Houdini Logs")
-      Input_Sheet <- readxl::read_excel(input_sheet)
+      Input_Sheet <- readxl::read_excel(input_sheet, sheet = 1)
     },
     error = function(e){
       log_error("Error in reading {input_sheet}: {e}", namespace = "Houdini Logs")
@@ -181,6 +183,11 @@ apparate <- function(input_doc,input_sheet,file_location){
   #gets footnotes of a table
   footnotes <- Input_Sheet$Footnotes %>%
     replace(is.na(.),"")
+  #gets any notes about the table/figure
+  filters <- Input_Sheet$Notes %>%
+    sapply(function(x){
+      sort_filters(x)
+    })
   #gets header data - this functionality may not be needed later
   header_codes <- Input_Sheet$Header %>%
     replace(is.na(.), "") %>%
@@ -189,51 +196,56 @@ apparate <- function(input_doc,input_sheet,file_location){
       })
   toc()
   #adds each table to the word doc at its respective bookmark
-  for(i in 1:(n_tables[1])){
-
-    if(i == 11)
-      next
-
-    new_doc <- tryCatch(
-      {
-        if(is_table(bookmarks[i]))
-        {
-          tic(str_glue("Table {i}"))
-          #returns updated doc with table added
-          test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
-          print(test)
-          #logs a success if table is added correctly
-          log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-          toc()
-          new_doc %>%
-            add_table(bookmarks[i],test ,bm_jmptbl)
-        }
-        else
-        {
-          tic(str_glue("Figure {i}"))
-          img_width <- (get_png_size(dataset_names[i])[["width"]])/96
-          img_height <- (get_png_size(dataset_names[i])[["height"]])/96
-          new_height <- img_height*(width/img_width)
-          log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-          toc()
-          new_doc <- new_doc %>%
-            add_figure(bookmarks[i],dataset_names[i], bm_jmptbl, width = width, height = new_height)
-        }
-      },
-      error = function(e){
-        #logs a failure containing the error that occurred
-        log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-        #returns unchanged document
-        new_doc
-      }
-    )
-    #testing purposes
-    #print(prep_table(dataset_names[i],orientations[i],header_codes[[i]]))
-  }
-  #stores final doc in new variable
-  tic("possible")
-  output_doc <- new_doc
+  tic("Tables")
+  new_doc <- new_doc %>%
+    dapply(bookmarks,dataset_names,footnotes,bm_jmptbl,width)
+  # for(i in 1:(n_tables[1])){
+  #
+  #   if(i == 11)
+  #     next
+  #
+  #   # new_doc <- new_doc %>%
+  #   #   add_table(bookmarks[i],prep_table(dataset_names[i],formats[i],orientations[i],filters[i],footnotes[i],header_codes[[i]]) ,bm_jmptbl)
+  #   new_doc <- tryCatch(
+  #     {
+  #       if(is_table(bookmarks[i]))
+  #       {
+  #         tic(str_glue("Table {i}"))
+  #         #returns updated doc with table added
+  #         #test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
+  #         test <- prep_table(dataset_names[i],filters = filters[[i]])
+  #         print(test)
+  #         #logs a success if table is added correctly
+  #         log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+  #         toc()
+  #         new_doc %>%
+  #           add_table(bookmarks[i],test ,bm_jmptbl)
+  #       }
+  #       else
+  #       {
+  #         tic(str_glue("Figure {i}"))
+  #         img_width <- (get_png_size(dataset_names[i])[["width"]])/96
+  #         img_height <- (get_png_size(dataset_names[i])[["height"]])/96
+  #         new_height <- img_height*(width/img_width)
+  #         log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+  #         toc()
+  #         new_doc <- new_doc %>%
+  #           add_figure(bookmarks[i],dataset_names[i], bm_jmptbl, width = width, height = new_height)
+  #       }
+  #     },
+  #     error = function(e){
+  #       #logs a failure containing the error that occurred
+  #       log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+  #       #returns unchanged document
+  #       new_doc
+  #     }
+  #   )
+  #   #testing purposes
+  #   #print(prep_table(dataset_names[i],orientations[i],header_codes[[i]]))
+  # }
   toc()
+  #stores final doc in new variable
+  output_doc <- new_doc
   #outputs final document
   tic("Output final doc")
   print(output_doc, target="Houdini_Test_1.docx")
@@ -262,22 +274,24 @@ setup_log <- function()
 
 #location for some tables
 location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_03_05_04_t_elft.sas7bdat"
+table_name <- "t_14_02_10_t_phq9_oc.sas7bdat"
 table_names <- list.files(location2)
 table_names <- table_names[startsWith(table_names,"t")]
 
 
 # Set up location of SAS datasets
-location <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
+location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
+
+location <- location1
 
 
 # Read in word document
 input_doc <- "Houdini test with DSMB outputs.docx"
 input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 
-#word_size <- docx_dim(Input_Doc)
-#width <- word_size$page['width'] - word_size$margins['left'] - word_size$margins['right']
-#border_style = officer::fp_border(color="black", width=1)
+input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
+input_sheet <- "VELA-1 CSR Dry run test.xlsx"
+
 
 
 apparate(input_doc,input_sheet,location)

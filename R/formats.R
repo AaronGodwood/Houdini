@@ -36,7 +36,9 @@ apply_flextable_defaults <- function(ft) {
 #' @export
 #'
 #' @examples
-standard_format <- function(data, header_code = NULL, doc_width = 6.5){
+standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters){
+
+  tic("Standard Formatting")
 
   #gets dilimiter for splitting headers and footers from global Houdini settings
   delimiter <- houdini_global$defaults$delimiter
@@ -80,6 +82,8 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
   labels <- data %>%
     get_labels()
 
+
+
   #gets second & higher layer of headers by delimiter
   second_headers <- labels %>%
     sapply(function(x){
@@ -101,6 +105,8 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
         x
     })
 
+
+
   #formats first row of header to only contain first row labels
   data <- data %>%
     replace_labels(first_headers)
@@ -112,10 +118,10 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
   #removes PAGE label from second headers
   second_headers <- second_headers[-length(second_headers)]
 
-
-
+  #print(filters)
   ft <- data %>%
     dplyr::select(-starts_with(c("ROWORD"))) %>%
+    #timeline_filtering(filters) %>%
     flextable(col_keys = colkeys) %>% #turns data into a flextable with all columns but page showing
     apply_flextable_defaults() %>% #apply s default formatting settings to flextable
     lift_headers(second_headers) %>% #splits headers into multiple layers
@@ -125,6 +131,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
     #width(j = chr_cols, width = (col_width*desciptor_col_ratio)) %>%
     #width(j = buffer_cols, width = (col_width* 0.2)) %>%
     #width(j = data_cols, width = col_width)
+  toc()
   ft
 
 }
@@ -144,6 +151,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5){
 #' @examples
 non_standard_format <- function(data){
 
+  tic("Non-Standard Formatting")
   #gets all the row label columns
   ROWLBLs <- data %>%
     get_col_names(houdini_global$defaults$rowlbls.name)
@@ -158,7 +166,7 @@ non_standard_format <- function(data){
 
   #gets the row label indent columns if they exist
   LBLINDENTs <- data %>%
-    select(grep("^ROWLBL[0-9]INDENT$",names(.)))
+    select(grep("^ROWLBL[0-9]INDENT$",names(.)))        #URGENT THIS WORKS NOW BUT UNDERMINES GLOBAL SETTINGS PURPOSE
   #if row label indent columns exist apply indents
   if(!(purrr::is_empty(LBLINDENTs))){
     for(i in 1:length(ROWLBLs))
@@ -221,6 +229,9 @@ non_standard_format <- function(data){
   #adds correct labels to the formatted data
   new_data <- new_data %>%
     replace_labels(labels, add = TRUE)
+
+  toc()
+  new_data
 }
 
 

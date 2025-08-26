@@ -65,6 +65,36 @@ get_png_size <- function(image_path){
 
 }
 
+sort_filters <- function(raw_filters){
+  if(is.na(raw_filters))
+  {
+    return(c())
+  }
+
+
+  raw_filters <- raw_filters %>%
+    strsplit("; ") %>%
+    unlist()
+
+  filters <- c()
+  for( i in seq_along(raw_filters)){
+    if(grepl("Parameters: ", raw_filters[i])){
+
+    }
+    else
+    {
+      filters1 <- raw_filters[i] %>%
+        str_remove("Timelines: ") %>%
+        strsplit(",")
+
+      return(filters1)
+
+    }
+  }
+  return(c())
+
+}
+
 
 
 #returns a vector that represents the column in which a group ends
@@ -98,29 +128,4 @@ get_groups <- function(data){
   group
 }
 
-get_groups_rows <- function(data){
 
-
-  groups <- data %>%
-    sapply( function(col){
-      group <- c()
-      prev_cell <- col[1]
-      prev_indent <- grepl("^\\s", prev_cell)
-      for(i in 2:length(col)){
-        if((grepl("^\\s", col[i]) != prev_indent) || (prev_cell == "" && col[i] != ""))
-        {
-          if(!(i %in% groups)){
-            group <- group %>%
-              append(i)
-          }
-        }
-        prev_cell <- col[i]
-        prev_indent <- grepl("^\\s", prev_cell)
-      }
-      group
-    })
-  groups <- groups %>%
-    flatten() %>%
-    unique() #%>%
-  #replace(which(groups == 2),1)
-}

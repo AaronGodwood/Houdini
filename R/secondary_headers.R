@@ -33,7 +33,7 @@ apply_second_header <- function(data,second_labels,header_code){
   data
 }
 
-#brings secondary headers marked by the ^*^ delimiter up to a second and higher row of headers
+#brings secondary headers marked by the ^*^ delimiter up to a second and higher row of headers # may be defunct
 #' Turn a single layer of headers split by delimiters to a multi-layered header
 #'
 #' @param ft a flextable object for which the headers need lifting
@@ -43,14 +43,13 @@ apply_second_header <- function(data,second_labels,header_code){
 #' @export
 #'
 #' @examples
-lift_headers <- function(ft,second_headers){
-  #if there are no second layer of headers return the flextable as is
-  if(purrr::is_empty(second_headers))
-    ft
+lift_headers <- function(ht,second_headers){
 
-  #removes the current flextable borders
-  ft <-  ft %>%
-    border_remove()
+
+  #if there are no second layer of headers return the flextable as is
+  if(purrr::is_empty(second_headers)){
+    ft
+  }
 
   #standardises second_headers so that ell elements are of length 2 and bind it into a data frame
   second_headers <- second_headers %>%
@@ -81,6 +80,8 @@ lift_headers <- function(ft,second_headers){
     ft <- ft %>%
       add_header_row(values = second_headers[k,], top = TRUE ) %>%
       hline(j=border_cols, i = (dim(second_headers)[1] - k + 1),border = header_border,part = "header")
+
+    ft
   }
 
 
@@ -90,6 +91,7 @@ lift_headers <- function(ft,second_headers){
     hline_top(part = "header", border = header_border) %>%
     hline_bottom(part = "body" , border = header_border) %>%
     merge_h(part = "header")
+
 
   #returns the table
   ft
