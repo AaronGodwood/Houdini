@@ -274,7 +274,7 @@ setup_log <- function()
 
 #location for some tables
 location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_02_10_t_phq9_oc.sas7bdat"
+table_name <- "t_14_02_04_01_01_t_nrs3pt.sas7bdat"
 table_names <- list.files(location2)
 table_names <- table_names[startsWith(table_names,"t")]
 

@@ -1,62 +1,10 @@
-compile_wml <- function(ht, ...){
-  align <- ht$properties$align
 
-  align <- align %>%
-    match.arg(c("centre", "left", "right"), several.ok = FALSE)
-  align <- c("center" = "centre", "left" = "start", "right" = "end")[align]
-
-  dims <- dim(ht)
-  widths <- dims$widths
-
-  out <- paste0()
-
-  if(ht$properties$layout %in% "autofit"){
-    pt <- prop_table(
-      style = NULL,
-      layout = table_layout(type = "autofit"),
-      align = align,
-      width = table_width(width = ht$properties$width, unit = "pct"),
-      colwidths = table_colwidths(double(0L)),
-      word_title = ht$properties$word_title,
-      word_description = ht$properties$word_description
-    )
-  }
-  else
-  {
-    pt <- prop_table(
-      style = NULL,
-      layout = table_layout(type = "fixed"),
-      align = align,
-      width = table_width(width = sum(widths, na.rm = TRUE), unit = "in"),
-      colwidths = table_colwidths(widths),
-      word_title = ht$properties$word_title,
-      word_description = ht$properties$word_description
-    )
-  }
-
-  properties_str <- to_wml(pt)
-
-  out <- paste0(out, properties_str)
-
-  tab_str <- wml_rows
-}
 
 xml_hello <- function(){
-  hello_doc <- officer::read_docx("hello.docx")
+  hello_doc <- officer::read_docx("M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx")
   hello_xml <- hello_doc$doc_obj$get()
 }
 
-xml_test <- function(data){
-  table_properties <- generate_table_properties(1, "autofit")
-  nrows <- nrow(data)
-  table_rows <- character(nrows)
-  for(i in 1:nrows){
-    table_rows[i] <- generate_xml_row(data[i,])
-  }
-  table_rows <- paste(table_rows, collapse = "")
-
-  paste0("<w:tbl>",table_properties,table_rows,"</w:tbl>")
-}
 
 
 gen_xml <- function(ht){
@@ -71,7 +19,7 @@ gen_xml <- function(ht){
   table_rows <- character(nrow(body))
   header_rows <- character(nrow(header))
   for(i in 1:nrow(body)){
-    table_rows[i] <- generate_xml_row(body[i,])
+    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments)
   }
   for(i in 1:nrow(header)){
     header_num <- nrow(header) - i + 1
@@ -155,10 +103,12 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
 
   if((header >= 2 && text != "") || (header == 1)){
     borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
+    vAlign <- "<w:vAlign w:val=\"bottom\"/>"
   }
   else
   {
     borders = ""
+    vAlign <- ""
   }
 
   if(is.na(text) || text == "NA"){
@@ -176,7 +126,7 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   font_size <- "<w:sz w:val=\"20\"/>"
 
   cell <- paste0(
-    "<w:tcPr>",borders,merge,"</w:tcPr>",#"<w:tcW w:w=\"",width,"\" w:type=\"pct\"/>",
+    "<w:tcPr>",vAlign,borders,merge,"</w:tcPr>",#"<w:tcW w:w=\"",width,"\" w:type=\"pct\"/>",
     "<w:p>",
     "<w:pPr><w:jc w:val=\"", alignment,"\"/></w:pPr>",
     "<w:r><w:rPr>",font,font_size, bold, "</w:rPr><w:t>", text, "</w:t></w:r>",

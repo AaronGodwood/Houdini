@@ -100,14 +100,16 @@ add_xml_table <- function(x, bookmark, table, jmp_tbl){
 
   #adds table at that cursor point
   x <-  body_add_xml(x = x, table, pos = "on")
-  log_info("{bookmark} inserted", namespace = "Houdini Logs")
+
   #returns changed doc
   x
 }
 
 
 add_houdinitable <- function(x, bookmark, ht, jmp_tbl){
+  #generates xml version of table
   xml_table <- gen_xml(ht)
+  #adds table to doc
   add_xml_table(x,bookmark,xml_table,jmp_tbl)
 }
 
