@@ -106,6 +106,11 @@ add_xml_table <- function(x, bookmark, table, jmp_tbl){
 }
 
 
+add_houdinitable <- function(x, bookmark, ht, jmp_tbl){
+  xml_table <- gen_xml(ht)
+  add_xml_table(x,bookmark,xml_table,jmp_tbl)
+}
+
 #' Title
 #'
 #' @param x a word document that the figure is to be inserted into

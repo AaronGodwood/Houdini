@@ -43,7 +43,7 @@ apply_second_header <- function(data,second_labels,header_code){
 #' @export
 #'
 #' @examples
-lift_headers <- function(ht,second_headers){
+lift_headers <- function(ft,second_headers){
 
 
   #if there are no second layer of headers return the flextable as is

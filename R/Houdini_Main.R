@@ -100,10 +100,10 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, filt
   #Applies default formatting - times new roman(10), bold header, etc.
   ft <- raw_data %>%
     #parameter_filtering(filters) %>%
-    standard_format(header_code = header_code, doc_width = doc_width, filters = filters) %>%
-    add_footnote(footnotes) %>%
-    paginate(hdr_ftr = TRUE,group = "PAGE", group_def = "rle") %>%
-    apply_flextable_defaults()
+    standard_format(header_code = header_code, doc_width = doc_width, filters = filters)
+    #add_footnote(footnotes) %>%
+    #paginate(hdr_ftr = TRUE,group = "PAGE", group_def = "rle") %>%
+    #apply_flextable_defaults()
 
 
   #This doesn't really work right now, leaving it in to come back to it - not actually sure its needed as what i interpreted as 'landscape' may not be
@@ -197,52 +197,52 @@ apparate <- function(input_doc,input_sheet,file_location){
   toc()
   #adds each table to the word doc at its respective bookmark
   tic("Tables")
-  new_doc <- new_doc %>%
-    dapply(bookmarks,dataset_names,footnotes,bm_jmptbl,width)
-  # for(i in 1:(n_tables[1])){
-  #
-  #   if(i == 11)
-  #     next
-  #
-  #   # new_doc <- new_doc %>%
-  #   #   add_table(bookmarks[i],prep_table(dataset_names[i],formats[i],orientations[i],filters[i],footnotes[i],header_codes[[i]]) ,bm_jmptbl)
-  #   new_doc <- tryCatch(
-  #     {
-  #       if(is_table(bookmarks[i]))
-  #       {
-  #         tic(str_glue("Table {i}"))
-  #         #returns updated doc with table added
-  #         #test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
-  #         test <- prep_table(dataset_names[i],filters = filters[[i]])
-  #         print(test)
-  #         #logs a success if table is added correctly
-  #         log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-  #         toc()
-  #         new_doc %>%
-  #           add_table(bookmarks[i],test ,bm_jmptbl)
-  #       }
-  #       else
-  #       {
-  #         tic(str_glue("Figure {i}"))
-  #         img_width <- (get_png_size(dataset_names[i])[["width"]])/96
-  #         img_height <- (get_png_size(dataset_names[i])[["height"]])/96
-  #         new_height <- img_height*(width/img_width)
-  #         log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-  #         toc()
-  #         new_doc <- new_doc %>%
-  #           add_figure(bookmarks[i],dataset_names[i], bm_jmptbl, width = width, height = new_height)
-  #       }
-  #     },
-  #     error = function(e){
-  #       #logs a failure containing the error that occurred
-  #       log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-  #       #returns unchanged document
-  #       new_doc
-  #     }
-  #   )
-  #   #testing purposes
-  #   #print(prep_table(dataset_names[i],orientations[i],header_codes[[i]]))
-  # }
+  # new_doc <- new_doc %>%
+  #   dapply(bookmarks,dataset_names,footnotes,bm_jmptbl,width)
+  for(i in 1:(n_tables[1])){
+
+    if(i == 11)
+      next
+
+    # new_doc <- new_doc %>%
+    #   add_houdinitable(bookmarks[i],prep_table(dataset_names[i],formats[i],orientations[i],filters[i],footnotes[i],header_codes[[i]]) ,bm_jmptbl)
+    new_doc <- tryCatch(
+      {
+        if(is_table(bookmarks[i]))
+        {
+          tic(str_glue("Table {i}"))
+          #returns updated doc with table added
+          #test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
+          test <- prep_table(dataset_names[i],filters = filters[[i]])
+          #print(test)
+          #logs a success if table is added correctly
+          log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          toc()
+          new_doc %>%
+            add_houdinitable(bookmarks[i],test ,bm_jmptbl)
+        }
+        else
+        {
+          tic(str_glue("Figure {i}"))
+          img_width <- (get_png_size(dataset_names[i])[["width"]])/96
+          img_height <- (get_png_size(dataset_names[i])[["height"]])/96
+          new_height <- img_height*(width/img_width)
+          log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          toc()
+          new_doc <- new_doc %>%
+            add_figure(bookmarks[i],dataset_names[i], bm_jmptbl, width = width, height = new_height)
+        }
+      },
+      error = function(e){
+        #logs a failure containing the error that occurred
+        log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+        #returns unchanged document
+        new_doc
+      }
+    )
+    #testing purposes
+    #print(prep_table(dataset_names[i],orientations[i],header_codes[[i]]))
+  }
   toc()
   #stores final doc in new variable
   output_doc <- new_doc
@@ -282,12 +282,12 @@ table_names <- table_names[startsWith(table_names,"t")]
 # Set up location of SAS datasets
 location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
 
-location <- location1
+location <- location2
 
 
 # Read in word document
-input_doc <- "Houdini test with DSMB outputs.docx"
-input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
+# input_doc <- "Houdini test with DSMB outputs.docx"
+# input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 
 input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
 input_sheet <- "VELA-1 CSR Dry run test.xlsx"

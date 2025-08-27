@@ -2,7 +2,6 @@
 
 houdinitable <- function(data, col_keys = names(data),
                          cwidth = 0.75, cheight = 0.25,
-                         defaults = list(),
                          use_labels = TRUE){
   stopifnot(is.data.frame(data),ncol(data) > 0)
   if(any(duplicated(col_keys))){
@@ -32,7 +31,9 @@ houdinitable <- function(data, col_keys = names(data),
   for(i in 1:nrow(header_data)){
     spans[i,] = get_runs(header_data[i,])
   }
-  header$spans <- spans
+  header$spans <- spans %>%
+    lapply(as.numeric) %>%
+    data.frame()
   footer_data <- header_data[FALSE, , drop = FALSE]
   footer <- houdini_tabpart(data = footer_data, col_keys = col_keys, cwidth = cwidth, cheight = cheight)
 
@@ -40,6 +41,12 @@ houdinitable <- function(data, col_keys = names(data),
     split = TRUE,
     keep_with_next = FALSE
   )
+
+  widths <- rep((cwidth*1440),ncol(data))
+  names(widths) <- names(spans)
+  alignments <- rep("center",ncol(data))
+  names(alignments) <- names(widths)
+
 
   properties <- list(
     layout = "autofit",
@@ -54,6 +61,8 @@ houdinitable <- function(data, col_keys = names(data),
     footer = footer,
     col_keys = col_keys,
     invis_cols_names = invis_cols_names,
+    alignments = alignments,
+    widths = widths,
     properties = properties
   )
 
@@ -68,10 +77,16 @@ houdinitable <- function(data, col_keys = names(data),
 
 
 split_headers <- function(headers){
+
   delimiter <- houdini_global$defaults$delimiter
   headers <- headers %>%
     sapply(function(x){
-      headers <- strsplit(x,delimiter, fixed = FALSE)
+      if(!is.null(x))
+        headers <- strsplit(x,delimiter, fixed = FALSE)
+      else
+        headers <- ""
+
+      headers
 
   })
   headers <- headers %>%
@@ -84,6 +99,7 @@ split_headers <- function(headers){
     }) %>%
     rbind()
 
+  headers
 }
 
 
@@ -118,16 +134,4 @@ get_runs <- function(list){
   runs
 }
 
-add_footer <- function(ht,footers){
-  ht$footer$dataset <- ht$footer$dataset %>%
-    sapply(function(x){
-      c(x,footers)
-    }) %>%
-    data.frame()
-  spans <- data[FALSE, , drop = FALSE]
-  for(i in 1:nrow(ht$footer$dataset)){
-    spans[i,] = get_runs(ht$footer$dataset[i,])
-  }
-  ht$footer$spans <- spans
-  ht
-}
+

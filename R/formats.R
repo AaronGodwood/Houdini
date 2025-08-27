@@ -79,58 +79,64 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters){
 
 
   #gets label attribute for each column
-  labels <- data %>%
-    get_labels()
-
-
-
-  #gets second & higher layer of headers by delimiter
-  second_headers <- labels %>%
-    sapply(function(x){
-      if(grepl(delimiter,x)){
-        headers <- strsplit(x,delimiter, fixed = FALSE)[[1]]
-        headers[-(length(headers))]
-      }
-      else
-        ""
-    })
-
-  #gets first row of headers without second row appended
-  first_headers <- labels %>%
-    sapply(function(x){
-      if(grepl(delimiter,x)){
-        tail(strsplit(x,delimiter, fixed = FALSE)[[1]],1)
-      }
-      else
-        x
-    })
-
-
-
-  #formats first row of header to only contain first row labels
-  data <- data %>%
-    replace_labels(first_headers)
+  # labels <- data %>%
+  #   get_labels()
+  #
+  #
+  #
+  # #gets second & higher layer of headers by delimiter
+  # second_headers <- labels %>%
+  #   sapply(function(x){
+  #     if(grepl(delimiter,x)){
+  #       headers <- strsplit(x,delimiter, fixed = FALSE)[[1]]
+  #       headers[-(length(headers))]
+  #     }
+  #     else
+  #       ""
+  #   })
+  #
+  # #gets first row of headers without second row appended
+  # first_headers <- labels %>%
+  #   sapply(function(x){
+  #     if(grepl(delimiter,x)){
+  #       tail(strsplit(x,delimiter, fixed = FALSE)[[1]],1)
+  #     }
+  #     else
+  #       x
+  #   })
+  #
+  #
+  #
+  # #formats first row of header to only contain first row labels
+  # data <- data %>%
+  #   replace_labels(first_headers)
 
   #gets column names without the pages so they don't show later on
   colkeys <- data %>%
     names()
   colkeys <- colkeys[-length(colkeys)]
   #removes PAGE label from second headers
-  second_headers <- second_headers[-length(second_headers)]
+  #second_headers <- second_headers[-length(second_headers)]
 
   #print(filters)
-  ft <- data %>%
-    dplyr::select(-starts_with(c("ROWORD"))) %>%
-    #timeline_filtering(filters) %>%
-    flextable(col_keys = colkeys) %>% #turns data into a flextable with all columns but page showing
-    apply_flextable_defaults() %>% #apply s default formatting settings to flextable
-    lift_headers(second_headers) %>% #splits headers into multiple layers
-    align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
-    align(align = c("left"), part = "all", j = chr_cols) %>% #aligns descriptor columns to the left
-    set_table_properties(width = 1,layout = "autofit")  # Autofit the table layout
+  # ft <- data %>%
+  #   dplyr::select(-starts_with(c("ROWORD"))) %>%
+  #   #timeline_filtering(filters) %>%
+  #   flextable(col_keys = colkeys) %>% #turns data into a flextable with all columns but page showing
+  #   apply_flextable_defaults() %>% #apply s default formatting settings to flextable
+  #   lift_headers(second_headers) %>% #splits headers into multiple layers
+  #   align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
+  #   align(align = c("left"), part = "all", j = chr_cols) %>% #aligns descriptor columns to the left
+  #   set_table_properties(width = 1,layout = "autofit")  # Autofit the table layout
     #width(j = chr_cols, width = (col_width*desciptor_col_ratio)) %>%
     #width(j = buffer_cols, width = (col_width* 0.2)) %>%
     #width(j = data_cols, width = col_width)
+  ft <- data %>%
+    houdinitable(col_keys = colkeys) %>%
+    set_alignments("center") %>%
+    set_alignments("start", chr_cols)
+
+
   toc()
   ft
 
