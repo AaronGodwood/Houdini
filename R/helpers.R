@@ -1,4 +1,9 @@
 
+#checks the input excel doc has the required columns
+check_excel <- function(doc){
+  required_cols <- c("Dataset","Bookmark","Footnotes","Notes")
+  return(any(sapply(required_cols, function(x){!(x %in% names(doc))})))
+}
 
 #combines two columns of strings
 merge_columns <- function(col1,col2,separator = ""){
@@ -24,6 +29,7 @@ indent <- function(column, indent_column){
   merge_columns(indents,column)
 }
 
+#fills gaps of blank data in a column
 fill_gaps <- function(data){
   unique_data <- data[data != ""] %>%
     smallest_pattern()
@@ -31,6 +37,7 @@ fill_gaps <- function(data){
   data <- rep(unique_data, length.out = length(data))
 }
 
+#gets the smallest repeating pattern in a run of data
 smallest_pattern <- function(col){
   n <- length(col)
   for(i in 1:(n/2)){
@@ -44,20 +51,21 @@ smallest_pattern <- function(col){
   return(col)
 }
 
+#gets all column names from a df that match a specfic pattern
 get_col_names <- function(data, col_type){
   pattern <- sprintf("^%s[0-9]$",col_type)
   data %>%
     select(grep(pattern,names(.)))
 }
 
-
+#checks if a name starts with the word table
 is_table <- function(name){
   name %>%
     startsWith("Table")
 }
 
 
-
+#gets dimensions of .png file
 get_png_size <- function(image_path){
   con <- file(image_path,"rb")
   on.exit(close(con))
@@ -78,6 +86,7 @@ get_png_size <- function(image_path){
 
 }
 
+#sorts filters from excel doc into a named list e.g. parameters = c("filter1","filter2") timelines = c("filter3","filter4")
 sort_filters <- function(raw_filters){
   if(is.na(raw_filters))
   {

@@ -45,7 +45,6 @@ display_tables <- function(names, directory){
 }
 
 
-
 #' Reads in raw data from .sas7bdat file and converts it to a formatted table
 #'
 #' @param table_name a string representing the file name of a dataset
@@ -150,19 +149,25 @@ apparate <- function(input_doc,input_sheet,file_location){
   #prepares new doc for changes + output
   new_doc <- Input_Doc
   #generates jumptable of all bookmarks in the word doc
-  bm_jmptbl <- find_all_bookmarks(Input_Doc)
+  tryCatch(
+    {
+      bm_jmptbl <- find_all_bookmarks(Input_Doc)
+    },
+    error = function(e){
+      log_error("Error in reading bookmarks: {e}", namespace = "Houdini Logs")
+      stop("Error in reading bookamrks: refer to log")
+    }
+  )
+  if(check_excel(Input_Sheet)){
+    stop("Check required columns in excel doc: Dataset, Bookmark, Footnotes, Notes")
+  }
   #calculate number of tables
   n_tables <- Input_Sheet %>%
     dim()
   #gets bookmarks of all tables
   bookmarks <- Input_Sheet$Bookmark
-  #gets orientations of all tables
-  orientations <- Input_Sheet$Landscape %>%
-    replace(is.na(.),FALSE)
   #gets dataset names of all tables
   dataset_names <- Input_Sheet$Dataset
-  #gets formats of tables
-  formats <- Input_Sheet$Format
   #gets footnotes of a table
   footnotes <- Input_Sheet$Footnotes %>%
     replace(is.na(.),"")
@@ -195,9 +200,7 @@ apparate <- function(input_doc,input_sheet,file_location){
         {
           tic(str_glue("Table {i}"))
           #returns updated doc with table added
-          #test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
           test <- prep_table(dataset_names[i],filters = filters[[i]],footnotes = footnotes[i])
-          #print(test)
           #logs a success if table is added correctly
           log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
           toc()
@@ -266,15 +269,15 @@ table_names <- table_names[startsWith(table_names,"t")]
 # Set up location of SAS datasets
 location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
 
-location <- location1
+location <- location2
 
 
 # Read in word document
-input_doc <- "Houdini test with DSMB outputs.docx"
-input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
+# input_doc <- "Houdini test with DSMB outputs.docx"
+# input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 
-# input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
-# input_sheet <- "VELA-1 CSR Dry run test.xlsx"
+input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
+input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
 
