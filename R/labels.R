@@ -38,16 +38,3 @@ get_labels <- function(data){
     lapply(function(x) attr(x, "label")) # gets current labels
 }
 
-
-
-
-apply_labels <- function(ht, labels){
-  if(length(labels) > 0){
-    for(i in seq_along(labels)){
-      colname <- names(labels)[i]
-      lbls <- labels[[colname]]
-      #ht <- ht %>%
-
-    }
-  }
-}

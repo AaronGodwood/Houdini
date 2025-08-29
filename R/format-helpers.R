@@ -48,22 +48,22 @@ separate_data <- function(col){
 }
 
 #adds footnotes to a table
-add_footnote <- function(ft, footnotes = ""){
+add_footnote <- function(ht, footnotes = ""){
   #if there are no footnotes return table as is
   if(footnotes == "")
-    ft
+    ht
 
-  #splits footnotes into a list by delimiter
+  #splits footnotes into a vector by delimiter
   footnotes <- footnotes %>%
-    strsplit(split = houdini_global$defaults$delimiter)
+    strsplit(split = houdini_global$defaults$delimiter) %>%
+    unlist()
 
-  #flattens it
-  footnotes <- footnotes[[1]]
+
 
   #returns table with footer rows added
-  ft %>%
-    add_footer_lines(values = footnotes)
-
+  ht <- ht %>%
+    add_footer(footnotes)
+  ht
 }
 
 format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
@@ -186,17 +186,32 @@ add_page_column <- function(data){
 }
 
 
+
+
+
 parameter_filtering <- function(data, parameter){
-  data <- data %>%
-    filter(.data[[houdini_global$defaults$param.name]] == parameter) #%>%		# its likely the column will change
+  if(purrr::is_empty(parameter))
+  {
+    return(data)
+  }
+  pattern <- sprintf("%s1",houdini_global$defaults$param.name)
+  if(!(pattern %in% names(data))){
+    return(data)
+  }
+  new_data <- data %>%
+    filter(.data[[pattern]] == parameter) #%>%		# its likely the column will change
     #mutate(!!sym(houdini_global$defaults$param.name) = NULL)
-  data
+  if(nrow(new_data) == 0){
+    return(data)
+  }
+  else{
+    return(new_data)
+  }
 }
 
 timeline_filtering <- function(data, parameter){
-  if(is.null(parameter))
+  if(purrr::is_empty(parameter))
   {
-    print("ITSNULL")
     return(data)
   }
 
@@ -207,10 +222,15 @@ timeline_filtering <- function(data, parameter){
     filter(.data[[first_col_name]] %in% parameter) %>%
     with(PAGE)
 
-  data <- data %>%
+  new_data <- data %>%
     filter(PAGE %in% page_group)
 
-  data
+  if(nrow(new_data) == 0){
+    return(data)
+  }
+  else{
+    return(new_data)
+  }
 }
 
 

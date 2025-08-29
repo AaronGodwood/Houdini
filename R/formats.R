@@ -40,15 +40,23 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters){
 
   tic("Standard Formatting")
 
-  #gets dilimiter for splitting headers and footers from global Houdini settings
+  #gets delimiter for splitting headers and footers from global Houdini settings
   delimiter <- houdini_global$defaults$delimiter
+
+  pattern <- sprintf("%s1", houdini_global$defaults$trtlbls.name)
+  if( any( sapply( names( data), function( x) {grepl( pattern, x)}))){
+    data <- data %>%
+      apply_trt_headers()
+  }
 
   #gets only columns that are descriptor column or data columns
   data <- data %>%
+    parameter_filtering(filters$parameters) %>%
     dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name ))) # this should probably be moved at some point when i've worked out what filtering i will do
 
   #removes repeated row labels within the same "chunk"
-  data$ROWLBL1 <- data$ROWLBL1 %>%
+  first_col_lbl <- sprintf("%s1",houdini_global$defaults$rowlbls.name)
+  data[[first_col_lbl]] <- data[[first_col_lbl]] %>%
     separate_data()
 
   #gets descriptor columns
@@ -131,14 +139,16 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters){
     #width(j = chr_cols, width = (col_width*desciptor_col_ratio)) %>%
     #width(j = buffer_cols, width = (col_width* 0.2)) %>%
     #width(j = data_cols, width = col_width)
-  ft <- data %>%
+  ht <- data %>%
+    timeline_filtering(filters$timelines) %>%
     houdinitable(col_keys = colkeys) %>%
     set_alignments("center") %>%
-    set_alignments("start", chr_cols)
+    set_alignments("start", chr_cols) %>%
+    paginate(data[["PAGE"]])
 
 
   toc()
-  ft
+  ht
 
 }
 

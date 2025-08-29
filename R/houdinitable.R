@@ -37,22 +37,18 @@ houdinitable <- function(data, col_keys = names(data),
   footer_data <- header_data[FALSE, , drop = FALSE]
   footer <- houdini_tabpart(data = footer_data, col_keys = col_keys, cwidth = cwidth, cheight = cheight)
 
-  opts_word <- list(
-    split = TRUE,
-    keep_with_next = FALSE
-  )
 
   widths <- rep((cwidth*1440),ncol(data))
   names(widths) <- names(spans)
   alignments <- rep("center",ncol(data))
   names(alignments) <- names(widths)
+  keep_with_next <- rep(FALSE, rep(nrow(data)))
 
 
   properties <- list(
     layout = "autofit",
     width = 1,
-    align = "center",
-    opts_word = opts_word
+    align = "center"
   )
 
   out <- list(
@@ -63,7 +59,8 @@ houdinitable <- function(data, col_keys = names(data),
     invis_cols_names = invis_cols_names,
     alignments = alignments,
     widths = widths,
-    properties = properties
+    properties = properties,
+    keep_with_next = keep_with_next
   )
 
   class(out) <- c("houdinitable")

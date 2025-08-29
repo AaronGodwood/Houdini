@@ -96,3 +96,27 @@ lift_headers <- function(ft,second_headers){
   #returns the table
   ft
 }
+
+
+apply_trt_headers <- function(data){
+  pattern <- sprintf("^%s[0-9]+", houdini_global$defaults$trtlbls.name)
+  second_labels <- data %>%
+    select(matches(pattern))
+  labels <- data %>%
+    get_labels()
+  col_numbers <- second_labels %>%
+    names() %>%
+    sapply(function(x){
+      gsub(houdini_global$defaults$trtlbls.name, "", x) %>%
+        strsplit(split = "") %>%
+        sapply(function(y) sprintf("%s%s",houdini_global$defaults$cols.name,y))
+    })
+  for(i in 1:ncol(col_numbers)){
+    for(j in 1:nrow(col_numbers)){
+      labels[col_numbers[j,i]] <- sprintf("%s%s%s", second_labels[[names(col_numbers[j,i])]][1], houdini_global$defaults$delimiter.non.regex, labels[col_numbers[j,i]])
+    }
+  }
+  data <- data %>%
+    replace_labels(labels)
+  data
+}

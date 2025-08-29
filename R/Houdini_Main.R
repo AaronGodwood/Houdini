@@ -58,7 +58,7 @@ display_tables <- function(names, directory){
 #' @export
 #'
 #' @examples
-prep_table <- function(table_name, format = "Standard" , landscape = FALSE, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
+prep_table <- function(table_name, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
 
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
@@ -79,11 +79,7 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, filt
     replace_labels(new_labels)
 
 
-  # if(format != "Standard"){
-  #   raw_data <- raw_data %>%
-  #     non_standard_format()
-  # }
-  #
+
   #will be removed post-testing
   if(is.null(raw_data$COL1))
   {
@@ -91,32 +87,19 @@ prep_table <- function(table_name, format = "Standard" , landscape = FALSE, filt
       non_standard_format()
   }
 
-  #same as transpose bit below
-  # if(landscape == TRUE){
-  #   raw_data <- raw_data %>%
-  #     transpose_data()
-  # }
+  if(nrow(raw_data) == 0){
+    logger::log_warn("{table_name} has no data", namespace = "Houdini Logs")
+  }
+
+
 
   #Applies default formatting - times new roman(10), bold header, etc.
-  ft <- raw_data %>%
-    #parameter_filtering(filters) %>%
-    standard_format(header_code = header_code, doc_width = doc_width, filters = filters)
-    #add_footnote(footnotes) %>%
-    #paginate(hdr_ftr = TRUE,group = "PAGE", group_def = "rle") %>%
-    #apply_flextable_defaults()
-
-
-  #This doesn't really work right now, leaving it in to come back to it - not actually sure its needed as what i interpreted as 'landscape' may not be
-  # if(landscape == TRUE){
-  #   chr_rows <- which(names(new_labels) %in% chr_cols) - 1
-  #   sas_data <- sas_data %>%
-  #     align(align = c("center"), part = "all") %>%  #align all columns (to be just data columns) centrally
-  #     align(align = c("left"), part = "body", i = chr_rows[chr_rows != 0]) %>% #aligns descriptor rows to the left
-  #     transpose_flextable()
-  # }
+  ht <- raw_data %>%
+    standard_format(header_code = header_code, doc_width = doc_width, filters = filters) %>%
+    add_footnote(footnotes)
 
   #returns sas_data
-  ft
+  ht
 }
 
 #' Performs full Houdini operation
@@ -205,7 +188,7 @@ apparate <- function(input_doc,input_sheet,file_location){
       next
 
     # new_doc <- new_doc %>%
-    #   add_houdinitable(bookmarks[i],prep_table(dataset_names[i],formats[i],orientations[i],filters[i],footnotes[i],header_codes[[i]]) ,bm_jmptbl)
+    #   add_houdinitable(bookmarks[i],prep_table(dataset_names[i],filters[i],footnotes[i],header_codes[[i]]) ,bm_jmptbl)
     new_doc <- tryCatch(
       {
         if(is_table(bookmarks[i]))
@@ -213,7 +196,7 @@ apparate <- function(input_doc,input_sheet,file_location){
           tic(str_glue("Table {i}"))
           #returns updated doc with table added
           #test <- prep_table(dataset_names[i],formats[i],orientations[i],footnotes[i],header_codes[[i]])
-          test <- prep_table(dataset_names[i],filters = filters[[i]])
+          test <- prep_table(dataset_names[i],filters = filters[[i]],footnotes = footnotes[i])
           #print(test)
           #logs a success if table is added correctly
           log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
@@ -236,6 +219,7 @@ apparate <- function(input_doc,input_sheet,file_location){
       error = function(e){
         #logs a failure containing the error that occurred
         log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+        toc()
         #returns unchanged document
         new_doc
       }
@@ -274,7 +258,7 @@ setup_log <- function()
 
 #location for some tables
 location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_02_04_01_01_t_nrs3pt.sas7bdat"
+table_name <- "t_14_01_01_01_t_disp.sas7bdat"
 table_names <- list.files(location2)
 table_names <- table_names[startsWith(table_names,"t")]
 
@@ -282,15 +266,15 @@ table_names <- table_names[startsWith(table_names,"t")]
 # Set up location of SAS datasets
 location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
 
-location <- location2
+location <- location1
 
 
 # Read in word document
-# input_doc <- "Houdini test with DSMB outputs.docx"
-# input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
+input_doc <- "Houdini test with DSMB outputs.docx"
+input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 
-input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
-input_sheet <- "VELA-1 CSR Dry run test.xlsx"
+# input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
+# input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
 

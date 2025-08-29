@@ -87,7 +87,6 @@ add_table <- function(x, bookmark, table, jmp_tbl){
 
   #adds table at that cursor point
   x <-  body_add_flextable(x = x, value = table, align = "center", pos = "on")
-  log_info("{bookmark} inserted", namespace = "Houdini Logs")
   #returns changed doc
   x
 }

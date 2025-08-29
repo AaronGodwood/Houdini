@@ -26,9 +26,22 @@ indent <- function(column, indent_column){
 
 fill_gaps <- function(data){
   unique_data <- data[data != ""] %>%
-    unique()
+    smallest_pattern()
 
   data <- rep(unique_data, length.out = length(data))
+}
+
+smallest_pattern <- function(col){
+  n <- length(col)
+  for(i in 1:(n/2)){
+    if( n%% i == 0){
+      pattern <- col[1:i]
+      if(all(rep(pattern, n/i) == col)){
+        return(pattern)
+      }
+    }
+  }
+  return(col)
 }
 
 get_col_names <- function(data, col_type){
@@ -76,23 +89,29 @@ sort_filters <- function(raw_filters){
     strsplit("; ") %>%
     unlist()
 
-  filters <- c()
+  filters1 = character(0)
+  filters2 = character(0)
   for( i in seq_along(raw_filters)){
     if(grepl("Parameters: ", raw_filters[i])){
-
+      filters2 <- raw_filters[i] %>%
+      str_remove("Parameters: ") %>%
+        strsplit(", ")%>%
+        unlist()
     }
     else
     {
       filters1 <- raw_filters[i] %>%
         str_remove("Timelines: ") %>%
-        strsplit(",")
-
-      return(filters1)
+        strsplit(", ") %>%
+        unlist()
 
     }
   }
-  return(c())
-
+  out <- list(
+    parameters = filters2,
+    timelines = filters1
+  )
+  out
 }
 
 

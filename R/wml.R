@@ -1,16 +1,18 @@
 
 
 xml_hello <- function(){
-  hello_doc <- officer::read_docx("M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx")
+  hello_doc <- officer::read_docx("hello.docx")
   hello_xml <- hello_doc$doc_obj$get()
 }
 
 
 
 gen_xml <- function(ht){
+
   header <- ht$header$dataset
   header_spans <- ht$header$spans
   footer <- ht$footer$dataset
+  footer_spans <- ht$footer$spans
   body <- ht$body$dataset
   widths <- ht$widths
   alignments <- ht$alignments
@@ -18,19 +20,29 @@ gen_xml <- function(ht){
   table_grid <- generate_xml_grid(widths)
   table_rows <- character(nrow(body))
   header_rows <- character(nrow(header))
-  for(i in 1:nrow(body)){
-    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments)
+  footer_rows <- character(nrow(footer))
+  for(i in seq_len(nrow(body))){
+    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments,keep_with_next = ht$keep_with_next[i])
   }
-  for(i in 1:nrow(header)){
+  for(i in seq_len(nrow(header))){
     header_num <- nrow(header) - i + 1
     header_rows[i] <- generate_xml_row(header[i,],alignment = alignments, header = header_num, bold = TRUE, part = "header", spans = header_spans[i,])
   }
+  for(i in seq_len(nrow(footer))){
+    top_footer <- FALSE
+    if(i == 1){
+      top_footer <- TRUE
+    }
+
+    footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,],top_footer = top_footer)
+  }
   table_rows <- paste(table_rows, collapse = "")
   header_rows <- paste(header_rows, collapse = "")
-  paste0("<w:tbl>",table_properties,table_grid,header_rows,table_rows,"</w:tbl>")
+  footer_rows <- paste(footer_rows,collapse = "")
+  paste0("<w:tbl>",table_properties,table_grid,header_rows,table_rows,footer_rows,"</w:tbl>")
 }
 
-generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL){
+generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, top_footer = FALSE){
   header_num <- header
   if(is.null(alignment)){
     alignment = rep("start", length(row))
@@ -41,21 +53,14 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
   }
   if(part == "header"){
     header <- "<w:tblHeader/>"
+
   }
   else
   {
     header <- ""
   }
 
-  if(keep_with_next){
-    keep_with_next <- "<keepNext/>"
-  }
-  else
-  {
-    keep_with_next = ""
-  }
-
-  row_properties <- paste0("<w:trPr><w:cantSplit/>",keep_with_next,header,"</w:trPr>")
+  row_properties <- paste0("<w:trPr><w:trHeight w:val=\"360\" w:hRule=\"auto\"/><w:cantSplit/>",header,"</w:trPr>")
 
   cells <- character(length(row))
   current_span = 1
@@ -63,7 +68,7 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
     current_span <- current_span - 1
     cells[i] <- row[i] %>%
       escape_xml() %>%
-      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span)#, alignment = alignment[i])
+      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, top_footer = top_footer)#, alignment = alignment[i])
     current_span = current_span + spans[[i]]
   }
 
@@ -88,7 +93,7 @@ generate_xml_grid <- function(widths){
 }
 
 
-generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0){
+generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, top_footer = FALSE){
   if(in_span > 0)
   {
     return("")
@@ -100,10 +105,16 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   {
     bold <- ""
   }
-
+  if(keep_with_next){
+    keep_with_next <- "<w:keepNext/>"
+  }
+  else{
+    keep_with_next <- ""
+  }
   if((header >= 2 && text != "") || (header == 1)){
     borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
     vAlign <- "<w:vAlign w:val=\"bottom\"/>"
+    keep_with_next <- "<w:keepNext/>"
   }
   else
   {
@@ -114,6 +125,9 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   if(is.na(text) || text == "NA"){
     text <- ""
   }
+  else{
+    text <- process_text(text)
+  }
 
   if(span != 0){
     merge = paste0("<w:gridSpan w:val=\"",span,"\"/>")
@@ -121,6 +135,10 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   else{
     merge = ""
   }
+  if(top_footer){
+    borders <- "<w:tcBorders><w:top w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
+  }
+
 
   font <- "<w:rFonts w:ascii=\"Times New Roman\" w:hAnsi=\"Times New Roman\"/>"
   font_size <- "<w:sz w:val=\"20\"/>"
@@ -128,8 +146,8 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   cell <- paste0(
     "<w:tcPr>",vAlign,borders,merge,"</w:tcPr>",#"<w:tcW w:w=\"",width,"\" w:type=\"pct\"/>",
     "<w:p>",
-    "<w:pPr><w:jc w:val=\"", alignment,"\"/></w:pPr>",
-    "<w:r><w:rPr>",font,font_size, bold, "</w:rPr><w:t>", text, "</w:t></w:r>",
+    "<w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\"/>",keep_with_next,"<w:jc w:val=\"", alignment,"\"/></w:pPr>",
+    "<w:r><w:rPr>",font,font_size, bold, "</w:rPr>",text,"</w:r>",
     "</w:p>"
   )
 
@@ -141,9 +159,15 @@ generate_table_properties <- function(width = 1, layout){
   properties <- paste0(
     "<w:tblLayout w:type=\"",layout,"\"/>",
     "<w:tblW w:w=\"",width,"\" w:type=\"pct\"/>",
+    # "<w:tblCellMar>",
+    # "<w:top w:w=\"0\" w:type=\"dxa\"/>",
+    # "<w:bottom w:w=\"0\" w:type=\"dxa\"/>",
+    # "<w:left w:w=\"0\" w:type=\"dxa\"/>",
+    # "<w:right w:w=\"0\" w:type=\"dxa\"/>",
+    # "</w:tblCellMar>",
     "<w:tblBorders>",
     "<w:top w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/>",
-    "<w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/>",
+    "<w:bottom w:val=\"none\"/>",
     "<w:left w:val=\"none\"/>",
     "<w:right w:val=\"none\"/>",
     "<w:insideH w:val=\"none\"/>",
@@ -154,49 +178,25 @@ generate_table_properties <- function(width = 1, layout){
   paste0("<w:tblPr>", properties, "</w:tblPr>")
 }
 
-#may be massively redundant
-create_group <- function(rows, bold = FALSE, alignment = NULL, header = FALSE){
-  nrows <- nrow(rows)
-  if(header)
-  {
-    headers <- rep(TRUE, nrows)
-    header <- "<w:tblHeader/>"
-  }
-  else
-  {
-    headers <- rep(FALSE, nrows)
-    header <- ""
-  }
-  xml_rows <- character(nrows)
-  for(i in seq_along(nrows)){
-    xml_rows[i] <- generate_xml_row(rows[1,],bold = bold, alignment = alignment)
-  }
-  xml_rows <- paste(xml_rows, collapse = "")
 
-  paste0(
-    "<w:tr>",
-    "<w:trPr>",header,"<w:cantSplit/></w:trPr>",
-    "<w:tc>",
-    "<w:tcPr><w:tcW w:w=\"5000\" w:type=\"pct\"/></w:tcPr>",
-    "<w:tbl>",
-    "<w:tblPr>",
-    "<w:tblLayout w:type=\"fixed\"/>",
-    "<w:tblW w:w=\"5000\" w:type=\"pct\"/>",
-    "<w:tblBorders>",
-    "<w:top w:val=\"single\" w:sz=\"4\" w:color=\"000000\"/>",
-    "<w:top w:val=\"single\" w:sz=\"4\" w:color=\"000000\"/>",
-    "<w:left w:val=\"none\"/>",
-    "<w:right w:val=\"none\"/>",
-    "<w:insideH w:val=\"none\"/>",
-    "<w:insideV w:val=\"none\"/>",
-    "</w:tblBorders>",
-    "</w:tblPr>",
-    xml_rows,
-    "</w:tbl>",
-    "</w:tc>",
-    "</w:tr>"
-  )
+process_text <- function(text){
+  if(grepl("\\\n",text)){
+    texts <- strsplit(text,"\\\n") %>%
+      unlist()
+    texts[1:(length(texts)-1)] <- texts[-(length(texts))] %>%
+      sapply(function(x){
+        paste0("<w:t xml:space=\"preserve\">", x, "</w:t><w:br/>")
+      })
+    texts[length(texts)] <- paste0("<w:t xml:space=\"preserve\">", texts[length(texts)], "</w:t>")
+    new_text <- paste(texts,collapse = "")
+  }else{
+    new_text <- paste0("<w:t xml:space=\"preserve\">", text, "</w:t>")
+  }
+
+  new_text
 }
+
+
 
 
 

@@ -5,6 +5,7 @@ houdini_default_settings <- list(
   cols.name = "COL",
   colvars.name = "COLVAR",
   cellvalcs.name = "CELLVALC",
+  trtlbls.name = "TRTLBL",
   param.name = "BYLBL",
   delimiter = "\\^\\*\\^",
   delimiter.non.regex = "^*^") #maybe will change this to come from previous definition
@@ -30,6 +31,7 @@ set_houdini_defaults <- function(
     cols.name = NULL,
     colvars.name = NULL,
     cellvalcs.name = NULL,
+    trtlbls.name = NULL,
     param.name = NULL,
     delimiter = NULL,
     delimiter.non.regex = NULL){
@@ -50,6 +52,10 @@ set_houdini_defaults <- function(
 
   if(!is.null(cellvalcs.name)){
     x$cellvalcs.name <- cellvalcs.name
+  }
+
+  if(!is.null(trtlbls.name)){
+    x$trtlbls.name <- trtlbls.name
   }
 
   if(!is.null(param.name)){
