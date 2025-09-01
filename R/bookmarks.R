@@ -40,62 +40,39 @@ find_all_bookmarks <- function(x){
   bm_jmptbl <- set_names(matches, sapply(bm_starts,function(node) xml2::xml_attr(node, "name")))
 
   #returns 'jumptable' of bookmark names and their xml locations
-  bm_jmptbl
+  houdini_global$bookmark_jmptbl <- bm_jmptbl
 }
 
 #' Moves the cursor in a word document to a name bookmark
 #'
 #' @param x a word document in which you want to move the cursor
-#' @param jmp_tbl a list that behaves as a jumptable for bookmark from finf_all_bookmarks()
 #' @param id a string that is the name of a bookmark
 #'
 #' @return a word doc with a moved cursor
 #' @export
 #'
 #' @examples
-cursor_to_bookmark <- function(x,jmp_tbl,id){
+cursor_to_bookmark <- function(x,id){
+  if(purrr::is_empty(houdini_global$bookmark_jmptbl)){
+    stop("Bookmark jumptable is empty, run find_all_bookmarks()")
+  }
+  jmp_tbl <- houdini_global$bookmark_jmptbl
   if(id %in% names(jmp_tbl))
   {
     x$officer_cursor$which <- jmp_tbl[id]
   }
   else
-    stop("Cannot find bookmark in jumptable")
+    stop("Cannot find bookmark in jumptable - Is it named right?")
 
   x
 }
 
 
 
-
-# Set up function to add table
-#' Inserts a table into a word document at a bookmark
-#'
-#' @param x a word document that the table is to be inserted into
-#' @param bookmark a string that is the id of the bookmark where the table is to be inserted
-#' @param table a flextable object to insert into the document
-#' @param jmp_tbl a list representing a jumptable for bookmark ids and XML nodes
-#'
-#' @return a word document with the table inserted at the specified bookmark
-#' @export
-#'
-#' @examples
-add_table <- function(x, bookmark, table, jmp_tbl){
-
-  #sets cursor to each bookmark
-  x <- x %>%
-    cursor_to_bookmark(jmp_tbl,bookmark)
-
-  #adds table at that cursor point
-  x <-  body_add_flextable(x = x, value = table, align = "center", pos = "on")
-  #returns changed doc
-  x
-}
-
-
-add_xml_table <- function(x, bookmark, table, jmp_tbl){
+add_xml_table <- function(x, bookmark, table){
 
   x <- x %>%
-    cursor_to_bookmark(jmp_tbl,bookmark)
+    cursor_to_bookmark(bookmark)
 
   #adds table at that cursor point
   x <-  body_add_xml(x = x, table, pos = "on")
@@ -105,11 +82,22 @@ add_xml_table <- function(x, bookmark, table, jmp_tbl){
 }
 
 
-add_houdinitable <- function(x, bookmark, ht, jmp_tbl){
+#' Adds a houdinitable object to an rdocx object ata specified location
+#'
+#' @param x an rdocx object for the table to be inserted into
+#' @param bookmark the bookmark in the word document that the table is to be inserted at
+#' @param ht the houdinitable object to be inserted
+#' @param jmp_tbl
+#'
+#' @return
+#' @export
+#'
+#' @examples
+add_houdinitable <- function(x, bookmark, ht){
   #generates xml version of table
   xml_table <- gen_xml(ht)
   #adds table to doc
-  add_xml_table(x,bookmark,xml_table,jmp_tbl)
+  add_xml_table(x,bookmark,xml_table)
 }
 
 #' Title
@@ -125,9 +113,9 @@ add_houdinitable <- function(x, bookmark, ht, jmp_tbl){
 #' @export
 #'
 #' @examples
-add_figure <- function(x, bookmark, image, jmp_tbl, width = 6.5, height = 6.5){
+add_figure <- function(x, bookmark, image, width = 6.5, height = 6.5){
   x <- x %>%
-    cursor_to_bookmark(jmp_tbl,bookmark)
+    cursor_to_bookmark(bookmark)
 
 
   x <- body_add_img(x = x,width = width, height = height, src = image, pos = "on")

@@ -26,7 +26,7 @@ gen_xml <- function(ht){
   }
   for(i in seq_len(nrow(header))){
     header_num <- nrow(header) - i + 1
-    header_rows[i] <- generate_xml_row(header[i,],alignment = alignments, header = header_num, bold = TRUE, part = "header", spans = header_spans[i,])
+    header_rows[i] <- generate_xml_row(header[i,],alignment = alignments, header = header_num, bold = TRUE, part = "header", spans = header_spans[i,],keep_with_next = TRUE)
   }
   for(i in seq_len(nrow(footer))){
     top_footer <- FALSE
@@ -34,7 +34,7 @@ gen_xml <- function(ht){
       top_footer <- TRUE
     }
 
-    footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,],top_footer = top_footer)
+    footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,],top_footer = top_footer, keep_with_next = TRUE)
   }
   table_rows <- paste(table_rows, collapse = "")
   header_rows <- paste(header_rows, collapse = "")

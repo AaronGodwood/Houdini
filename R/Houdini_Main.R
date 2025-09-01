@@ -86,7 +86,8 @@ prep_table <- function(table_name, filters = "", footnotes = "", header_code = N
       non_standard_format()
   }
 
-  if(nrow(raw_data) == 0){
+
+  if(nrow(raw_data) <= 1){
     logger::log_warn("{table_name} has no data", namespace = "Houdini Logs")
   }
 
@@ -185,8 +186,7 @@ apparate <- function(input_doc,input_sheet,file_location){
   toc()
   #adds each table to the word doc at its respective bookmark
   tic("Tables")
-  # new_doc <- new_doc %>%
-  #   dapply(bookmarks,dataset_names,footnotes,bm_jmptbl,width)
+
   for(i in 1:(n_tables[1])){
 
     if(i == 11)
@@ -202,13 +202,15 @@ apparate <- function(input_doc,input_sheet,file_location){
           #returns updated doc with table added
           test <- prep_table(dataset_names[i],filters = filters[[i]],footnotes = footnotes[i])
           #logs a success if table is added correctly
-          log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
           toc()
-          new_doc %>%
-            add_houdinitable(bookmarks[i],test ,bm_jmptbl)
+          new_doc <- new_doc %>%
+            add_houdinitable(bookmarks[i],test)
+          log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          new_doc
         }
         else
         {
+          logger::log_level(TBLSTART,"Figure {i}: {dataset_names[i]}",namespace = "Houdini Logs")
           tic(str_glue("Figure {i}"))
           img_width <- (get_png_size(dataset_names[i])[["width"]])/96
           img_height <- (get_png_size(dataset_names[i])[["height"]])/96
@@ -216,7 +218,7 @@ apparate <- function(input_doc,input_sheet,file_location){
           log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
           toc()
           new_doc <- new_doc %>%
-            add_figure(bookmarks[i],dataset_names[i], bm_jmptbl, width = width, height = new_height)
+            add_figure(bookmarks[i],dataset_names[i],width = width, height = new_height)
         }
       },
       error = function(e){
@@ -227,8 +229,7 @@ apparate <- function(input_doc,input_sheet,file_location){
         new_doc
       }
     )
-    #testing purposes
-    #print(prep_table(dataset_names[i],orientations[i],header_codes[[i]]))
+
   }
   toc()
   #stores final doc in new variable
@@ -251,7 +252,7 @@ apparate <- function(input_doc,input_sheet,file_location){
 setup_log <- function()
 {
   #sets up log output file
-  logger::log_appender(appender_file("Houdini_log.log"))
+  logger::log_appender(appender_file("houdini.log"))
   #sets log level
   logger::log_threshold(DEBUG)
 }
@@ -259,29 +260,34 @@ setup_log <- function()
 
 
 
-#location for some tables
-location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-table_name <- "t_14_01_01_01_t_disp.sas7bdat"
-table_names <- list.files(location2)
-table_names <- table_names[startsWith(table_names,"t")]
-
-
-# Set up location of SAS datasets
-location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
-
-location <- location2
-
-
-# Read in word document
-# input_doc <- "Houdini test with DSMB outputs.docx"
-# input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
-
-input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
-input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
 
-apparate(input_doc,input_sheet,location)
+r <- function(){
+  #location for some tables
+  location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
+  table_name <- "t_14_03_01_07_t_fae_soc_pt.sas7bdat"
+  table_names <- list.files(location2)
+  table_names <- table_names[startsWith(table_names,"t")]
+
+
+  # Set up location of SAS datasets
+  location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
+
+  location <- location2
+
+
+  # Read in word document
+  # input_doc <- "Houdini test with DSMB outputs.docx"
+  # input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
+
+  input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
+  input_sheet <- "VELA-1 CSR Dry run test.xlsx"
+
+
+  apparate(input_doc,input_sheet,location)
+}
+
 
 
 

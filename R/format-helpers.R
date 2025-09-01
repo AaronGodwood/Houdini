@@ -198,15 +198,26 @@ parameter_filtering <- function(data, parameter){
   if(!(pattern %in% names(data))){
     return(data)
   }
+  parameter <- parameter %>%
+    sapply(function(x){
+      if(x %in% data[[pattern]])
+      {
+        x
+      }
+      else{
+        logger::log_warn("Filter parameter: {x} not found - no parameter filtering applied", namespace = "Houdini Log")
+        c
+      }
+    })
+
   new_data <- data %>%
-    filter(.data[[pattern]] == parameter) #%>%		# its likely the column will change
-    #mutate(!!sym(houdini_global$defaults$param.name) = NULL)
+    filter(.data[[pattern]] %in% parameter)
+
+
   if(nrow(new_data) == 0){
     return(data)
   }
-  else{
-    return(new_data)
-  }
+  return(new_data)
 }
 
 timeline_filtering <- function(data, parameter){
@@ -218,6 +229,18 @@ timeline_filtering <- function(data, parameter){
 
   first_col_name <- sym(sprintf("%s1", houdini_global$defaults$rowlbls.name))
 
+  parameter <- parameter %>%
+    sapply(function(x){
+      if(x %in% data[[first_col_name]])
+      {
+        x
+      }
+      else{
+        logger::log_warn("Filter parameter: {x} not found - no timeline filtering applied", namespace = "Houdini Log")
+        c
+      }
+    })
+
   page_group <- data %>%
     filter(.data[[first_col_name]] %in% parameter) %>%
     with(PAGE)
@@ -228,9 +251,8 @@ timeline_filtering <- function(data, parameter){
   if(nrow(new_data) == 0){
     return(data)
   }
-  else{
-    return(new_data)
-  }
+  return(new_data)
+
 }
 
 

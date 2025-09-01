@@ -24,4 +24,7 @@ create_non_standard_df <- function(){
     COLVAR1 = c(rep(c("Part A","Part A","Part B", "Part B",""),16)),
     COLVAR2 = c(rep(c("Placebo","Treatment","Placebo","Treatment","Total"),16))
     )
+  labels <- c("Visit","","","","")
+  data <- data %>% replace_labels(labels, add = TRUE)
+  data
 }

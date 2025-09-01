@@ -10,6 +10,8 @@ houdini_default_settings <- list(
   delimiter = "\\^\\*\\^",
   delimiter.non.regex = "^*^") #maybe will change this to come from previous definition
 
+houdini_global$bookmark_jmptbl <- list()
+
 houdini_global$defaults <- houdini_default_settings
 
 
