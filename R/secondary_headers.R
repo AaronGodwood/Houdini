@@ -33,7 +33,7 @@ apply_second_header <- function(data,second_labels,header_code){
   data
 }
 
-#brings secondary headers marked by the ^*^ delimiter up to a second and higher row of headers # may be defunct
+#brings secondary headers marked by the ^*^ delimiter up to a second and higher row of headers # may be defunct # I think this can be deleted
 #' Turn a single layer of headers split by delimiters to a multi-layered header
 #'
 #' @param ft a flextable object for which the headers need lifting

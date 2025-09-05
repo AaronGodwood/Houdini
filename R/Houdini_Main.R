@@ -10,7 +10,7 @@ library(logger)
 library(tidyverse)
 library(haven)
 library(officer)
-library(flextable)
+
 library(readxl)
 library(tictoc)
 
@@ -45,6 +45,14 @@ display_tables <- function(names, directory){
 }
 
 
+prep_rtf <- function(table_name, file_location,hide_data = FALSE){
+  raw_rtf <- sprintf("%s%s",file_location,table_name) %>%
+    read_raw_rtf()
+  xml_table <- build_table(raw_rtf,hide_data)
+  xml_table
+}
+
+
 #' Reads in raw data from .sas7bdat file and converts it to a formatted table
 #'
 #' @param table_name a string representing the file name of a dataset
@@ -57,13 +65,13 @@ display_tables <- function(names, directory){
 #' @export
 #'
 #' @examples
-prep_table <- function(table_name, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
+prep_table <- function(table_name, location, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
 
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
-  raw_data <- stringr::str_c(location, table_name, "") %>%
+  raw_data <- sprintf("%s%s",location,table_name) %>%
     haven::read_sas() %>%
-    dplyr::select(-starts_with(c("ROWORD","PAGE"))) %>%
+    #dplyr::select(-starts_with(c("ROWORD","PAGE"))) %>%
     dplyr::mutate(dplyr::across(dplyr::where(is.character), ~ gsub("\\|n", "\n", .))) # replaces |n with \n in data columns
 
 
@@ -82,9 +90,19 @@ prep_table <- function(table_name, filters = "", footnotes = "", header_code = N
   #will be removed post-testing
   if(is.null(raw_data$COL1))
   {
+
     raw_data <- raw_data %>%
       non_standard_format()
   }
+  # if(!is.null(raw_data$TRTLBL12)){
+  #   needs_headers <- FALSE
+  # }
+  # if(needs_headers){
+  #
+  #   data <-raw_data %>%
+  #     dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name )))
+  #   print(paste0(table_name,": " ,ncol(data)))
+  # }
 
 
   if(nrow(raw_data) <= 1){
@@ -102,26 +120,34 @@ prep_table <- function(table_name, filters = "", footnotes = "", header_code = N
   ht
 }
 
-#' Performs full Houdini operation
+#' @title Performs full Houdini operation
+#'
+#'Inserts all tables specified in the indicated
+#'
+#'
+#'
 #'
 #' @param input_doc a string stating the file name for a word document populated with bookmarks fro table insertion
 #' @param input_sheet a string stating the file name for a an excel sheet with information about what tables to insert and where to insert them
 #' @param file_location a string representing the file path that the data sets reside in
 #'
-#' @return
+#' @return Outputs a word document with tables added
 #' @export
 #'
 #' @examples
-apparate <- function(input_doc,input_sheet,file_location){
+apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf = FALSE){
+
   #testing
   tic("Start-Finish")
   #sets up log file and log level
   setup_log()
+  if(hide_data)
+    log_info("Data is being hidden", namespace = "Houdini Logs")
   START <- structure(400L, level = "START/END", class = c("loglevel", "integer"))
   log_level(START,"Script Start:", namespace = "Houdini Logs")
   log_info("Directory: {file_location}", namespace = "Houdini Logs")
   log_info("User: {Sys.info()[[\"user\"]]}", namespace = "Houdini Logs")
-  #reads in word document with bookmarks
+  #reads in word document with bookmarks & logs it, stops operation if this fails as the program cannot continue without the word doc
   tic("Load Info:")
   tryCatch(
     {
@@ -133,7 +159,7 @@ apparate <- function(input_doc,input_sheet,file_location){
       stop("Error in reading Word document: refer to log")
     }
   )
-  #reads in excel document containing instructions
+  #reads in excel document containing instructions & logs it
   tryCatch(
     {
       log_info("Sucessfully read document: {input_sheet}", namespace = "Houdini Logs")
@@ -189,23 +215,31 @@ apparate <- function(input_doc,input_sheet,file_location){
 
   for(i in 1:(n_tables[1])){
 
-    if(i == 11)
-      next
+
 
     # new_doc <- new_doc %>%
-    #   add_houdinitable(bookmarks[i],prep_table(dataset_names[i],filters[i],footnotes[i],header_codes[[i]]) ,bm_jmptbl)
+    #    add_houdinitable(bookmarks[i],prep_table(dataset_names[i],filters[i],footnotes[i],header_codes[[i]]))
     new_doc <- tryCatch(
       {
         if(is_table(bookmarks[i]))
         {
           tic(str_glue("Table {i}"))
-          #returns updated doc with table added
-          test <- prep_table(dataset_names[i],filters = filters[[i]],footnotes = footnotes[i])
-          #logs a success if table is added correctly
-          toc()
-          new_doc <- new_doc %>%
-            add_houdinitable(bookmarks[i],test)
+          if(rtf){
+            name <- dataset_names[i] %>%
+              gsub("\\.sas7bdat","\\.rtf",.)
+            test <- prep_rtf(name,file_location,hide_data)
+            new_doc <- new_doc %>%
+              add_xml_table(bookmark = bookmarks[i],test)
+          }
+          else{
+            #returns updated doc with table added
+            test <- prep_table(dataset_names[i],location = file_location,filters = filters[[i]],footnotes = footnotes[i], header_code = header_codes[[i]])
+            #logs a success if table is added correctly
+            new_doc <- new_doc %>%
+              add_houdinitable(bookmarks[i],test,hide_data)
+          }
           log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          toc()
           new_doc
         }
         else
@@ -245,7 +279,7 @@ apparate <- function(input_doc,input_sheet,file_location){
 #sets up log output file and log level
 #' Sets up log output file and log levels
 #'
-#' @return
+#' @return nothing
 #' @export
 #'
 #' @examples
@@ -266,7 +300,7 @@ setup_log <- function()
 r <- function(){
   #location for some tables
   location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-  table_name <- "t_14_03_01_07_t_fae_soc_pt.sas7bdat"
+  table_name <- "t_14_02_02_01_t_hiscr.sas7bdat"
   table_names <- list.files(location2)
   table_names <- table_names[startsWith(table_names,"t")]
 
@@ -274,7 +308,13 @@ r <- function(){
   # Set up location of SAS datasets
   location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
 
-  location <- location2
+  location3 <- "/DATA/projects/slk/ppp/ppp201/unblinded/instream/data/tfls/internal/"
+
+  location4 <- "/DATA/projects/slk/psa/psa301/blinded/instream/data/tfls/internal/"
+
+  location5 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/tfls/tables/external/"
+
+  file_location <- location5
 
 
   # Read in word document
@@ -285,7 +325,7 @@ r <- function(){
   input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
-  apparate(input_doc,input_sheet,location)
+  apparate(input_doc,input_sheet,file_location, rtf = TRUE, hide_data = TRUE)
 }
 
 

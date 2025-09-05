@@ -1,10 +1,8 @@
-#This is code from https://github.com/davidgohel/officer/blob/master/R/docx_cursor.R
-#taken in to test speed as this function is the main bottleneck
 
 
 
 
-#creates jumptable to all bookmarks in doc
+
 #' Creates a jumptable for all bookmarks in a word document
 #'
 #' @param x a word document
@@ -43,7 +41,7 @@ find_all_bookmarks <- function(x){
   houdini_global$bookmark_jmptbl <- bm_jmptbl
 }
 
-#' Moves the cursor in a word document to a name bookmark
+#' Moves the cursor in a word document to a named bookmark
 #'
 #' @param x a word document in which you want to move the cursor
 #' @param id a string that is the name of a bookmark
@@ -69,47 +67,56 @@ cursor_to_bookmark <- function(x,id){
 
 
 
+#' Adds an xml table to an rdocx object at a specified bookmark
+#'
+#' @param x an rdocx object for the table to be added to
+#' @param bookmark the bookmark where the table is to be inserted
+#' @param table an xml table to be inserted into the rdocx object
+#'
+#' @return an rdocx object with the table appended
+#' @keywords internal
+#'
+#' @examples
 add_xml_table <- function(x, bookmark, table){
 
   x <- x %>%
     cursor_to_bookmark(bookmark)
 
   #adds table at that cursor point
-  x <-  body_add_xml(x = x, table, pos = "on")
+  x <-  officer::body_add_xml(x = x, table, pos = "on")
 
   #returns changed doc
   x
 }
 
 
-#' Adds a houdinitable object to an rdocx object ata specified location
+#' Adds a houdinitable object to an rdocx object at specified bookmark
 #'
 #' @param x an rdocx object for the table to be inserted into
 #' @param bookmark the bookmark in the word document that the table is to be inserted at
 #' @param ht the houdinitable object to be inserted
-#' @param jmp_tbl
 #'
-#' @return
+#' @return an rdocx object with the table added
 #' @export
 #'
 #' @examples
-add_houdinitable <- function(x, bookmark, ht){
+add_houdinitable <- function(x, bookmark, ht, hide_data = FALSE){
   #generates xml version of table
-  xml_table <- gen_xml(ht)
+  xml_table <- gen_xml(ht,hide_data)
   #adds table to doc
   add_xml_table(x,bookmark,xml_table)
 }
 
-#' Title
+#' Adds a figure to a word document
 #'
 #' @param x a word document that the figure is to be inserted into
 #' @param bookmark a string that is the id of the bookmark where the table is to be inserted
-#' @param image
+#' @param image the file location of the image to be added
 #' @param jmp_tbl a list representing a jumptable for bookmark ids and XML nodes
 #' @param width the width of the image in the document (defaults to 6.5in the width of a doc with standard margins)
 #' @param height the width of the image in the document
 #'
-#' @return
+#' @return a document with a figure added
 #' @export
 #'
 #' @examples

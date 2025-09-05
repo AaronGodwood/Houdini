@@ -7,7 +7,15 @@ xml_hello <- function(){
 
 
 
-gen_xml <- function(ht){
+#' Compiles a WordXML output from a houdini table object
+#'
+#' @param ht a houdinitable object to be compiled to Word XMl
+#'
+#' @return a string containing a compiled word table in WordXML format
+#' @keywords internal
+#'
+#' @examples
+gen_xml <- function(ht, hide_data = FALSE){
 
   header <- ht$header$dataset
   header_spans <- ht$header$spans
@@ -22,7 +30,7 @@ gen_xml <- function(ht){
   header_rows <- character(nrow(header))
   footer_rows <- character(nrow(footer))
   for(i in seq_len(nrow(body))){
-    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments,keep_with_next = ht$keep_with_next[i])
+    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments,keep_with_next = ht$keep_with_next[i],hide_data = hide_data)
   }
   for(i in seq_len(nrow(header))){
     header_num <- nrow(header) - i + 1
@@ -42,7 +50,28 @@ gen_xml <- function(ht){
   paste0("<w:tbl>",table_properties,table_grid,header_rows,table_rows,footer_rows,"</w:tbl>")
 }
 
-generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, top_footer = FALSE){
+
+
+#' Generates a WordXML output for a row element part of a table
+#'
+#'
+#' Here <tblHeader/> tag is added which means that these rows repeat over a page
+#' Here the height is set to auto so the height of the cell fits to its contents
+#'
+#' @param row a row of a data frame to be compiled to a wordXML row
+#' @param bold a Boolean that says weather or not the row should be bold
+#' @param alignment a string that represents the text alignment of the cell in the row e.g. "start", "end" or "center"
+#' @param part a string that says what part of the table the row is in e.g. "header", "footer" or "body"
+#' @param keep_with_next a Boolean that says if the row should be kept on the same page as the next row in a word doc
+#' @param header a number that says if the row is a header row and if it is weather it is the bottom most or not
+#' @param spans an integer vector representing any spans (merged cells) in the row
+#' @param top_footer a Boolean that says if the row is the topmost footer row
+#'
+#' @return a WordXMl output of a row element
+#' @keywords internal
+#'
+#' @examples
+generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, top_footer = FALSE, hide_data = FALSE){
   header_num <- header
   if(is.null(alignment)){
     alignment = rep("start", length(row))
@@ -68,7 +97,7 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
     current_span <- current_span - 1
     cells[i] <- row[i] %>%
       escape_xml() %>%
-      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, top_footer = top_footer)#, alignment = alignment[i])
+      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, top_footer = top_footer, hide_data = hide_data)#, alignment = alignment[i])
     current_span = current_span + spans[[i]]
   }
 
@@ -76,6 +105,14 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
 
 }
 
+#' Replaces certain special characters with their XML counterparts
+#'
+#' @param text text to have special characters replaced
+#'
+#' @return text with special characters replaced
+#' @keywords internal
+#'
+#' @examples
 escape_xml <- function(text){
   text %>%
     gsub("&", "&amp;", .) %>%
@@ -84,6 +121,14 @@ escape_xml <- function(text){
 
 }
 
+#' Creates the grid part of a wordXML table
+#'
+#' @param widths a vector that describes the widths of each column
+#'
+#' @return
+#' @keywords internal
+#'
+#' @examples
 generate_xml_grid <- function(widths){
   cols <- character(length(widths))
   for(i in seq_along(widths)){
@@ -93,7 +138,32 @@ generate_xml_grid <- function(widths){
 }
 
 
-generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, top_footer = FALSE){
+#' Generates a WordXML output for a cell of a table
+#'
+#'This contains the formatting for each cell:
+#'-Font size is declared here (1 unit here is 1/2 a unit in word font size e.g. 20 here is 10 in word)
+#'-Font is declared here (ascii is standards and then hAnsi is for special characters ect)
+#'-Cell alignment (start for left aligned, center for center and end for right)
+#'-Sets spacing before and after text to 0 so no random space around text
+#'
+#'
+#'
+#' @param text a string representing the contents of the cell
+#' @param bold a Boolean that says weather the text should be bold (will be bold if the cell is part of  header row)
+#' @param alignment a string representing the text alignment of the cell (should be either start, end or center)
+#' @param width a float that represents the width of the cell
+#' @param header an integer that says what part of the header the cell is in e.g. (0 - not a header, 1 - bottom row of headers, 2+ - not bottom row of headers)
+#' - If the header is a bottom row or not a bottom row and has content it gets aligned to the bottom of the cell and gets a border below it
+#' @param span an integer that represents if this cell is the start of a span (merged section) of cells so it says to take up the space of n columns
+#' @param in_span an number that if greater than 0 says its in the span of another cell so not to generate
+#' @param keep_with_next a Boolean that says that the cells in this row should be kept on the same page as the cells of the next row
+#' @param top_footer a Boolean that says if it is the topmost row of footers which if true will add a border above it
+#'
+#' @return a string representing a WordXMl table cell
+#' @keywords internal
+#'
+#' @examples
+generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, top_footer = FALSE, hide_data = FALSE){
   if(in_span > 0)
   {
     return("")
@@ -125,6 +195,9 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   if(is.na(text) || text == "NA"){
     text <- ""
   }
+  else if(hide_data && (!grepl("[A-Za-z]", text) && text != "")){
+    text <- "<w:t xml:space=\"preserve\">XX</w:t>"
+  }
   else{
     text <- process_text(text)
   }
@@ -154,17 +227,24 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   paste0("<w:tc>", cell, "</w:tc>")
 }
 
+#' Generates the table properties part of a WordXML table
+#'
+#'Here a Top border is declared but no other borders - others come from cells in header or footer rows
+#'Here the width of the whole table is declared with 5000pct being 100%
+#'
+#'
+#' @param width the width the whole table should be as a fraction of the entire document
+#' @param layout
+#'
+#' @return an XML output of the table properties part of a wordXMLtable
+#' @keywords internal
+#'
+#' @examples
 generate_table_properties <- function(width = 1, layout){
   width <- width * 5000
   properties <- paste0(
     "<w:tblLayout w:type=\"",layout,"\"/>",
     "<w:tblW w:w=\"",width,"\" w:type=\"pct\"/>",
-    # "<w:tblCellMar>",
-    # "<w:top w:w=\"0\" w:type=\"dxa\"/>",
-    # "<w:bottom w:w=\"0\" w:type=\"dxa\"/>",
-    # "<w:left w:w=\"0\" w:type=\"dxa\"/>",
-    # "<w:right w:w=\"0\" w:type=\"dxa\"/>",
-    # "</w:tblCellMar>",
     "<w:tblBorders>",
     "<w:top w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/>",
     "<w:bottom w:val=\"none\"/>",
@@ -179,6 +259,17 @@ generate_table_properties <- function(width = 1, layout){
 }
 
 
+#' Adds in line breaks to text sections that contain \n
+#'
+#'\n means nothing in XML so they lines have to be put into individual text tags with linebreak tags in between
+#'xml:space = preserve means that spaces at the begining of cell stay otherwise they dissapear
+#'
+#' @param text the section of text that line breaks need to be added to
+#'
+#' @return an XML output of a series of text tags with line breaks if they occur
+#' @keywords internal
+#'
+#' @examples
 process_text <- function(text){
   if(grepl("\\\n",text)){
     texts <- strsplit(text,"\\\n") %>%

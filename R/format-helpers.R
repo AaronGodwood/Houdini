@@ -1,5 +1,13 @@
 
 #orders columns in right order
+#' Orders data and descriptor columns into the correct order
+#'
+#' @param data a data frame containing descriptor and data containing columns
+#'
+#' @return a data frame containing descriptor and data containing columns in the correct order
+#' @keywords internal
+#'
+#' @examples
 order_cols <- function(data){
 
   ROWLBLs <- data %>%
@@ -11,17 +19,25 @@ order_cols <- function(data){
   for(i in length(COLs):1){
     column_name <- sprintf("%s%s", houdini_global$defaults$cols.name, i)
     data <- data %>%
-      relocate(column_name)
+      relocate(all_of(column_name))
   }
   for(i in length(ROWLBLs):1){
     column_name <- sprintf("%s%s", houdini_global$defaults$rowlbls.name, i)
     data <- data %>%
-      relocate(column_name)
+      relocate(all_of(column_name))
   }
   data
 }
 
-#removes repeated values within a chunk of data
+
+#' Removes repeated data within a chunk e.g, AAAABBBB -> A   B
+#'
+#' @param col a list representing the column for which the data needs to be separated
+#'
+#' @return a list with the data separated
+#' @keywords internal
+#'
+#' @examples
 separate_data <- function(col){
   #if its smaller than 2 there can be no repeated values
   if(length(col) < 2)
@@ -48,6 +64,15 @@ separate_data <- function(col){
 }
 
 #adds footnotes to a table
+#' Wrapper function to split footnotes before calling the houdinitable add_footer() function
+#'
+#' @param ht a houdinitable object
+#' @param footnotes an un-split string of all the footnotes for a table
+#'
+#' @return a houdinitable object with footnotes added
+#' @keywords internal
+#'
+#' @examples
 add_footnote <- function(ht, footnotes = ""){
   #if there are no footnotes return table as is
   if(footnotes == "")
@@ -78,17 +103,29 @@ format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
 
 
 
+#' Adds buffer rows (row spacing) between groups of rows
+#'
+#' @param data a data frame to have buffer rows added to it
+#'
+#' @return a data frame with buffer rows added to it
+#' @keywords internal
+#'
+#' @examples
 add_row_buffers <- function(data){
 
+  #adds no buffers if theres one row or less
   if(nrow(data) < 2)
     data
 
+  #gets labels as for some reason adding rows removes them
   labels <- data %>%
     get_labels()
 
-
+  #gets the set name of the descriptor containing columns and the column itself
   col_label <- sprintf("%s1", houdini_global$defaults$rowlbls.name)
   first_col <- data[[col_label]]
+
+  #gets the index of rows where the indent goes backwards or it goes from an empty cell to not
   groups <- prev_apply(first_col, "", f = function(elem, prev_elem, counter){
     elem_indent <- elem %>%
       stringr::str_count("^\\s+")
@@ -101,6 +138,7 @@ add_row_buffers <- function(data){
       c()
   })
 
+  #adds in empty rows at these indexes
   rows_added = 0
   for(i in groups){
     data <- data %>%
@@ -108,14 +146,25 @@ add_row_buffers <- function(data){
     rows_added <- rows_added +1
   }
 
+  #replaces labels as for some reason they dissapear when adding rows
   data <- data %>%
     replace_labels(labels, add = TRUE)
+
+  #returns data with buffer rows added
   data
 }
 
 
 
 
+#' Adds buffer columns (column spacing) between groups of columns
+#'
+#' @param data a data frame to have buffer columns added to it
+#'
+#' @return a data frame with buffer columns added to it
+#' @keywords internal
+#'
+#' @examples
 add_col_buffers <- function(data){ # having issues with dropping labels - got a work around but its not ideal
 
   #get labels as adding columns deletes them
@@ -145,6 +194,15 @@ add_col_buffers <- function(data){ # having issues with dropping labels - got a 
 }
 
 #adds a column that shows which "chunk" of data each row belongs
+#' Adds a column that shows which "chunk of data each row belongs do
+#' This is done by grouping data between buffers into the same "chunk"
+#'
+#' @param data a data frame to have the page column appended
+#'
+#' @return a data frame with the page column appended
+#' @keywords internal
+#'
+#' @examples
 add_page_column <- function(data){
 
   #gets labels as adding a column appears to delete them
@@ -188,7 +246,15 @@ add_page_column <- function(data){
 
 
 
-
+#' Filters data by certein parameters e.g. score
+#'
+#' @param data a data frame representing the data to be filtered
+#' @param parameter a character vector containing parameters to be filtered by
+#'
+#' @return a filtered data frame
+#' @keywords internal
+#'
+#' @examples
 parameter_filtering <- function(data, parameter){
   if(purrr::is_empty(parameter))
   {
@@ -220,6 +286,15 @@ parameter_filtering <- function(data, parameter){
   return(new_data)
 }
 
+#' Filters data by the timeline that they belong to
+#'
+#' @param data a data frame representing the data to be filtered
+#' @param parameter a character vector containing timelines to be filtered by
+#'
+#' @return a filtered data frame
+#' @keywords internal
+#'
+#' @examples
 timeline_filtering <- function(data, parameter){
   if(purrr::is_empty(parameter))
   {

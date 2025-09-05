@@ -21,6 +21,8 @@ houdini_global$defaults <- houdini_default_settings
 #' @param cols.name the name that the data columns are called in standard data sets
 #' @param colvars.name the name of the columns containing data column headers in non-standard data sets
 #' @param cellvalcs.name the name of the column containing data points in non-standard data sets
+#' @param trtlbls.name the name of the column containing a second layer of headers for some tables
+#' @param param.name the name of the column containing the data parameter filtering is done by
 #' @param delimiter the split delimiter used for splitting header rows and footer rows (IMPORTANT: use regex escape characters (\\) infront of special characters)
 #' @param delimiter.non.regex the split delimiter used for splitting header rows and footer rows without regex escape characters
 #'
@@ -41,7 +43,7 @@ set_houdini_defaults <- function(
   x <- list()
 
   if(!is.null(rowlbls.name)){
-    x$rowlbls.name <- rowlbl.name
+    x$rowlbls.name <- rowlbls.name
   }
 
   if(!is.null(cols.name)){
@@ -94,7 +96,7 @@ init_houdini_defaults <- function(){
 
 #' Returns the default settings for the Houdini package
 #'
-#' @return
+#' @return defalt settings of the houdini package
 #' @export
 #'
 #' @examples
