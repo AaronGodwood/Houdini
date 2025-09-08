@@ -14,6 +14,54 @@ get_pages <- function(rtf){
   rtf[-1]
 }
 
+get_header <- function(rtf_page){
+  header <- rtf_page %>%
+    str_extract("(?s)(\\{\\\\header)(.*?)(\\{\\\\par\\}\\}\\})") %>%
+    str_extract("(?s)(\\\\trowd)(.*)") %>%
+    strsplit("\\{\\\\row\\}\\\r\\\n") %>%
+    unlist() %>%
+    lapply(function(x) extract_rtf_row(x)) %>%
+    unname()
+  header <- header[-length(header)]
+
+  out <- list(
+    cut = header[[2]]$texts[2],
+    run = header[[2]]$texts[1],
+    tableid = header[[3]]$texts,
+    title = header[[4]]$texts,
+    analysis = header[[5]]$texts,
+    parameter <- header[[6]]$texts
+  )
+  class(out) <- "header"
+  out
+}
+
+get_footer <- function(rtf_page){
+  footer <- rtf_page %>%
+    str_extract("(?s)(\\{\\\\footer)(.*?)(\\\\pard\\}\\})") %>%
+    str_extract("(?s)(\\\\trowd)(.*)") %>%
+    strsplit("\\{\\\\row\\}\\\r\\\n") %>%
+    unlist() %>%
+    lapply(function(x) extract_rtf_row(x)) %>%
+    unname()
+  footer <- footer[-length(footer)]
+  footnotes <- c()
+  for(i in seq_along(footer)){
+    if(footer[[i]]$texts == "")
+    {
+      break
+    }
+    else{
+      footnotes <- c(footnotes,footer[[i]]$texts)
+    }
+  }
+  out <- list(
+    footnotes = footnotes,
+    info = footer[[length(footer)]]$texts
+  )
+  class(out) <- "footer"
+  out
+}
 
 get_rtf_spans <- function(max_widths, widths){
   prev_span <- 0

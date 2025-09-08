@@ -4,13 +4,7 @@ read_raw_rtf <- function(file_path){
   readChar(file_path, size, useBytes = TRUE)
 }
 
-get_header <- function(rtf_page){
-  header <- rtf_page %>%
-    str_extract("(?s)(?<=\\{\\\\header).*")
-  header <- paste0("{\\header",header)
-  header <- strsplit(header, split = "")[[1]] %>%
-    get_section()
-}
+
 
 # count_till_section <- function(input_text){
 #   if(purrr::is_empty(input_text) || input_text[1] == "{"){
@@ -30,56 +24,56 @@ get_header <- function(rtf_page){
 #
 # }
 #
-get_section <- function(input_text, cbracket_count = 0){
-  if(purrr::is_empty(input_text)){
-    return("")
-  }
-  if(input_text[1] == "{"){
-    cbracket_count <- cbracket_count + 1
-  }else if(input_text[1] == "}"){
-    cbracket_count <- cbracket_count - 1
-  }
-  if(cbracket_count == 0){
-    return(input_text[1])
-  }
-  return(paste0(input_text[1],get_section(input_text[-1],cbracket_count),collapse = ""))
-}
+# get_section <- function(input_text, cbracket_count = 0){
+#   if(purrr::is_empty(input_text)){
+#     return("")
+#   }
+#   if(input_text[1] == "{"){
+#     cbracket_count <- cbracket_count + 1
+#   }else if(input_text[1] == "}"){
+#     cbracket_count <- cbracket_count - 1
+#   }
+#   if(cbracket_count == 0){
+#     return(input_text[1])
+#   }
+#   return(paste0(input_text[1],get_section(input_text[-1],cbracket_count),collapse = ""))
+# }
 
 
 
 
-get_df_template <- function(rows,max_ncells){
-  nchr_cols <- NULL
-  ndata_cols <- NULL
-
-  for(i in seq_along(rows)){
-    if(rows[i]$header == FALSE && rows[i]$ncells == max_ncells){
-      nchr_cols <- rows[i]$texts %>%
-        sapply(function(x) grepl("[A-Za-z]",x))
-      ndata_cols <- max_ncells - nchr_cols
-      break
-    }
-  }
-
-  if(!is.null(ndata_cols) && !is.null(nchr_cols)){
-    # headers <- c(produce_col_names("ROWORD",nchr_cols),produce_col_names(houdini_global$defaults$rowlbls.name,nchr_cols),produce_col_names(houdini_global$defaults$cols.name,ndata_cols))
-    headers <- c(produce_col_names(houdini_global$defaults$rowlbls.name,nchr_cols),produce_col_names(houdini_global$defaults$cols.name,ndata_cols))
-    df <- data.frame(matrix(ncol = (1*nchr_cols + ndata_cols), nrow = 0))
-    names(df) <- headers
-  }
-  else{
-    stop("Table has no data")
-  }
-  df
-}
-
-produce_col_names <- function(name_type, ncols){
-  names <- character(ncols)
-  for(i in seq_len(ncols)){
-    names[i] <- sprintf("%s%s",name_type,i)
-  }
-  names
-}
+# get_df_template <- function(rows,max_ncells){
+#   nchr_cols <- NULL
+#   ndata_cols <- NULL
+#
+#   for(i in seq_along(rows)){
+#     if(rows[i]$header == FALSE && rows[i]$ncells == max_ncells){
+#       nchr_cols <- rows[i]$texts %>%
+#         sapply(function(x) grepl("[A-Za-z]",x))
+#       ndata_cols <- max_ncells - nchr_cols
+#       break
+#     }
+#   }
+#
+#   if(!is.null(ndata_cols) && !is.null(nchr_cols)){
+#     # headers <- c(produce_col_names("ROWORD",nchr_cols),produce_col_names(houdini_global$defaults$rowlbls.name,nchr_cols),produce_col_names(houdini_global$defaults$cols.name,ndata_cols))
+#     headers <- c(produce_col_names(houdini_global$defaults$rowlbls.name,nchr_cols),produce_col_names(houdini_global$defaults$cols.name,ndata_cols))
+#     df <- data.frame(matrix(ncol = (1*nchr_cols + ndata_cols), nrow = 0))
+#     names(df) <- headers
+#   }
+#   else{
+#     stop("Table has no data")
+#   }
+#   df
+# }
+#
+# produce_col_names <- function(name_type, ncols){
+#   names <- character(ncols)
+#   for(i in seq_len(ncols)){
+#     names[i] <- sprintf("%s%s",name_type,i)
+#   }
+#   names
+# }
 
 build_table <- function(raw_rtf, hide_data = FALSE){
   rtf_pages <- get_pages(raw_rtf)
