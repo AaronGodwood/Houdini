@@ -24,7 +24,7 @@ indent <- function(column, indent_column){
   #creates a column of n spaces based on number in the indent col - NA goes to 0
   indents <- indent_column %>%
     replace(is.na(.), 0) %>%
-    strrep(" ", .)
+    strrep("  ", .)
 
   merge_columns(indents,column)
 }

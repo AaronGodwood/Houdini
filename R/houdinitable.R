@@ -23,13 +23,13 @@ houdinitable <- function(data, col_keys = names(data),
   header_data <- data %>%
     get_labels() %>%
     split_headers()
-  header_data <- data.frame(header_data)
+
 
 
   header <- houdini_tabpart(data = header_data, col_keys = col_keys, cwidth = cwidth, cheight = cheight)
   spans <- data[FALSE, , drop = FALSE]
   for(i in 1:nrow(header_data)){
-    spans[i,] = get_runs(header_data[i,])
+    spans[i,] <- get_runs(header_data[i,])
   }
   header$spans <- spans %>%
     lapply(as.numeric) %>%
@@ -96,14 +96,14 @@ split_headers <- function(headers){
     }) %>%
     rbind()
 
-  headers
+  data.frame(headers)
 }
 
 
 get_runs <- function(list){
   if(purrr::is_empty(list))
   {
-    return(c(0))
+    return(c())
   }
   else if(length(list) == 1){
     return(c(1))

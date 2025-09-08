@@ -44,9 +44,9 @@ gen_xml <- function(ht, hide_data = FALSE){
 
     footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,],top_footer = top_footer, keep_with_next = TRUE)
   }
-  table_rows <- paste(table_rows, collapse = "")
-  header_rows <- paste(header_rows, collapse = "")
-  footer_rows <- paste(footer_rows,collapse = "")
+  table_rows <- paste0(table_rows, collapse = "")
+  header_rows <- paste0(header_rows, collapse = "")
+  footer_rows <- paste0(footer_rows,collapse = "")
   paste0("<w:tbl>",table_properties,table_grid,header_rows,table_rows,footer_rows,"</w:tbl>")
 }
 
@@ -101,7 +101,7 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
     current_span = current_span + spans[[i]]
   }
 
-  paste0("<w:tr>",row_properties, paste(cells, collapse = ""), "</w:tr>")
+  paste0("<w:tr>",row_properties, paste0(cells, collapse = ""), "</w:tr>")
 
 }
 
@@ -134,7 +134,7 @@ generate_xml_grid <- function(widths){
   for(i in seq_along(widths)){
     cols[i] <- paste0("<w:gridCol w:w=\"",widths[i],"\"/>")
   }
-  paste0("<w:tblGrid>",paste(cols, collapse = ""),"</w:tblGrid>")
+  paste0("<w:tblGrid>",paste0(cols, collapse = ""),"</w:tblGrid>")
 }
 
 
@@ -279,7 +279,7 @@ process_text <- function(text){
         paste0("<w:t xml:space=\"preserve\">", x, "</w:t><w:br/>")
       })
     texts[length(texts)] <- paste0("<w:t xml:space=\"preserve\">", texts[length(texts)], "</w:t>")
-    new_text <- paste(texts,collapse = "")
+    new_text <- paste0(texts,collapse = "")
   }else{
     new_text <- paste0("<w:t xml:space=\"preserve\">", text, "</w:t>")
   }

@@ -9,7 +9,7 @@
 library(logger)
 library(tidyverse)
 library(haven)
-library(officer)
+library(xml2)
 
 library(readxl)
 library(tictoc)
@@ -65,11 +65,11 @@ prep_rtf <- function(table_name, file_location,hide_data = FALSE){
 #' @export
 #'
 #' @examples
-prep_table <- function(table_name, location, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
+prep_table <- function(table_name, file_location, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
 
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
-  raw_data <- sprintf("%s%s",location,table_name) %>%
+  raw_data <- sprintf("%s%s",file_location,table_name) %>%
     haven::read_sas() %>%
     #dplyr::select(-starts_with(c("ROWORD","PAGE"))) %>%
     dplyr::mutate(dplyr::across(dplyr::where(is.character), ~ gsub("\\|n", "\n", .))) # replaces |n with \n in data columns
@@ -152,7 +152,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
   tryCatch(
     {
       log_info("Sucessfully read document: {input_doc}", namespace = "Houdini Logs")
-      Input_Doc <- officer::read_docx(input_doc)
+      Input_Doc <- read_docx(input_doc)
     },
     error = function(e){
       log_error("Error in reading {input_doc}: {e}", namespace = "Houdini Logs")
@@ -233,7 +233,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
           }
           else{
             #returns updated doc with table added
-            test <- prep_table(dataset_names[i],location = file_location,filters = filters[[i]],footnotes = footnotes[i], header_code = header_codes[[i]])
+            test <- prep_table(dataset_names[i],file_location = file_location,filters = filters[[i]],footnotes = footnotes[i], header_code = header_codes[[i]])
             #logs a success if table is added correctly
             new_doc <- new_doc %>%
               add_houdinitable(bookmarks[i],test,hide_data)
@@ -270,7 +270,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
   output_doc <- new_doc
   #outputs final document
   tic("Output final doc")
-  print(output_doc, target="Houdini_Test_1.docx")
+  output_docx(output_doc, target="Houdini_Test_1.docx")
   log_level(START,"Script Finish:", namespace = "Houdini Logs")
   toc()
   toc()
@@ -300,7 +300,7 @@ setup_log <- function()
 r <- function(){
   #location for some tables
   location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-  table_name <- "t_14_02_02_01_t_hiscr.sas7bdat"
+  table_name <- "t_14_01_02_01_t_demog.sas7bdat"
   table_names <- list.files(location2)
   table_names <- table_names[startsWith(table_names,"t")]
 
@@ -314,8 +314,8 @@ r <- function(){
 
   location5 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/tfls/tables/external/"
 
-  file_location <- location5
-
+  file_location <- location2
+  location <- file_location
 
   # Read in word document
   # input_doc <- "Houdini test with DSMB outputs.docx"
@@ -325,7 +325,7 @@ r <- function(){
   input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
-  apparate(input_doc,input_sheet,file_location, rtf = TRUE, hide_data = TRUE)
+  apparate(input_doc,input_sheet,file_location, rtf = FALSE, hide_data = TRUE)
 }
 
 

@@ -66,7 +66,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
   # applying the second layer of headers and parameter filtering must be done before selecting columns as the columns used to do this get deleted at this point
   data <- data %>%
     parameter_filtering(filters$parameters) %>%
-    dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name ))) # this should probably be moved at some point when i've worked out what filtering i will do
+    dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name,houdini_global$defaults$rowgrp.name ))) # this should probably be moved at some point when i've worked out what filtering i will do
 
   #removes repeated row labels within the same "chunk" e.g. WeeK 1, Week 1, Week 1 goes to Week 1
   first_col_lbl <- sprintf("%s1",houdini_global$defaults$rowlbls.name)
@@ -87,6 +87,8 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
 
   #Orders columns with descriptor cols on left followed by data cols in order - must happen before subsequent code as they rely on ordered cols
   data <- data %>%
+    add_row_buffers2() %>%
+    dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name))) %>%
     order_cols()
 
   #checks if any of the header labels already have a second row of labels by checking if they contain the delimiter that will be used to split them later
@@ -101,7 +103,6 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
   # I undertand that dataset starts with a similar column however it was done this way as datasets were inconsistent
   data <- data %>%
     add_col_buffers() %>%
-    add_row_buffers() %>%
     add_page_column()
 
 

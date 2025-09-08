@@ -14,7 +14,7 @@
 find_all_bookmarks <- function(x){
 
 
-  doc_xml <- x$doc_obj$get() #gets the word doc in xml format
+  doc_xml <- x$doc #gets the word doc in xml format
 
   bm_starts <- xml2::xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]") #attaints all boomarks that start without _ (unhidden ones)
 
@@ -57,7 +57,7 @@ cursor_to_bookmark <- function(x,id){
   jmp_tbl <- houdini_global$bookmark_jmptbl
   if(id %in% names(jmp_tbl))
   {
-    x$officer_cursor$which <- jmp_tbl[id]
+    x$cursor$which <- jmp_tbl[id]
   }
   else
     stop("Cannot find bookmark in jumptable - Is it named right?")
@@ -83,7 +83,7 @@ add_xml_table <- function(x, bookmark, table){
     cursor_to_bookmark(bookmark)
 
   #adds table at that cursor point
-  x <-  officer::body_add_xml(x = x, table, pos = "on")
+  x <-add_xml(x = x, table, pos = "on")
 
   #returns changed doc
   x

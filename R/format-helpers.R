@@ -102,6 +102,43 @@ format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
 }
 
 
+add_row_buffers2 <- function(data){
+
+  #adds no buffers if theres one row or less
+  if(nrow(data) < 2)
+    data
+
+  #gets labels as for some reason adding rows removes them
+  labels <- data %>%
+    get_labels()
+
+  col_label <- sprintf("%s1", houdini_global$defaults$rowgrp.name)
+  row_grps <- data %>%
+    dplyr::select(all_of(starts_with(houdini_global$defaults$rowgrp.name)))
+  rows_added <- 0
+  for(i in seq_len(nrow(row_grps))){
+    if(i == 1){
+      prev_elem <- row_grps[i,]
+      data <- data %>%
+        tibble::add_row(.before = (i+rows_added))
+      rows_added <- rows_added + 1
+    }else{
+      if(any(row_grps[i,] != prev_elem)){
+        prev_elem <- row_grps[i,]
+        data <- data %>%
+          tibble::add_row(.before = (i+rows_added))
+        rows_added <- rows_added + 1
+      }
+    }
+  }
+  #replaces labels as for some reason they dissapear when adding rows
+  data <- data %>%
+    replace_labels(labels, add = TRUE)
+
+  #returns data with buffer rows added
+  data
+}
+
 
 #' Adds buffer rows (row spacing) between groups of rows
 #'

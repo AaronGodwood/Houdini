@@ -4,77 +4,81 @@ read_raw_rtf <- function(file_path){
   readChar(file_path, size, useBytes = TRUE)
 }
 
-
-
-
-get_pages <- function(rtf){
-  rtf <- rtf %>%
-    strsplit(split = "\\\\sectd") %>%
-    unlist()
-  rtf <- rtf %>%
-    sapply(function(x) {
-      x <- x %>%
-        str_extract("(?s)(?<=\\{\\\\\\*\\\\bkmkend IDX[0-9]?[0-9]?[0-9]?\\}).*") %>%
-        strsplit("\\{\\\\row\\}\\\r\\\n") %>%
-        unlist()
-      x[-length(x)]
-      }) %>%
-    unname()
-  rtf[-1]
+get_header <- function(rtf_page){
+  header <- rtf_page %>%
+    str_extract("(?s)(?<=\\{\\\\header).*")
+  header <- paste0("{\\header",header)
+  header <- strsplit(header, split = "")[[1]] %>%
+    get_section()
 }
 
-
-get_rtf_spans <- function(max_widths, widths){
-  prev_span <- 0
-  spans <- c()
-  for(i in seq_along(widths)){
-    span <- which(max_widths == widths[i]) - prev_span
-    spans <- c(spans,span,rep(0,span-1))
-    prev_span <- prev_span + span
+# count_till_section <- function(input_text){
+#   if(purrr::is_empty(input_text) || input_text[1] == "{"){
+#     return(0)
+#   }
+#   return(count_till_section(input_text[-1]) + 1)
+# }
+#
+# get_sections <- function(input_text){
+#   if(purrr::is_empty(input_text)){
+#     return(c())
+#   }
+#   n_till_section <- count_till_section(input_text)
+#   input_text <- input_text[(n_till_section+1):length(input_text)]
+#   next_section <- get_section(input_text)
+#   return(c(next_section,get_sections(input_text[(nchar(next_section)+1):length(input_text)])))
+#
+# }
+#
+get_section <- function(input_text, cbracket_count = 0){
+  if(purrr::is_empty(input_text)){
+    return("")
   }
-  spans
+  if(input_text[1] == "{"){
+    cbracket_count <- cbracket_count + 1
+  }else if(input_text[1] == "}"){
+    cbracket_count <- cbracket_count - 1
+  }
+  if(cbracket_count == 0){
+    return(input_text[1])
+  }
+  return(paste0(input_text[1],get_section(input_text[-1],cbracket_count),collapse = ""))
 }
 
-get_max_widths <- function(rows){
-  max_ncells <- 0
-  max_widths <- c()
+
+
+
+get_df_template <- function(rows,max_ncells){
+  nchr_cols <- NULL
+  ndata_cols <- NULL
+
   for(i in seq_along(rows)){
-    row <- rows[[i]]
-    if(row$ncells > max_ncells){
-      max_ncells <- row$ncells
-      max_widths <- row$widths
+    if(rows[i]$header == FALSE && rows[i]$ncells == max_ncells){
+      nchr_cols <- rows[i]$texts %>%
+        sapply(function(x) grepl("[A-Za-z]",x))
+      ndata_cols <- max_ncells - nchr_cols
+      break
     }
   }
-  max_widths
+
+  if(!is.null(ndata_cols) && !is.null(nchr_cols)){
+    # headers <- c(produce_col_names("ROWORD",nchr_cols),produce_col_names(houdini_global$defaults$rowlbls.name,nchr_cols),produce_col_names(houdini_global$defaults$cols.name,ndata_cols))
+    headers <- c(produce_col_names(houdini_global$defaults$rowlbls.name,nchr_cols),produce_col_names(houdini_global$defaults$cols.name,ndata_cols))
+    df <- data.frame(matrix(ncol = (1*nchr_cols + ndata_cols), nrow = 0))
+    names(df) <- headers
+  }
+  else{
+    stop("Table has no data")
+  }
+  df
 }
 
-get_standard_widths <- function(max_widths){
-  widths <- integer(length(max_widths))
-  for(i in seq_along(max_widths)){
-    if(i == 1)
-    {
-      widths[i] <- max_widths [i]
-    }
-    else{
-      widths[i] <- max_widths[i] - max_widths[i-1]
-    }
+produce_col_names <- function(name_type, ncols){
+  names <- character(ncols)
+  for(i in seq_len(ncols)){
+    names[i] <- sprintf("%s%s",name_type,i)
   }
-  widths
-}
-
-normalise_texts <- function(texts,spans){
-  if(length(texts) == length(spans)){
-    return(texts)
-  }
-  span_count <- 0
-  new_texts <- character()
-  for(i in seq_along(spans)){
-    if(spans[i] != 0){
-      span_count <- span_count + 1
-      new_texts <- c(new_texts,rep(texts[span_count],spans[i]))
-    }
-  }
-  new_texts
+  names
 }
 
 build_table <- function(raw_rtf, hide_data = FALSE){
@@ -88,18 +92,26 @@ build_table <- function(raw_rtf, hide_data = FALSE){
 }
 
 
-compile_rows <- function(rtf_rows, hide_data = FALSE){
+compile_rows <- function(rtf_rows, hide_data = FALSE, produce_df = FALSE){
   rows <- rtf_rows %>%
     lapply(function(x) extract_rtf_row(x)) %>%
     unname()
+
   found_header <- FALSE
   max_widths <- get_max_widths(rows)
   max_ncells <- length(max_widths)
+
+  if(produce_df){
+    df <- get_df_template(rows)
+    df_headers <- names(df)
+  }
+
   xml_grid <- max_widths %>%
     get_standard_widths() %>%
     generate_xml_grid()
   xml_rows <- character()
   prev_ncells <- 0
+
   for(i in seq_along(rows)){
     row <- rows[[i]]
     if(row$ncells == 1 && prev_ncells == 1)
@@ -124,16 +136,27 @@ compile_rows <- function(rtf_rows, hide_data = FALSE){
     if(row$header){
       if(found_header){
         next
-      }else if(row$ncells == max_ncells){
+      }else if(row$ncells == max_ncells){ #add a bottom most header row
         xml_rows <- c(xml_rows,generate_xml_row(row$texts,bold = TRUE, alignment = row$alignments, part = "header", header = 1, keep_with_next = TRUE, spans = spans, hide_data = hide_data))
-      }else{
+        if(produce_df)
+          labels <-row$texts
+      }else{ # add an additional layer of headers
         xml_rows <- c(xml_rows,generate_xml_row(row$texts,bold = TRUE, alignment = row$alignments, part = "header", header = 2, keep_with_next = TRUE, spans = spans, hide_data = hide_data))
       }
     }else{
       xml_rows <- c(xml_rows,generate_xml_row(row$texts, alignment = row$alignments, part = "body", keep_with_next = keep_with_next, spans = spans, hide_data = hide_data))
+      if(produce_df && row$ncells == max_ncells){
+        df_row <- row$texts
+        df <- df %>%
+          rbind(df_row)
+      }
     }
     prev_ncells <- row$ncells
 
+  }
+  if(produce_df){
+    names(df) <- df_headers
+    haven::write_sas()
   }
   xml_rows <- paste(xml_rows, collapse = "")
   paste0(xml_grid,xml_rows)

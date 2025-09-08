@@ -17,7 +17,7 @@ add_footer <- function(ht,footers){
       c(x,footers)
     }) %>%
     data.frame()
-  spans <- data[FALSE, , drop = FALSE]
+  spans <- ht$footer$dataset[FALSE, , drop = FALSE]
   for(i in 1:nrow(ht$footer$dataset)){
     spans[i,] = get_runs(ht$footer$dataset[i,])
   }
