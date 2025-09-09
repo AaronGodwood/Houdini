@@ -83,7 +83,7 @@ add_xml_table <- function(x, bookmark, table){
     cursor_to_bookmark(bookmark)
 
   #adds table at that cursor point
-  x <-add_xml(x = x, table, pos = "on")
+  x <-add_xml(x = x, table, pos = "next")
 
   #returns changed doc
   x

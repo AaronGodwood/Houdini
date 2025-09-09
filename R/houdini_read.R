@@ -194,9 +194,9 @@ absolute_path <- function(x){
 
 
 
-add_xml <- function(x, str, pos = c("after", "before", "on")) {
+add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
   new_xml <- as_xml_document(str)
-  pos <- match.arg(pos)
+  pos <- match.arg(pos,c("after", "before", "on","next"),several.ok = FALSE)
 
   cursor_node <- get_cursor_block(x$cursor,x$doc)
   if (is.null(cursor_node)) {
@@ -207,7 +207,26 @@ add_xml <- function(x, str, pos = c("after", "before", "on")) {
     )
     .name <- xml_name(new_xml)
     x$cursor <- cursor_append(x$cursor, .name)
-  } else if (pos == "on") {
+    return(x)
+  }
+  if(pos == "next"){
+    x$cursor$which <- x$cursor$which + 1L
+    cursor_node <- get_cursor_block(x$cursor,x$doc)
+    if(is.null(cursor_node) || (xml_name(cursor_node) != "tbl" && xml_name(cursor_node) != "w:tbl")){
+      x$cursor$which <- (x$cursor$which -1)
+      cursor_node <- get_cursor_block(x$cursor,x$doc)
+      pos <- "after"
+    }else{
+      print("ran")
+      xml_replace(cursor_node, new_xml)
+      x$cursor <- cursor_replace_nodename(
+        x$cursor,
+        xml_name(new_xml)
+      )
+    }
+  }
+  print(pos)
+  if (pos == "on") {
     xml_replace(cursor_node, new_xml)
     x$cursor <- cursor_replace_nodename(
       x$cursor,
@@ -215,9 +234,11 @@ add_xml <- function(x, str, pos = c("after", "before", "on")) {
     )
   } else if (pos == "after") {
     xml_add_sibling(cursor_node, new_xml, .where = pos)
+    houdini_global$bookmark_jmptbl[-seq_len(which(houdini_global$bookmark_jmptbl == x$cursor$which))] <- houdini_global$bookmark_jmptbl[-seq_len(which(houdini_global$bookmark_jmptbl == x$cursor$which))] + 1L
     x$cursor <- cursor_add_after(x$cursor, xml_name(new_xml))
-  } else {
+  }else {
     xml_add_sibling(cursor_node, new_xml, .where = pos)
+    houdini_global$bookmark_jmptbl[seq_len(which(houdini_global$bookmark_jmptbl == (x$cursor$which-1)))] <- houdini_global$bookmark_jmptbl[seq_len(which(houdini_global$bookmark_jmptbl == (x$cursor$which-1)))] + 1L
     x$cursor <- cursor_add_before(x$cursor, xml_name(new_xml))
   }
   x
@@ -243,7 +264,7 @@ cursor_append <- function(x, what) {
 }
 
 cursor_add_after <- function(x, what) {
-  seq_left <- seq_along(x$which)
+  seq_left <- seq_len(x$which)
   set_left <- x$nodes_names[seq_left]
   set_right <- x$nodes_names[-seq_left]
   x$nodes_names <- c(set_left, what, set_right)
@@ -252,7 +273,7 @@ cursor_add_after <- function(x, what) {
 }
 
 cursor_add_before <- function(x, what) {
-  seq_left <- seq_along(x$which - 1)
+  seq_left <- seq_len(x$which - 1)
   set_left <- x$nodes_names[seq_left]
   set_right <- x$nodes_names[-seq_left]
   x$nodes_names <- c(set_left, what, set_right)

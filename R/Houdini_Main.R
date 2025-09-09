@@ -45,10 +45,10 @@ display_tables <- function(names, directory){
 }
 
 
-prep_rtf <- function(table_name, file_location,hide_data = FALSE){
+prep_rtf <- function(table_name, file_location,filters,hide_data = FALSE){
   raw_rtf <- sprintf("%s%s",file_location,table_name) %>%
     read_raw_rtf()
-  xml_table <- build_table(raw_rtf,hide_data)
+  xml_table <- build_table(raw_rtf,filters,hide_data)
   xml_table
 }
 
@@ -227,7 +227,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
           if(rtf){
             name <- dataset_names[i] %>%
               gsub("\\.sas7bdat","\\.rtf",.)
-            test <- prep_rtf(name,file_location,hide_data)
+            test <- prep_rtf(name,file_location,filters[[i]],hide_data)
             new_doc <- new_doc %>%
               add_xml_table(bookmark = bookmarks[i],test)
           }
@@ -314,7 +314,7 @@ r <- function(){
 
   location5 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/tfls/tables/external/"
 
-  file_location <- location2
+  file_location <- location5
   location <- file_location
 
   # Read in word document
@@ -325,7 +325,7 @@ r <- function(){
   input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
-  apparate(input_doc,input_sheet,file_location, rtf = FALSE, hide_data = TRUE)
+  apparate(input_doc,input_sheet,file_location, rtf = TRUE, hide_data = TRUE)
 }
 
 

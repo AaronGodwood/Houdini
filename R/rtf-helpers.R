@@ -1,9 +1,36 @@
-get_pages <- function(rtf){
+get_pages <- function(rtf,filters){
+
+  parameters <- filters$parameters
   rtf <- rtf %>%
     strsplit(split = "\\\\sectd") %>%
     unlist()
-  rtf <- rtf %>%
-    sapply(function(x) {
+  rtf <- rtf[-1]
+
+  headers <- rtf %>%
+    lapply(function(x) get_header(x))
+  footers <- rtf %>%
+    lapply(function(x) get_footer(x))
+  new_headers <- list()
+  new_footers <- list()
+  new_rtf <- c()
+  for(j in seq_along(parameters)){
+    for(i in seq_along(headers)){
+      if(grepl(parameters[j],headers[[i]]$parameter,fixed = TRUE)){
+        new_headers <- append(new_headers,headers[i])
+        new_footers <- append(new_footers,footers[i])
+        new_rtf <- c(new_rtf,rtf[i])
+      }
+    }
+  }
+  if(length(new_rtf) == 0){
+    new_rtf <- rtf
+    new_headers <- headers
+    new_footers <- footers
+  }
+
+
+  new_rtf <- new_rtf %>%
+    lapply(function(x) {
       x <- x %>%
         str_extract("(?s)(?<=\\{\\\\\\*\\\\bkmkend IDX[0-9]?[0-9]?[0-9]?\\}).*") %>%
         strsplit("\\{\\\\row\\}\\\r\\\n") %>%
@@ -11,8 +38,9 @@ get_pages <- function(rtf){
       x[-length(x)]
     }) %>%
     unname()
-  rtf[-1]
+  new_rtf
 }
+
 
 get_header <- function(rtf_page){
   header <- rtf_page %>%
@@ -24,14 +52,29 @@ get_header <- function(rtf_page){
     unname()
   header <- header[-length(header)]
 
-  out <- list(
-    cut = header[[2]]$texts[2],
-    run = header[[2]]$texts[1],
-    tableid = header[[3]]$texts,
-    title = header[[4]]$texts,
-    analysis = header[[5]]$texts,
-    parameter <- header[[6]]$texts
+  out <- tryCatch(
+    {
+      list(
+        cut = header[[2]]$texts[2],
+        run = header[[2]]$texts[1],
+        tableid = header[[3]]$texts,
+        title = header[[4]]$texts,
+        analysis = header[[5]]$texts,
+        parameter = header[[6]]$texts
+      )
+    },
+    error = function(e){
+      list(
+        cut = header[[2]]$texts[2],
+        run = header[[2]]$texts[1],
+        tableid = header[[3]]$texts,
+        title = header[[4]]$texts,
+        analysis = header[[5]]$texts,
+        parameter = c()
+      )
+    }
   )
+
   class(out) <- "header"
   out
 }

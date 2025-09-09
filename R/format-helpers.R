@@ -309,7 +309,7 @@ parameter_filtering <- function(data, parameter){
       }
       else{
         logger::log_warn("Filter parameter: {x} not found - no parameter filtering applied", namespace = "Houdini Log")
-        c
+        c()
       }
     })
 
@@ -349,7 +349,7 @@ timeline_filtering <- function(data, parameter){
       }
       else{
         logger::log_warn("Filter parameter: {x} not found - no timeline filtering applied", namespace = "Houdini Log")
-        c
+        c()
       }
     })
 
