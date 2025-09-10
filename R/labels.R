@@ -7,9 +7,8 @@
 #' @param add a Boolean that says weather you want to add new labels rather than replace them
 #'
 #' @return a data frame with new changed labels
-#' @export
+#' @keywords internal
 #'
-#' @examples
 replace_labels <- function(data, new_labels, add = FALSE){ #can maybe make this functional - faster/less memory
 
   labels <- data %>%
@@ -30,9 +29,8 @@ replace_labels <- function(data, new_labels, add = FALSE){ #can maybe make this 
 #' @param data the data frame for which you want to get the labels
 #'
 #' @return a character vector of the labels you want
-#' @export
+#' @keywords internal
 #'
-#' @examples
 get_labels <- function(data){
   data %>%
     lapply(function(x) attr(x, "label")) # gets current labels

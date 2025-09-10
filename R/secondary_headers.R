@@ -5,9 +5,9 @@
 #' @param header_code a character vector that defines which labels belong to which column
 #'
 #' @return a data frame with a second layer of headers added to the labels of the header
-#' @export
+#' @importFrom purrr is_empty
+#' @keywords internal
 #'
-#' @examples
 apply_second_header <- function(data,second_labels,header_code){
 
 
@@ -33,75 +33,21 @@ apply_second_header <- function(data,second_labels,header_code){
   data
 }
 
-#brings secondary headers marked by the ^*^ delimiter up to a second and higher row of headers # may be defunct # I think this can be deleted
-#' Turn a single layer of headers split by delimiters to a multi-layered header
+
+
+
+#' Moves a secondary layer of label headers from a marked column in a dataframe to the column labels with a delimiter
 #'
-#' @param ft a flextable object for which the headers need lifting
-#' @param second_headers a list of character vectors that represent the 2nd and upwards layers of headers
+#' @param data a dataframe
 #'
-#' @return a flextable object with lifted headers
-#' @export
+#' @return a dataframe with second layer of labels appended
+#' @importFrom dplyr select all_of
+#' @keywords internal
 #'
-#' @examples
-lift_headers <- function(ft,second_headers){
-
-
-  #if there are no second layer of headers return the flextable as is
-  if(purrr::is_empty(second_headers)){
-    ft
-  }
-
-  #standardises second_headers so that ell elements are of length 2 and bind it into a data frame
-  second_headers <- second_headers %>%
-    sapply(function(x){
-      if(length(x) != max(lengths(second_headers))){
-        x <- x %>%
-          append(rep("",(max(lengths(second_headers))-length(x))))
-      }
-      x
-    }) %>%
-    rbind()
-
-
-  #adds each new layer of headers to the table
-  for( k in dim(second_headers)[1]:1){
-    border_cols <- second_headers[k,] %>%
-      sapply(function(x){
-
-        if(x == ""){
-          FALSE
-        }
-        else
-          TRUE
-      }) %>%
-      which()
-
-
-    ft <- ft %>%
-      add_header_row(values = second_headers[k,], top = TRUE ) %>%
-      hline(j=border_cols, i = (dim(second_headers)[1] - k + 1),border = header_border,part = "header")
-
-    ft
-  }
-
-
-  #futher formats the table so it all looks normal
-  ft <- ft %>%
-    hline(i = (dim(second_headers)[1]+1),part = "header", border = header_border) %>%
-    hline_top(part = "header", border = header_border) %>%
-    hline_bottom(part = "body" , border = header_border) %>%
-    merge_h(part = "header")
-
-
-  #returns the table
-  ft
-}
-
-
 apply_trt_headers <- function(data){
-  pattern <- sprintf("^%s[0-9]+", houdini_global$defaults$trtlbls.name)
   second_labels <- data %>%
-    select(matches(pattern))
+    dplyr::select(dplyr::starts_with(houdini_global$defaults$trtlbls.name))
+
   labels <- data %>%
     get_labels()
   col_numbers <- second_labels %>%

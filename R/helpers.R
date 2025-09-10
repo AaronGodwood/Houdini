@@ -52,10 +52,15 @@ smallest_pattern <- function(col){
 }
 
 #gets all column names from a df that match a specfic pattern
+
+#'
+#' @importFrom dplyr select
+#' @keywords internal
 get_col_names <- function(data, col_type){
   pattern <- sprintf("^%s[0-9]$",col_type)
-  data %>%
-    select(grep(pattern,names(.)))
+  data <- data %>%
+    dplyr::select(grep(pattern,names(.)))
+  data
 }
 
 #checks if a name starts with the word table
@@ -87,6 +92,8 @@ get_png_size <- function(image_path){
 }
 
 #sorts filters from excel doc into a named list e.g. parameters = c("filter1","filter2") timelines = c("filter3","filter4")
+#'@importFrom stringr str_remove
+#'@keywords internal
 sort_filters <- function(raw_filters){
   if(is.na(raw_filters))
   {

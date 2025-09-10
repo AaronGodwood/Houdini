@@ -8,15 +8,17 @@
 #' @param x a word document
 #'
 #' @return a list that acts as a jumptable for bookmark names and XML node values
+#' @importFrom xml2 xml_find_all xml_path xml_parents
+#' @importFrom purrr set_names
 #' @export
 #'
-#' @examples
+#'
 find_all_bookmarks <- function(x){
 
 
   doc_xml <- x$doc #gets the word doc in xml format
 
-  bm_starts <- xml2::xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]") #attaints all boomarks that start without _ (unhidden ones)
+  bm_starts <- xml2::xml_find_all(doc_xml,"//w:bookmarkStart[not(starts-with(@w:name, '_'))]") #attaints all bookmarks that start without _ (unhidden ones)
 
   nodes_with_text <- xml2::xml_find_all(
     doc_xml,
@@ -47,9 +49,10 @@ find_all_bookmarks <- function(x){
 #' @param id a string that is the name of a bookmark
 #'
 #' @return a word doc with a moved cursor
+#' @importFrom purrr is_empty
 #' @export
 #'
-#' @examples
+#'
 cursor_to_bookmark <- function(x,id){
   if(purrr::is_empty(houdini_global$bookmark_jmptbl)){
     stop("Bookmark jumptable is empty, run find_all_bookmarks()")
@@ -76,7 +79,7 @@ cursor_to_bookmark <- function(x,id){
 #' @return an rdocx object with the table appended
 #' @keywords internal
 #'
-#' @examples
+#'
 add_xml_table <- function(x, bookmark, table){
 
   x <- x %>%
@@ -95,11 +98,12 @@ add_xml_table <- function(x, bookmark, table){
 #' @param x an rdocx object for the table to be inserted into
 #' @param bookmark the bookmark in the word document that the table is to be inserted at
 #' @param ht the houdinitable object to be inserted
+#' @param hide_data a boolean describing if  it will hide the data from the doc by replacing all data with "XX"
 #'
 #' @return an rdocx object with the table added
 #' @export
 #'
-#' @examples
+#'
 add_houdinitable <- function(x, bookmark, ht, hide_data = FALSE){
   #generates xml version of table
   xml_table <- gen_xml(ht,hide_data)
@@ -112,14 +116,13 @@ add_houdinitable <- function(x, bookmark, ht, hide_data = FALSE){
 #' @param x a word document that the figure is to be inserted into
 #' @param bookmark a string that is the id of the bookmark where the table is to be inserted
 #' @param image the file location of the image to be added
-#' @param jmp_tbl a list representing a jumptable for bookmark ids and XML nodes
 #' @param width the width of the image in the document (defaults to 6.5in the width of a doc with standard margins)
 #' @param height the width of the image in the document
 #'
 #' @return a document with a figure added
 #' @export
 #'
-#' @examples
+#'
 add_figure <- function(x, bookmark, image, width = 6.5, height = 6.5){
   x <- x %>%
     cursor_to_bookmark(bookmark)
@@ -130,9 +133,7 @@ add_figure <- function(x, bookmark, image, width = 6.5, height = 6.5){
   x
 }
 
-compile_xml <- function(ft){
-  flextable:::gen_raw_wml(ft)
-}
+
 
 
 

@@ -6,5 +6,5 @@ test_that("merge_columns works", {
 
 
 test_that("indent works", {
-  expect_equal(indent(c("a","b","c"),c(1,2,3)),c(" a","  b","   c"))
+  expect_equal(indent(c("a","b","c"),c(1,2,3)),c("  a","    b","      c"))
 })

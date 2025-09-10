@@ -1,3 +1,12 @@
+#' Splits up pages of an RTF document
+#'
+#' @param rtf raw rtf markup to be split
+#' @param filters any parameter filter to filter out certain pages
+#'
+#' @return a list of rtf markup split by page
+#' @importFrom stringr str_extract
+#' @keywords internal
+#'
 get_pages <- function(rtf,filters){
 
   parameters <- filters$parameters
@@ -42,6 +51,14 @@ get_pages <- function(rtf,filters){
 }
 
 
+#' Gets the header section of an rtf markup page
+#'
+#' @param rtf_page the rtf markup page
+#'
+#' @return a header section in rtf markup
+#' @importFrom stringr str_extract
+#' @keywords internal
+#'
 get_header <- function(rtf_page){
   header <- rtf_page %>%
     str_extract("(?s)(\\{\\\\header)(.*?)(\\{\\\\par\\}\\}\\})") %>%
@@ -79,6 +96,15 @@ get_header <- function(rtf_page){
   out
 }
 
+
+#' Gets the footer section of an rtf markup page
+#'
+#' @param rtf_page the rtf markup page
+#'
+#' @return a footer section in rtf markup
+#' @importFrom stringr str_extract
+#' @keywords internal
+#'
 get_footer <- function(rtf_page){
   footer <- rtf_page %>%
     str_extract("(?s)(\\{\\\\footer)(.*?)(\\\\pard\\}\\})") %>%

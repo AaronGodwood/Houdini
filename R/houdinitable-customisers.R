@@ -4,9 +4,9 @@
 #' @param footers a character vector of vectors to be added as footnotes
 #'
 #' @return a houidnitbale object with footers added
+#' @importFrom purrr is_empty
 #' @export
 #'
-#' @examples
 add_footer <- function(ht,footers){
   #changes nothing if there are no footers
   if(purrr::is_empty(footers)){
@@ -37,7 +37,6 @@ add_footer <- function(ht,footers){
 #' @return a houdinitable object with column text alignments changed
 #' @export
 #'
-#' @examples
 set_alignments <- function(ht,alignment, col_keys = NULL){
   if(is.null(col_keys)){
     alignments <- rep(alignment,length(ht$alignments))
@@ -63,10 +62,9 @@ set_alignments <- function(ht,alignment, col_keys = NULL){
 #' @param width a float or integer defining the width you wish to set the specified column to
 #' @param col_keys column keys defining the columns you want to set the widths of
 #'
-#' @return
+#' @return a houdinitable object with modified widths
 #' @export
 #'
-#' @examples
 set_widths <- function(ht,width, col_keys = NULL){
   if(is.null(col_keys)){
     widths <- rep(width,length(ht$widths))
@@ -94,7 +92,6 @@ set_widths <- function(ht,width, col_keys = NULL){
 #' @return a houdinitable object with data grouped
 #' @export
 #'
-#' @examples
 paginate <- function(ht, column){
   if(length(column) < 2)
   {

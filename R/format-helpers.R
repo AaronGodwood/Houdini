@@ -5,9 +5,9 @@
 #' @param data a data frame containing descriptor and data containing columns
 #'
 #' @return a data frame containing descriptor and data containing columns in the correct order
+#' @importFrom dplyr relocate all_of
 #' @keywords internal
 #'
-#' @examples
 order_cols <- function(data){
 
   ROWLBLs <- data %>%
@@ -19,12 +19,12 @@ order_cols <- function(data){
   for(i in length(COLs):1){
     column_name <- sprintf("%s%s", houdini_global$defaults$cols.name, i)
     data <- data %>%
-      relocate(all_of(column_name))
+      dplyr::relocate(dplyr::all_of(column_name))
   }
   for(i in length(ROWLBLs):1){
     column_name <- sprintf("%s%s", houdini_global$defaults$rowlbls.name, i)
     data <- data %>%
-      relocate(all_of(column_name))
+      dplyr::relocate(dplyr::all_of(column_name))
   }
   data
 }
@@ -37,7 +37,6 @@ order_cols <- function(data){
 #' @return a list with the data separated
 #' @keywords internal
 #'
-#' @examples
 separate_data <- function(col){
   #if its smaller than 2 there can be no repeated values
   if(length(col) < 2)
@@ -72,7 +71,6 @@ separate_data <- function(col){
 #' @return a houdinitable object with footnotes added
 #' @keywords internal
 #'
-#' @examples
 add_footnote <- function(ht, footnotes = ""){
   #if there are no footnotes return table as is
   if(footnotes == "")
@@ -102,6 +100,11 @@ format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
 }
 
 
+#' Title
+#' @importFrom dplyr select all_of starts_with
+#' @importFrom tibble add_row
+#' @keywords internal
+#'
 add_row_buffers2 <- function(data){
 
   #adds no buffers if theres one row or less
@@ -145,9 +148,11 @@ add_row_buffers2 <- function(data){
 #' @param data a data frame to have buffer rows added to it
 #'
 #' @return a data frame with buffer rows added to it
+#' @importFrom dplyr select all_of starts_with
+#' @importFrom tibble add_row
+#' @importFrom stringr str_count
 #' @keywords internal
 #'
-#' @examples
 add_row_buffers <- function(data){
 
   #adds no buffers if theres one row or less
@@ -199,9 +204,9 @@ add_row_buffers <- function(data){
 #' @param data a data frame to have buffer columns added to it
 #'
 #' @return a data frame with buffer columns added to it
+#' @importFrom tibble add_column
 #' @keywords internal
 #'
-#' @examples
 add_col_buffers <- function(data){ # having issues with dropping labels - got a work around but its not ideal
 
   #get labels as adding columns deletes them
@@ -239,7 +244,6 @@ add_col_buffers <- function(data){ # having issues with dropping labels - got a 
 #' @return a data frame with the page column appended
 #' @keywords internal
 #'
-#' @examples
 add_page_column <- function(data){
 
   #gets labels as adding a column appears to delete them
@@ -280,23 +284,26 @@ add_page_column <- function(data){
 
 }
 
+filter
 
 
-
-#' Filters data by certein parameters e.g. score
+#' Filters data by certain parameters e.g. score
 #'
 #' @param data a data frame representing the data to be filtered
 #' @param parameter a character vector containing parameters to be filtered by
 #'
 #' @return a filtered data frame
+#' @importFrom purrr is_empty
+#' @importFrom dplyr filter
+#' @importFrom logger log_warn
 #' @keywords internal
 #'
-#' @examples
 parameter_filtering <- function(data, parameter){
   if(purrr::is_empty(parameter))
   {
     return(data)
   }
+
   pattern <- sprintf("%s1",houdini_global$defaults$param.name)
   if(!(pattern %in% names(data))){
     return(data)
@@ -308,7 +315,7 @@ parameter_filtering <- function(data, parameter){
         x
       }
       else{
-        logger::log_warn("Filter parameter: {x} not found - no parameter filtering applied", namespace = "Houdini Log")
+        logger::log_warn("Parameter filter: {x} not found - parameter filter not applied", namespace = "Houdini Log")
         c()
       }
     })
@@ -329,9 +336,11 @@ parameter_filtering <- function(data, parameter){
 #' @param parameter a character vector containing timelines to be filtered by
 #'
 #' @return a filtered data frame
+#' @importFrom purrr is_empty
+#' @importFrom dplyr filter
+#' @importFrom logger log_warn
 #' @keywords internal
 #'
-#' @examples
 timeline_filtering <- function(data, parameter){
   if(purrr::is_empty(parameter))
   {
@@ -339,7 +348,7 @@ timeline_filtering <- function(data, parameter){
   }
 
 
-  first_col_name <- sym(sprintf("%s1", houdini_global$defaults$rowlbls.name))
+  first_col_name <- sprintf("%s1", houdini_global$defaults$rowlbls.name)
 
   parameter <- parameter %>%
     sapply(function(x){
@@ -348,17 +357,17 @@ timeline_filtering <- function(data, parameter){
         x
       }
       else{
-        logger::log_warn("Filter parameter: {x} not found - no timeline filtering applied", namespace = "Houdini Log")
+        logger::log_warn("Timeline filter: {x} not found - timeline filter not applied", namespace = "Houdini Log")
         c()
       }
     })
 
   page_group <- data %>%
-    filter(.data[[first_col_name]] %in% parameter) %>%
+    dplyr::filter(.data[[first_col_name]] %in% parameter) %>%
     with(PAGE)
 
   new_data <- data %>%
-    filter(PAGE %in% page_group)
+    dplyr::filter(PAGE %in% page_group)
 
   if(nrow(new_data) == 0){
     return(data)

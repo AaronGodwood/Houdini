@@ -16,6 +16,17 @@ build_table <- function(raw_rtf,filters, hide_data = FALSE){
 }
 
 
+#' Converts rows of a table in rtf markup to a table in WordML
+#'
+#' @param rtf_rows rows of a table in rtf markup
+#' @param filters any filters to filter out certain rows
+#' @param hide_data an option to hide any data in output by replacing it with XX, defaults to FALSE
+#'
+#' @return a WordML table
+#' @importFrom logger log_warn
+#' @importFrom purrr is_empty
+#' @keywords internal
+#'
 compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = FALSE){
   rows <- rtf_rows %>%
     lapply(function(x) extract_rtf_row(x)) %>%
@@ -37,7 +48,7 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
         x
       }
       else{
-        logger::log_warn("Filter parameter: {x} not found - no timeline filtering applied", namespace = "Houdini Log")
+        logger::log_warn("Timeline filter: {x} not found - timeline filter not applied", namespace = "Houdini Log")
         c()
       }
     })
@@ -113,10 +124,18 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
   #   names(df) <- df_headers
   #   haven::write_sas()
   # }
-  xml_rows <- paste(xml_rows, collapse = "")
+  xml_rows <- paste0(xml_rows, collapse = "")
   paste0(xml_grid,xml_rows)
 }
 
+#' Extracts data from a row of an rtf table
+#'
+#' @param row a row from an rtf table
+#'
+#' @return key information about cells in an rtf row
+#' @importFrom stringr str_match
+#' @keywords internal
+#'
 extract_rtf_row <- function(row){
   sections <- row %>%
     strsplit(split = "\\\r\\\n\\\\") %>%
@@ -160,6 +179,14 @@ extract_rtf_row <- function(row){
 
 
 
+#' Extracts the text from an rtf cell
+#'
+#' @param cell_prop an rtf line containing the text
+#'
+#' @return the text from an rtf cell
+#' @importFrom stringr str_match
+#' @keywords internal
+#'
 extract_text <- function(cell_prop){
   cell_prop <- cell_prop %>%
     gsub("\\\r\\\n","",.)

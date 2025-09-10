@@ -1,8 +1,18 @@
 
 
+#' Creates a houdinitable object from a dataframe
+#'
+#' @param data a data frame to convert
+#' @param col_keys names of the columns that you want ot show up
+#' @param cwidth cell width
+#' @param cheight cell height
+#'
+#' @return a houdnitable object
+#' @importFrom stats setNames
+#' @export
+#'
 houdinitable <- function(data, col_keys = names(data),
-                         cwidth = 0.75, cheight = 0.25,
-                         use_labels = TRUE){
+                         cwidth = 0.75, cheight = 0.25){
   stopifnot(is.data.frame(data),ncol(data) > 0)
   if(any(duplicated(col_keys))){
     stop("Can't have duplicated col keys")
@@ -65,7 +75,6 @@ houdinitable <- function(data, col_keys = names(data),
 
   class(out) <- c("houdinitable")
 
-  #out <- set_table_properties
 
   #apply_labels(out, labels)
   out
@@ -99,7 +108,9 @@ split_headers <- function(headers){
   data.frame(headers)
 }
 
-
+#'
+#' @importFrom purrr is_empty
+#' @keywords internal
 get_runs <- function(list){
   if(purrr::is_empty(list))
   {

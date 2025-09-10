@@ -4,28 +4,6 @@ std_labels = c(A = "Part A (Placebo Controlled)", B = "Part B (Maintainence)", C
 
 
 
-#' Applies default formatting to a table
-#'
-#' @param ft a flextable for formatting to be applied to
-#'
-#' @return a flextable with formatting applied
-#' @export
-#'
-#' @examples
-# apply_flextable_defaults <- function(ft) {
-#   ft <- ft %>%
-#     #fontsize(size = 10) %>%             # Set font size to 10
-#     fontsize(size = 10, part = "all") %>%
-#     #font(font = "Times New Roman") %>%   # Set font to Times New Roman
-#     font(font = "Times New Roman", part = "all") %>%   # Set font to Times New Roman
-#     bold(part = "header") %>%  # set header to bold
-#     padding(padding = 0) %>%            # Set padding to 0
-#     line_spacing(space = 1) #%>%          # Set line spacing to 1
-#     #set_table_properties(width = 1,layout = "autofit")  # Autofit the table layout
-#   return(ft)
-# }
-
-
 #' Formats standard formatted data sets into tables
 #'
 #' 1-Apply and secondary layers of headers from TRTLBL columns if they exist
@@ -45,9 +23,11 @@ std_labels = c(A = "Part A (Placebo Controlled)", B = "Part B (Maintainence)", C
 #' @param filters a named vector produced by sort_filters() that describes the filtering required
 #'
 #' @return a formatted table representing the data from the data frame
+#' @importFrom dplyr select starts_with where
+#' @importFrom lubridate setdiff
 #' @keywords internal
 #'
-#' @examples
+#'
 standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters = c(parameters = c(), timelines = c() )){
 
 
@@ -87,7 +67,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
 
   #Orders columns with descriptor cols on left followed by data cols in order - must happen before subsequent code as they rely on ordered cols
   data <- data %>%
-    add_row_buffers2() %>%
+    add_row_buffers() %>%
     dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name))) %>%
     order_cols()
 
@@ -144,9 +124,12 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
 #' @param data a data frame that represents the non-standard formatted dataset
 #'
 #' @return a data frame that represents a standard formatted dataset
-#' @export
+#' @importFrom dplyr select starts_with
+#' @importFrom purrr is_empty
+#' @importFrom tibble tibble
+#' @keywords internal
 #'
-#' @examples
+#'
 non_standard_format <- function(data){
 
 
@@ -164,7 +147,7 @@ non_standard_format <- function(data){
 
   #gets the row label indent columns if they exist
   LBLINDENTs <- data %>%
-    select(grep("^ROWLBL[0-9]INDENT$",names(.)))        #URGENT THIS WORKS NOW BUT UNDERMINES GLOBAL SETTINGS PURPOSE
+    dplyr::select(grep("^ROWLBL[0-9]INDENT$",names(.)))        #URGENT THIS WORKS NOW BUT UNDERMINES GLOBAL SETTINGS PURPOSE
   #if row label indent columns exist apply indents
   if(!(purrr::is_empty(LBLINDENTs))){
     for(i in 1:length(ROWLBLs))
@@ -185,26 +168,13 @@ non_standard_format <- function(data){
   }
   new_headers <- current_headers %>%
     unique()
-  #gets rows of headers
-  # first_headers <- headers %>%
-  #   dplyr::select(dplyr::last_col())
-  # first_headers <- first_headers[[1]] %>%
-  #   fill_gaps()
-  # if(length(headers) > 1){
-  #   col_name <- sprintf("%s1", houdini_global$defaults$colvars.name)
-  #   second_headers <- data$COLVAR1 #needs to be chnaged
-  #   new_headers <- merge_columns(second_headers,first_headers, separator = houdini_global$defaults$delimiter.non.regex ) %>%
-  #     unique()
-  # }
-  # else
-  #   new_headers <- first_headers %>%
-  #     unique()
+
 
   labels <- c(labels,new_headers)
 
 
   CELLVALs <- data %>%
-    dplyr::select(starts_with( c( houdini_global$defaults$cellvalcs.name )))
+    dplyr::select(dplyr::starts_with( c( houdini_global$defaults$cellvalcs.name )))
   CELLVALs <- CELLVALs[[1]]
   n_points <- new_headers %>%
     length()

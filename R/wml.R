@@ -1,9 +1,6 @@
 
 
-xml_hello <- function(){
-  hello_doc <- officer::read_docx("hello.docx")
-  hello_xml <- hello_doc$doc_obj$get()
-}
+
 
 
 
@@ -14,7 +11,6 @@ xml_hello <- function(){
 #' @return a string containing a compiled word table in WordXML format
 #' @keywords internal
 #'
-#' @examples
 gen_xml <- function(ht, hide_data = FALSE){
 
   header <- ht$header$dataset
@@ -70,7 +66,6 @@ gen_xml <- function(ht, hide_data = FALSE){
 #' @return a WordXMl output of a row element
 #' @keywords internal
 #'
-#' @examples
 generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, top_footer = FALSE, hide_data = FALSE){
   header_num <- header
   if(is.null(alignment)){
@@ -112,7 +107,6 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
 #' @return text with special characters replaced
 #' @keywords internal
 #'
-#' @examples
 escape_xml <- function(text){
   text %>%
     gsub("&", "&amp;", .) %>%
@@ -125,10 +119,9 @@ escape_xml <- function(text){
 #'
 #' @param widths a vector that describes the widths of each column
 #'
-#' @return
+#' @return a table grid xml string
 #' @keywords internal
 #'
-#' @examples
 generate_xml_grid <- function(widths){
   cols <- character(length(widths))
   for(i in seq_along(widths)){
@@ -162,7 +155,6 @@ generate_xml_grid <- function(widths){
 #' @return a string representing a WordXMl table cell
 #' @keywords internal
 #'
-#' @examples
 generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, top_footer = FALSE, hide_data = FALSE){
   if(in_span > 0)
   {
@@ -239,7 +231,6 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
 #' @return an XML output of the table properties part of a wordXMLtable
 #' @keywords internal
 #'
-#' @examples
 generate_table_properties <- function(width = 1, layout){
   width <- width * 5000
   properties <- paste0(
@@ -259,17 +250,16 @@ generate_table_properties <- function(width = 1, layout){
 }
 
 
-#' Adds in line breaks to text sections that contain \n
+#' Adds in line breaks to text sections that contain \\n
 #'
-#'\n means nothing in XML so they lines have to be put into individual text tags with linebreak tags in between
-#'xml:space = preserve means that spaces at the begining of cell stay otherwise they dissapear
+#' \\n means nothing in XML so they lines have to be put into individual text tags with linebreak tags in between
+#'xml:space = preserve means that spaces at the beginning of cell stay otherwise they disappear
 #'
 #' @param text the section of text that line breaks need to be added to
 #'
 #' @return an XML output of a series of text tags with line breaks if they occur
 #' @keywords internal
 #'
-#' @examples
 process_text <- function(text){
   if(grepl("\\\n",text)){
     texts <- strsplit(text,"\\\n") %>%

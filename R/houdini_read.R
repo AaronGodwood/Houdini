@@ -1,5 +1,16 @@
 
 
+
+
+#' Outputs a hrdocx object to a .docx file
+#'
+#' @param x the hrdocx object to be outputted
+#' @param target the filepath of the outputted document
+#'
+#' @return a hrdocx object
+#' @importFrom xml2 xml_text write_xml
+#' @keywords internal
+#'
 output_docx <- function(x, target = NULL){
   if(is.null(target)){
     cat("hrdocx object with",length(x),"elements\n")
@@ -23,10 +34,21 @@ output_docx <- function(x, target = NULL){
 
 }
 
+#'
+#' @importFrom xml2 xml_length xml_child
+#' @export
 length.hrdocx <- function(x){
   xml_length(xml_child(x$doc, "w:body"))
 }
 
+#' Reads in a .docx file to an hrdocx object
+#'
+#' @param path the file path of the .docx file
+#'
+#' @return a hrdocx object representing the document.xml part of a .docx file
+#' @importFrom xml2 read_xml
+#' @keywords internal
+#'
 read_docx <- function(path){
   if( !is.null(path) && !file.exists(path)){
     stop(paste0("Could not find file ",path))
@@ -57,6 +79,9 @@ read_docx <- function(path){
   out
 }
 
+#'
+#'@importFrom xml2 xml_find_first
+#'@keywords internal
 docx_dim <- function(x){
   cursor <- paste0("/w:document/w:body/*[",x$cursor$which,"]")
   if (is.na(cursor)) {
@@ -78,6 +103,9 @@ docx_dim <- function(x){
   sd
 }
 
+#'
+#' @importFrom xml2 as_list
+#' @keywords internal
 section_dimensions <- function(node) {
   section_obj <- as_list(node)
 
@@ -113,6 +141,9 @@ section_dimensions <- function(node) {
   )
 }
 
+#'
+#' @importFrom zip zipr
+#' @keywords internal
 pack_folder <- function(folder, target){
 
   target <- absolute_path(target)
@@ -148,6 +179,9 @@ pack_folder <- function(folder, target){
   target
 }
 
+#'
+#' @importFrom zip unzip
+#' @keywords internal
 unpack_folder <- function(file, folder){
 
   stopifnot(file.exists(file))
@@ -194,6 +228,16 @@ absolute_path <- function(x){
 
 
 
+#' adds an xml string to an xml tree at the cursor position
+#'
+#' @param x the xml tree that the string is to be added to
+#' @param str the xml string
+#' @param pos either on, after, next or before: on replaces the node at the cursor, after inserts it after and before before. next replaces a table if its the next node otherwise defaults to after
+#'
+#' @return an xml tree with a node added
+#' @importFrom xml2 as_xml_document xml_add_child xml_find_first xml_name xml_replace xml_add_sibling
+#' @keywords internal
+#'
 add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
   new_xml <- as_xml_document(str)
   pos <- match.arg(pos,c("after", "before", "on","next"),several.ok = FALSE)
@@ -202,7 +246,7 @@ add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
   if (is.null(cursor_node)) {
     xml_add_child(
       xml_find_first(x$doc, "/w:document/w:body"),
-      xml_elt,
+      new_xml,
       .where = 0
     )
     .name <- xml_name(new_xml)
@@ -217,7 +261,6 @@ add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
       cursor_node <- get_cursor_block(x$cursor,x$doc)
       pos <- "after"
     }else{
-      print("ran")
       xml_replace(cursor_node, new_xml)
       x$cursor <- cursor_replace_nodename(
         x$cursor,
@@ -225,7 +268,6 @@ add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
       )
     }
   }
-  print(pos)
   if (pos == "on") {
     xml_replace(cursor_node, new_xml)
     x$cursor <- cursor_replace_nodename(
@@ -245,6 +287,14 @@ add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
 }
 
 
+#' Creates a cursor object based on an xml tree
+#'
+#' @param node an xml tree that the cursor will track
+#'
+#' @return a houdini_cursor object
+#' @importFrom xml2 xml_find_all xml_name
+#' @keywords internal
+#'
 houdini_cursor <- function(node){
   nodes <- xml_find_all(node, "/w:document/w:body/*")
   nodes_names <- xml_name(nodes)
@@ -280,11 +330,21 @@ cursor_add_before <- function(x, what) {
   x
 }
 
+
 cursor_replace_nodename <- function(x, what) {
   x$nodes_names[x$which] <- what
   x
 }
 
+#' Gets XML node that the cursor is at
+#'
+#' @param x cursor object
+#' @param node document containing the cursor
+#'
+#' @return an xml node
+#' @importFrom xml2 xml_find_first
+#' @keywords internal
+#'
 get_cursor_block <- function(x, node) {
   if (length(x$nodes_names) < 1) {
     return(NULL)

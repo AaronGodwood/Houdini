@@ -1,48 +1,8 @@
-#
-#
-#
-#
-#
-#
-
-#import libraries
-library(logger)
-library(tidyverse)
-library(haven)
-library(xml2)
-
-library(readxl)
-library(tictoc)
 
 
-#testing purposes
-display_tables <- function(names, directory){
-  tic("Processing 115 tables")
-  for(i in 1:length(names))
-  {
-    tryCatch(
-      {
-        tic(str_glue("Table{i}"))
-        #returns updated doc with table added
-        print(prep_table(names[i]))
-
-        #logs a success if table is added correctly
-        log_info("Table {i}:", namespace = "Houdini Logs")
-        toc()
-
-      },
-      error = function(e){
-        #logs a failure containing the error that occurred
-        log_error("Table {i}: Error: {e}", namespace = "Houdini Logs")
-        toc()
-        #returns unchanged document
-      }
-    )
-  }
-  toc()
 
 
-}
+
 
 
 prep_rtf <- function(table_name, file_location,filters,hide_data = FALSE){
@@ -56,15 +16,18 @@ prep_rtf <- function(table_name, file_location,filters,hide_data = FALSE){
 #' Reads in raw data from .sas7bdat file and converts it to a formatted table
 #'
 #' @param table_name a string representing the file name of a dataset
-#' @param format a string that says weather the dataset is in standard format or not
-#' @param landscape a Boolean that says weather a table should be landscape <might get removed>
+#' @param file_location the file path to the dataset to be read
+#' @param filters any filters to be performed on the table e.g. on;y Week 16 data
+#' @param footnotes any footnotes to be added to the table
 #' @param header_code a header code for adding headers missing from data sets
 #' @param doc_width a float that represents the total width the table needs to be
 #'
 #' @return a formatted table
-#' @export
+#' @importFrom haven read_sas
+#' @importFrom dplyr mutate across where
+#' @importFrom logger log_warn
+#' @keywords internal
 #'
-#' @examples
 prep_table <- function(table_name, file_location, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
 
 
@@ -94,15 +57,6 @@ prep_table <- function(table_name, file_location, filters = "", footnotes = "", 
     raw_data <- raw_data %>%
       non_standard_format()
   }
-  # if(!is.null(raw_data$TRTLBL12)){
-  #   needs_headers <- FALSE
-  # }
-  # if(needs_headers){
-  #
-  #   data <-raw_data %>%
-  #     dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name )))
-  #   print(paste0(table_name,": " ,ncol(data)))
-  # }
 
 
   if(nrow(raw_data) <= 1){
@@ -122,7 +76,7 @@ prep_table <- function(table_name, file_location, filters = "", footnotes = "", 
 
 #' @title Performs full Houdini operation
 #'
-#'Inserts all tables specified in the indicated
+#' @description Inserts all tables specified in the indicated
 #'
 #'
 #'
@@ -130,43 +84,46 @@ prep_table <- function(table_name, file_location, filters = "", footnotes = "", 
 #' @param input_doc a string stating the file name for a word document populated with bookmarks fro table insertion
 #' @param input_sheet a string stating the file name for a an excel sheet with information about what tables to insert and where to insert them
 #' @param file_location a string representing the file path that the data sets reside in
+#' @param hide_data A Boolean describing if the fucntion will hide data on output by replacing data with "XX"
+#' @param rtf a Boolean describing if the functions extracts data from rtf files or not, defaults to FALSE
 #'
 #' @return Outputs a word document with tables added
+#' @import logger
+#' @importFrom readxl read_excel
 #' @export
 #'
-#' @examples
 apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf = FALSE){
 
   #testing
-  tic("Start-Finish")
+  #tic("Start-Finish")
   #sets up log file and log level
   setup_log()
   if(hide_data)
-    log_info("Data is being hidden", namespace = "Houdini Logs")
+    logger::log_info("Data is being hidden", namespace = "Houdini Logs")
   START <- structure(400L, level = "START/END", class = c("loglevel", "integer"))
-  log_level(START,"Script Start:", namespace = "Houdini Logs")
-  log_info("Directory: {file_location}", namespace = "Houdini Logs")
-  log_info("User: {Sys.info()[[\"user\"]]}", namespace = "Houdini Logs")
+  logger::log_level(START,"Script Start:", namespace = "Houdini Logs")
+  logger::log_info("Directory: {file_location}", namespace = "Houdini Logs")
+  logger::log_info("User: {Sys.info()[[\"user\"]]}", namespace = "Houdini Logs")
   #reads in word document with bookmarks & logs it, stops operation if this fails as the program cannot continue without the word doc
-  tic("Load Info:")
+  #tic("Load Info:")
   tryCatch(
     {
-      log_info("Sucessfully read document: {input_doc}", namespace = "Houdini Logs")
+      logger::log_info("Sucessfully read document: {input_doc}", namespace = "Houdini Logs")
       Input_Doc <- read_docx(input_doc)
     },
     error = function(e){
-      log_error("Error in reading {input_doc}: {e}", namespace = "Houdini Logs")
+      logger::log_error("Error in reading {input_doc}: {e}", namespace = "Houdini Logs")
       stop("Error in reading Word document: refer to log")
     }
   )
   #reads in excel document containing instructions & logs it
   tryCatch(
     {
-      log_info("Sucessfully read document: {input_sheet}", namespace = "Houdini Logs")
+      logger::log_info("Sucessfully read document: {input_sheet}", namespace = "Houdini Logs")
       Input_Sheet <- readxl::read_excel(input_sheet, sheet = 1)
     },
     error = function(e){
-      log_error("Error in reading {input_sheet}: {e}", namespace = "Houdini Logs")
+      logger::log_error("Error in reading {input_sheet}: {e}", namespace = "Houdini Logs")
       stop("Error in reading Excel document: refer to log")
     }
   )
@@ -181,7 +138,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
       bm_jmptbl <- find_all_bookmarks(Input_Doc)
     },
     error = function(e){
-      log_error("Error in reading bookmarks: {e}", namespace = "Houdini Logs")
+      logger::log_error("Error in reading bookmarks: {e}", namespace = "Houdini Logs")
       stop("Error in reading bookamrks: refer to log")
     }
   )
@@ -209,9 +166,9 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
     sapply(function(x){
       strsplit(x,split = "")
       })
-  toc()
+  #toc()
   #adds each table to the word doc at its respective bookmark
-  tic("Tables")
+  #tic("Tables")
 
   for(i in 1:(n_tables[1])){
 
@@ -223,7 +180,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
       {
         if(is_table(bookmarks[i]))
         {
-          tic(str_glue("Table {i}"))
+          #tic(str_glue("Table {i}"))
           if(rtf){
             name <- dataset_names[i] %>%
               gsub("\\.sas7bdat","\\.rtf",.)
@@ -238,51 +195,51 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
             new_doc <- new_doc %>%
               add_houdinitable(bookmarks[i],test,hide_data)
           }
-          log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-          toc()
+          logger::log_info("Table {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          #toc()
           new_doc
         }
         else
         {
           logger::log_level(TBLSTART,"Figure {i}: {dataset_names[i]}",namespace = "Houdini Logs")
-          tic(str_glue("Figure {i}"))
+          #tic(str_glue("Figure {i}"))
           img_width <- (get_png_size(dataset_names[i])[["width"]])/96
           img_height <- (get_png_size(dataset_names[i])[["height"]])/96
           new_height <- img_height*(width/img_width)
-          log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-          toc()
+          logger::log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          #toc()
           new_doc <- new_doc %>%
             add_figure(bookmarks[i],dataset_names[i],width = width, height = new_height)
         }
       },
       error = function(e){
         #logs a failure containing the error that occurred
-        log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
-        toc()
+        logger::log_error("Table {i}: Error: {e} - {dataset_names[i]} was not inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+        #toc()
         #returns unchanged document
         new_doc
       }
     )
 
   }
-  toc()
+  #toc()
   #stores final doc in new variable
   output_doc <- new_doc
   #outputs final document
-  tic("Output final doc")
+  #tic("Output final doc")
   output_docx(output_doc, target="Houdini_Test_1.docx")
-  log_level(START,"Script Finish:", namespace = "Houdini Logs")
-  toc()
-  toc()
+  logger::log_level(START,"Script Finish:", namespace = "Houdini Logs")
+  #toc()
+  #toc()
 }
 
 #sets up log output file and log level
 #' Sets up log output file and log levels
 #'
 #' @return nothing
+#' @import logger
 #' @export
 #'
-#' @examples
 setup_log <- function()
 {
   #sets up log output file

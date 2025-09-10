@@ -57,7 +57,7 @@ test_that("Add Page Column Works",{
     order_cols() %>%
     add_row_buffers()
   PAGE <- c(1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4)
-  expected_data <- add_column(data,PAGE)
+  expected_data <- tibble::add_column(data,PAGE)
   expect_equal(add_page_column(data),expected_data,ignore_attr = TRUE)
 })
 

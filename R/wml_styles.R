@@ -1,3 +1,8 @@
+#not sure if any of this works but am leaving it in as a concept
+#can defo be implemented and would probably cut off a bit of time as stuff like borders only have to be declared once
+#unfortately i have kind of run out of time to add this but am leaving the concept here
+
+
 create_style <- function(){
   style <- paste0(
     "<w:style w:type=\"table\" w:styleId=\"houdinitable\">",
@@ -29,6 +34,8 @@ create_style <- function(){
   style
 }
 
+#' @importFrom xml2 read_xml xml_root xml_add_child
+#' @keywords internal
 add_style <- function(style,filename){
   style_xml <- get_styles(filename)
   style_root <- xml2::xml_root(style_xml)
@@ -57,6 +64,8 @@ create_style_df <- function(styles){
   add_row(styles,style)
 }
 
+#' @importFrom xml2 read_xml
+#' @keywords internal
 get_styles <- function(filename){
   package_dir <- tempfile()
   unpack_folder(file = filename, folder = package_dir)

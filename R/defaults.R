@@ -24,13 +24,14 @@ houdini_global$defaults <- houdini_default_settings
 #' @param cellvalcs.name the name of the column containing data points in non-standard data sets
 #' @param trtlbls.name the name of the column containing a second layer of headers for some tables
 #' @param param.name the name of the column containing the data parameter filtering is done by
+#' @param rowgrp.name the name of the column describing the row group
 #' @param delimiter the split delimiter used for splitting header rows and footer rows (IMPORTANT: use regex escape characters (\\) infront of special characters)
 #' @param delimiter.non.regex the split delimiter used for splitting header rows and footer rows without regex escape characters
 #'
-#' @return
+#' @return invisible
+#' @importFrom utils modifyList
 #' @export
 #'
-#' @examples
 set_houdini_defaults <- function(
     rowlbls.name = NULL,
     cols.name = NULL,
@@ -88,10 +89,9 @@ set_houdini_defaults <- function(
 
 #' Restores Houdini package options to the defaults
 #'
-#' @return
+#' @return invisible
 #' @export
 #'
-#' @examples
 init_houdini_defaults <- function(){
   x <- houdini_default_settings
   houdini_global$defaults <- x
@@ -105,7 +105,6 @@ init_houdini_defaults <- function(){
 #' @return defalt settings of the houdini package
 #' @export
 #'
-#' @examples
 get_houdini_defaults <- function(){
   x <- houdini_default_settings
   class(x) <- "houdini_defaults"
