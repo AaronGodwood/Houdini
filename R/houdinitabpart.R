@@ -4,7 +4,7 @@ houdini_tabpart <- function(data, col_keys = names(data),
 
   span_init <- matrix(1L, nrow = nrow(data), ncol = length(col_keys))
 
-  spans <- list(rows = span_init)
+  spans <- data.frame(span_init)
 
 
   if (length(cwidth) == length(col_keys)) {

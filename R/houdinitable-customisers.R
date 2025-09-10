@@ -16,6 +16,7 @@ add_footer <- function(ht,footers){
     sapply(function(x){
       c(x,footers)
     }) %>%
+    t() %>%
     data.frame()
   spans <- ht$footer$dataset[FALSE, , drop = FALSE]
   for(i in 1:nrow(ht$footer$dataset)){

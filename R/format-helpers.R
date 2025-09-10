@@ -73,13 +73,14 @@ separate_data <- function(col){
 #'
 add_footnote <- function(ht, footnotes = ""){
   #if there are no footnotes return table as is
-  if(footnotes == "")
-    ht
-
-  #splits footnotes into a vector by delimiter
-  footnotes <- footnotes %>%
-    strsplit(split = houdini_global$defaults$delimiter) %>%
-    unlist()
+  if(footnotes == ""){
+    footnotes <- c("")
+  }else{
+    #splits footnotes into a vector by delimiter
+    footnotes <- footnotes %>%
+      strsplit(split = houdini_global$defaults$delimiter) %>%
+      unlist()
+  }
 
 
 
