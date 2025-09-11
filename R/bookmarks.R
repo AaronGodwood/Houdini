@@ -68,7 +68,13 @@ cursor_to_bookmark <- function(x,id){
   x
 }
 
+add_img <- function(x, img, width, height, pos = "after"){
+  unit <- "in"
 
+  file_type <- gsub("(.*)(\\.[a-zA-Z0-0]+)$", "\\2", src)
+  new_src <- tempfile(fileext = file_type)
+  file.copy(src, to = new_src)
+}
 
 #' Adds an xml table to an rdocx object at a specified bookmark
 #'

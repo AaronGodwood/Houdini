@@ -84,6 +84,34 @@ set_widths <- function(ht,width, col_keys = NULL){
 
 }
 
+auto_widths <- function(ht, data_cols){
+  all_parts <- rbind(ht$header$dataset,ht$body$dataset)
+  all_parts <- rbind(ht$header$dataset,all_parts)
+  all_parts <- all_parts %>%
+    apply(c(1,2),function(x) nchar(x))
+  all_parts[all_parts == 0] <- NA
+  parts_length <- colMeans(all_parts, na.rm = TRUE) %>%
+    sapply(function(x){
+      if(is.na(x)){
+        return(0)
+      }
+      return(x)
+    })
+  data_cols_length <- mean(parts_length[data_cols])
+  parts_length <- names(parts_length) %>%
+    sapply(function(x){
+      if(x %in% data_cols)
+      {
+        return(data_cols_length)
+      }
+      parts_length[[x]]
+    })
+  total <- sum(parts_length)
+  scale <- 10000 / total
+  widths <- parts_length * scale
+  ht$widths <- widths
+  ht
+}
 
 #' Stops groups of data being split over a page in a word doc
 #'

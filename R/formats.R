@@ -53,21 +53,10 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
   data[[first_col_lbl]] <- data[[first_col_lbl]] %>%
     separate_data()
 
-  #gets descriptor column names so these can be aligned left later
-  chr_cols <- data %>%
-    dplyr::select(dplyr::where( ~ any(grepl("[A-Za-z]", .)))) %>%
-    names()
-
-  #gets data columns names so that these can be aligned centrally later
-  data_cols <- data %>%
-    names() %>%
-    lubridate::setdiff(chr_cols)
-
-
 
   #Orders columns with descriptor cols on left followed by data cols in order - must happen before subsequent code as they rely on ordered cols
   data <- data %>%
-    add_row_buffers() %>%
+    add_row_buffers2() %>%
     dplyr::select(starts_with(c( houdini_global$defaults$cols.name, houdini_global$defaults$rowlbls.name))) %>%
     order_cols()
 
@@ -77,6 +66,16 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
     data <- data %>%
       apply_second_header(std_labels,header_code)
   }
+
+  #gets descriptor column names so these can be aligned left later
+  chr_cols <- data %>%
+    dplyr::select(dplyr::where( ~ any(grepl("[A-Za-z]", .)))) %>%
+    names()
+
+  #gets data columns names so that these can be aligned centrally later
+  data_cols <- data %>%
+    names() %>%
+    lubridate::setdiff(chr_cols)
 
   #adds buffers between row groups of data and between column groups then adds a page column that describes what groups each row belongs to
   #page column must be added after row buffers as it rely s on the row buffers to categorise the groups
@@ -106,7 +105,8 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
     houdinitable(col_keys = colkeys) %>%
     set_alignments("center") %>%
     set_alignments("start", chr_cols) %>%
-    paginate(data[["PAGE"]])
+    paginate(data[["PAGE"]]) %>%
+    auto_widths(data_cols)
 
 
 

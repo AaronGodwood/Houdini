@@ -1,5 +1,29 @@
 
-
+gen_xml_landscape <- function(ht, hide_data = FALSE){
+  header <- ht$header$dataset %>%
+    t() %>%
+    data.frame()
+  header_spans <- ht$header$spans  %>%
+    t() %>%
+    data.frame()
+  n_headers <- ncol(header)
+  footer <- ht$footer$dataset
+  footer_spans <- ht$footer$spans
+  body <- ht$body$dataset  %>%
+    t() %>%
+    data.frame()
+  widths <- ht$widths
+  alignments <- ht$alignments
+  table_properties <- generate_table_properties(width = 1, layout = "autofit") # will access width and layout from ht
+  table_grid <- generate_xml_grid(widths)
+  table <- cbind(header,body)
+  table_rows <- character(nrow(table))
+  for(i in seq_len(nrow(table))){
+    table_rows[i] <- generate_xml_row(table[i,],landscape = TRUE, n_headers = n_headers)
+  }
+  table_rows <- paste0(table_rows, collapse = "")
+  paste0("<w:tbl>",table_properties,table_grid,table_rows,"</w:tbl>")
+}
 
 
 
@@ -20,13 +44,18 @@ gen_xml <- function(ht, hide_data = FALSE){
   body <- ht$body$dataset
   widths <- ht$widths
   alignments <- ht$alignments
-  table_properties <- generate_table_properties(width = 1, layout = "autofit") # will access width and layout from ht
+  table_properties <- generate_table_properties(width = 1, layout = "fixed") # will access width and layout from ht
   table_grid <- generate_xml_grid(widths)
   table_rows <- character(nrow(body))
   header_rows <- character(nrow(header))
   footer_rows <- character(nrow(footer))
   for(i in seq_len(nrow(body))){
-    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments,keep_with_next = ht$keep_with_next[i],hide_data = hide_data)
+    if(i == nrow(body)){
+      bottom_row <- TRUE
+    }else{
+      bottom_row <- FALSE
+    }
+    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments,keep_with_next = FALSE ,bottom_row = bottom_row,hide_data = hide_data) #keep with next has been changed to false for all body elements o request of MW
   }
   for(i in seq_len(nrow(header))){
     header_num <- nrow(header) - i + 1
@@ -38,7 +67,7 @@ gen_xml <- function(ht, hide_data = FALSE){
       top_footer <- TRUE
     }
 
-    footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,],top_footer = top_footer, keep_with_next = TRUE)
+    footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,], keep_with_next = TRUE)
   }
   table_rows <- paste0(table_rows, collapse = "")
   header_rows <- paste0(header_rows, collapse = "")
@@ -62,11 +91,13 @@ gen_xml <- function(ht, hide_data = FALSE){
 #' @param header a number that says if the row is a header row and if it is weather it is the bottom most or not
 #' @param spans an integer vector representing any spans (merged cells) in the row
 #' @param top_footer a Boolean that says if the row is the topmost footer row
+#' @param landscape if the table needs to be generated in landscape
+#' @param n_headers tells the function how many headers there are, for use with a landscape table
 #'
 #' @return a WordXMl output of a row element
 #' @keywords internal
 #'
-generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, top_footer = FALSE, hide_data = FALSE){
+generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, bottom_row = FALSE, hide_data = FALSE, landscape = FALSE, n_headers = 0){
   header_num <- header
   if(is.null(alignment)){
     alignment = rep("start", length(row))
@@ -89,10 +120,20 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
   cells <- character(length(row))
   current_span = 1
   for(i in seq_along(row)){
+    if(i < n_headers && landscape == TRUE){
+      header_num <- 2
+      bold <- TRUE
+    }else if(i == n_headers && landscape == TRUE){
+      header_num <- 1
+      bold <- TRUE
+    }else if(landscape == TRUE){
+      header_num <- 0
+      bold <- FALSE
+    }
     current_span <- current_span - 1
     cells[i] <- row[i] %>%
       escape_xml() %>%
-      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, top_footer = top_footer, hide_data = hide_data)#, alignment = alignment[i])
+      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, bottom_row = bottom_row, hide_data = hide_data, landscape = landscape)#, alignment = alignment[i])
     current_span = current_span + spans[[i]]
   }
 
@@ -155,7 +196,7 @@ generate_xml_grid <- function(widths){
 #' @return a string representing a WordXMl table cell
 #' @keywords internal
 #'
-generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, top_footer = FALSE, hide_data = FALSE){
+generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, bottom_row = FALSE, hide_data = FALSE,landscape = FALSE){
   if(in_span > 0)
   {
     return("")
@@ -174,14 +215,24 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
     keep_with_next <- ""
   }
   if((header >= 2 && text != "") || (header == 1)){
-    borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
-    vAlign <- "<w:vAlign w:val=\"bottom\"/>"
-    keep_with_next <- "<w:keepNext/>"
+    if(landscape){
+      borders <- "<w:tcBorders><w:right w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
+      vAlign <- "<w:vAlign w:val=\"center\"/>"
+    }else{
+      borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
+      vAlign <- "<w:vAlign w:val=\"bottom\"/>"
+      keep_with_next <- "<w:keepNext/>"
+    }
   }
   else
   {
     borders = ""
     vAlign <- ""
+  }
+  if(landscape){
+    text_dir <- "<w:textDirection w:val=\"btLr\"/>"
+  }else{
+    text_dir <- ""
   }
 
   if(is.na(text) || text == "NA"){
@@ -200,8 +251,8 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   else{
     merge = ""
   }
-  if(top_footer){
-    borders <- "<w:tcBorders><w:top w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
+  if(bottom_row){
+    borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
   }
 
 
@@ -211,7 +262,7 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
   cell <- paste0(
     "<w:tcPr>",vAlign,borders,merge,"</w:tcPr>",#"<w:tcW w:w=\"",width,"\" w:type=\"pct\"/>",
     "<w:p>",
-    "<w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\"/>",keep_with_next,"<w:jc w:val=\"", alignment,"\"/></w:pPr>",
+    "<w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\"/>",keep_with_next,text_dir,"<w:jc w:val=\"", alignment,"\"/></w:pPr>",
     "<w:r><w:rPr>",font,font_size, bold, "</w:rPr>",text,"</w:r>",
     "</w:p>"
   )

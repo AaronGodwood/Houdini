@@ -10,11 +10,28 @@ build_table <- function(raw_rtf,filters, hide_data = FALSE){
   table_properties <- generate_table_properties(width = 1, layout = "fixed") # will access width and layout from ht
   #filter
   xml_rows <- rtf_pages %>%
-    unlist() %>%
     compile_rows(filters,hide_data)
   paste0("<w:tbl>",table_properties,xml_rows,"</w:tbl>")
 }
 
+
+compile_footer <- function(footer,max_ncells){
+  footnotes <- footer$footnotes
+  if(length(footnotes) == 0){
+    footnotes <- c(" ")
+  }
+  spans <- c(max_ncells,rep(0,(max_ncells-1)))
+  xml_footers <- character(length(footnotes))
+  for(i in seq_along(footnotes)){
+    top_footer <- FALSE
+    if(i == 1){
+      top_footer <- TRUE
+    }
+
+    xml_footers[i] <- generate_xml_row(footnotes[i],part = "footer", spans = spans ,top_footer = top_footer, keep_with_next = TRUE)
+  }
+  paste0(xml_footers,collapse = "")
+}
 
 #' Converts rows of a table in rtf markup to a table in WordML
 #'
@@ -28,7 +45,8 @@ build_table <- function(raw_rtf,filters, hide_data = FALSE){
 #' @keywords internal
 #'
 compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = FALSE){
-  rows <- rtf_rows %>%
+  rows <- rtf_rows$rtf %>%
+    unlist() %>%
     lapply(function(x) extract_rtf_row(x)) %>%
     unname()
 
@@ -108,7 +126,7 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
         in_filter <- FALSE
       }
       if(in_filter){
-        xml_rows <- c(xml_rows,generate_xml_row(row$texts, alignment = row$alignments, part = "body", keep_with_next = keep_with_next, spans = spans, hide_data = hide_data))
+        xml_rows <- c(xml_rows,generate_xml_row(row$texts, alignment = row$alignments, part = "body", keep_with_next = FALSE, spans = spans, hide_data = hide_data))
       }
 
       # if(produce_df && row$ncells == max_ncells){
@@ -125,7 +143,8 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
   #   haven::write_sas()
   # }
   xml_rows <- paste0(xml_rows, collapse = "")
-  paste0(xml_grid,xml_rows)
+  xml_footers <- compile_footer(rtf_rows$footer,max_ncells)
+  paste0(xml_grid,xml_rows,xml_footers)
 }
 
 #' Extracts data from a row of an rtf table

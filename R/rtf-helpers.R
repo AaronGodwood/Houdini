@@ -19,6 +19,15 @@ get_pages <- function(rtf,filters){
     lapply(function(x) get_header(x))
   footers <- rtf %>%
     lapply(function(x) get_footer(x))
+
+  page_parameters <- headers %>%
+    sapply(function(x){
+      return(x$parameter)
+    }) %>%
+    unlist()
+
+
+
   new_headers <- list()
   new_footers <- list()
   new_rtf <- c()
@@ -47,7 +56,12 @@ get_pages <- function(rtf,filters){
       x[-length(x)]
     }) %>%
     unname()
-  new_rtf
+  out <- list(
+    rtf = new_rtf,
+    header = headers[[1]],
+    footer = footers[[1]]
+  )
+  out
 }
 
 
@@ -68,6 +82,7 @@ get_header <- function(rtf_page){
     lapply(function(x) extract_rtf_row(x)) %>%
     unname()
   header <- header[-length(header)]
+  header <- header[sapply(header,function(x) any(x$texts != ""))]
 
   out <- tryCatch(
     {
@@ -115,19 +130,27 @@ get_footer <- function(rtf_page){
     unname()
   footer <- footer[-length(footer)]
   footnotes <- c()
-  for(i in seq_along(footer)){
-    if(footer[[i]]$texts == "")
-    {
-      break
+  if(length(footer) > 1){
+    for(i in seq_along(footer)){
+      if(footer[[i]]$texts == "")
+      {
+        break
+      }
+      else{
+        footnotes <- c(footnotes,footer[[i]]$texts)
+      }
     }
-    else{
-      footnotes <- c(footnotes,footer[[i]]$texts)
-    }
+    out <- list(
+      footnotes = footnotes,
+      info = footer[[length(footer)]]$texts
+    )
+  }else{
+    out <- list(
+      footnotes = c(" "),
+      info = footer[[1]]$texts
+    )
   }
-  out <- list(
-    footnotes = footnotes,
-    info = footer[[length(footer)]]$texts
-  )
+
   class(out) <- "footer"
   out
 }

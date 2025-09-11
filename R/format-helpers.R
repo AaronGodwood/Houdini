@@ -74,7 +74,7 @@ separate_data <- function(col){
 add_footnote <- function(ht, footnotes = ""){
   #if there are no footnotes return table as is
   if(footnotes == ""){
-    footnotes <- c("")
+    footnotes <- c()
   }else{
     #splits footnotes into a vector by delimiter
     footnotes <- footnotes %>%
@@ -104,6 +104,7 @@ format_sizes <- function(ft,doc_width,chr_cols,data_cols,buffer_cols){
 #' Title
 #' @importFrom dplyr select all_of starts_with
 #' @importFrom tibble add_row
+#' @importFrom stringr str_count
 #' @keywords internal
 #'
 add_row_buffers2 <- function(data){
@@ -115,24 +116,49 @@ add_row_buffers2 <- function(data){
   #gets labels as for some reason adding rows removes them
   labels <- data %>%
     get_labels()
-
-  col_label <- sprintf("%s1", houdini_global$defaults$rowgrp.name)
+  pattern <- sprintf("%s1", houdini_global$defaults$rowlbls.name)
   row_grps <- data %>%
-    dplyr::select(all_of(starts_with(houdini_global$defaults$rowgrp.name)))
+    dplyr::select(all_of(starts_with(houdini_global$defaults$rowlbls.name))) %>%
+    apply(c(1,2),function(x){
+      if(x == ""){
+        return(1000)
+      }
+      else{
+        return(stringr::str_count(x,"^\\s+"))
+      }
+    }) %>%
+    data.frame()
+  row_grps[names(row_grps) != pattern] <-  row_grps[names(row_grps) != pattern] %>%
+    apply(c(1,2),function(x){
+      if(x == 1000){
+        return(0)
+      }
+      return(x)
+    })
+  if(all(row_grps == 0)){
+    condition <- function(lhs,rhs){
+      return(any(lhs < rhs))
+    }
+  }else{
+    condition <- function(lhs,rhs){
+      return((any(lhs < rhs)) || (lhs[1] == 0 && rhs[1] == 0))
+    }
+  }
+
   rows_added <- 0
   for(i in seq_len(nrow(row_grps))){
-    if(i == 1){
-      prev_elem <- row_grps[i,]
+    if( i == 1){
       data <- data %>%
         tibble::add_row(.before = (i+rows_added))
-      rows_added <- rows_added + 1
+      rows_added <- rows_added +1
+      prev_row <- row_grps[i,]
     }else{
-      if(any(row_grps[i,] != prev_elem)){
-        prev_elem <- row_grps[i,]
+      if(condition(row_grps[i,], prev_row)){
         data <- data %>%
           tibble::add_row(.before = (i+rows_added))
-        rows_added <- rows_added + 1
+        rows_added <- rows_added +1
       }
+      prev_row <- row_grps[i,]
     }
   }
   #replaces labels as for some reason they dissapear when adding rows
@@ -225,7 +251,7 @@ add_col_buffers <- function(data){ # having issues with dropping labels - got a 
       tibble::add_column(!!col_name := NA , .after = i+cols_added) #adds empty buffer column after data columns - cols_added accounts for added new ones
 
     labels <- labels %>%
-      append("   ", after = i+cols_added) #adds new blank column label to buffer columns
+      append(" ", after = i+cols_added) #adds new blank column label to buffer columns
 
     cols_added <- cols_added + 1
   }
@@ -255,13 +281,40 @@ add_page_column <- function(data){
   labels <- labels %>%
     append("PAGE")
 
-  #gets first column to base groups off
-  first_col = data[[1]]
+  col_label <- sprintf("%s1", houdini_global$defaults$rowlbls.name)
+  first_col <- data[[col_label]]
+
+  #gets the index of rows where the indent goes backwards or it goes from an empty cell to not
+  prev_elem <- ""
+  last_na <- FALSE
+  groups <- integer()
+  for(i in seq_along(first_col)){
+    elem <- first_col[i]
+    if(is.na(elem)){
+      elem <- prev_elem
+      last_na <- TRUE
+      next
+    }
+    elem_indent <- elem %>%
+      stringr::str_count("^\\s+")
+    prev_indent <- prev_elem %>%
+      stringr::str_count("^\\s+")
+    if((prev_elem == "" && elem != "") || (elem_indent < prev_indent) || (prev_indent == 0 && elem_indent == 0 && elem != "" && prev_elem != elem)){
+      if(last_na){
+        groups <- c(groups,i-1)
+      }else{
+        groups <- c(groups,i)
+      }
+
+    }
+    last_na <- FALSE
+    prev_elem <- elem
+  }
 
   PAGE <- c()
   page_num <- 0
   for(i in 1:length(first_col)){ #iterates through each row of first column
-    if(is.na(first_col[i])){ #if it reaches a buffer row place a buffer in the new column and increment the page number
+    if(i %in% groups){ #if it reaches a buffer row place a buffer in the new column and increment the page number
       page_num <- page_num + 1
       PAGE <- PAGE %>%
         append(page_num)
@@ -285,7 +338,7 @@ add_page_column <- function(data){
 
 }
 
-filter
+
 
 
 #' Filters data by certain parameters e.g. score

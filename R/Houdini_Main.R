@@ -242,8 +242,9 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
 #'
 setup_log <- function()
 {
+  file_name <- paste0("houdini[",Sys.time(),"].log")
   #sets up log output file
-  logger::log_appender(appender_file("houdini.log"))
+  logger::log_appender(appender_file(file_name))
   #sets log level
   logger::log_threshold(DEBUG)
 }
@@ -257,7 +258,8 @@ setup_log <- function()
 r <- function(){
   #location for some tables
   location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-  table_name <- "t_14_01_02_01_t_demog.sas7bdat"
+  table_name <- "t_14_02_06_01_01_t_dlqi.sas7bdat"
+
   table_names <- list.files(location2)
   table_names <- table_names[startsWith(table_names,"t")]
 
@@ -271,7 +273,7 @@ r <- function(){
 
   location5 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/tfls/tables/external/"
 
-  file_location <- location5
+  file_location <- location2
   location <- file_location
 
   # Read in word document
@@ -282,7 +284,7 @@ r <- function(){
   input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
-  apparate(input_doc,input_sheet,file_location, rtf = TRUE, hide_data = TRUE)
+  apparate(input_doc,input_sheet,file_location,rtf = FALSE, hide_data = TRUE)
 }
 
 
