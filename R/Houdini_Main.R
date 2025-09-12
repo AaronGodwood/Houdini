@@ -155,17 +155,20 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
   #gets footnotes of a table
   footnotes <- Input_Sheet$Footnotes %>%
     replace(is.na(.),"")
-  #gets any notes about the table/figure
-  filters <- Input_Sheet$Notes %>%
-    sapply(function(x){
-      sort_filters(x)
-    })
+  #gets any filters for the table/figure
+  timelines <- Input_Sheet$Timelines %>%
+    replace(is.na(.),"")
+  parameters <- Input_Sheet$Parameters %>%
+    replace(is.na(.),"")
+  filters <- sort_filters(timelines,parameters)
   #gets header data - this functionality may not be needed later
   header_codes <- Input_Sheet$Header %>%
     replace(is.na(.), "") %>%
     sapply(function(x){
       strsplit(x,split = "")
       })
+  codes <- Input_Sheet$Code[!is.na(Input_Sheet$Code)] %>%
+    sort_codes()
   #toc()
   #adds each table to the word doc at its respective bookmark
   #tic("Tables")
@@ -258,7 +261,7 @@ setup_log <- function()
 r <- function(){
   #location for some tables
   location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-  table_name <- "t_14_02_06_01_01_t_dlqi.sas7bdat"
+  table_name <- "t_14_01_07_t_trt_dur.sas7bdat"
 
   table_names <- list.files(location2)
   table_names <- table_names[startsWith(table_names,"t")]

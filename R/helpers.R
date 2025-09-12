@@ -1,7 +1,7 @@
 
 #checks the input excel doc has the required columns
 check_excel <- function(doc){
-  required_cols <- c("Dataset","Bookmark","Footnotes","Notes")
+  required_cols <- c("Dataset","Bookmark","Footnotes","Timelines","Parameters")
   return(any(sapply(required_cols, function(x){!(x %in% names(doc))})))
 }
 
@@ -92,45 +92,47 @@ get_png_size <- function(image_path){
 }
 
 #sorts filters from excel doc into a named list e.g. parameters = c("filter1","filter2") timelines = c("filter3","filter4")
-#'@importFrom stringr str_remove
+#'
 #'@keywords internal
-sort_filters <- function(raw_filters){
-  if(is.na(raw_filters))
-  {
-    return(c())
+sort_filters <- function(timelines, parameters){
+  timelines <- timelines %>%
+    lapply(function(x){
+      strsplit(x,"; ")[[1]]
+    })
+
+  parameters <- parameters %>%
+    lapply(function(x){
+      strsplit(x,"; ")[[1]]
+    })
+
+  filters <-list()
+  for(i in seq_along(timelines)){
+    out <- list(
+      parameters = parameters[[i]],
+      timelines = timelines[[i]]
+    )
+    filters[[i]] <- out
   }
 
+  return(filters)
 
-  raw_filters <- raw_filters %>%
-    strsplit("; ") %>%
-    unlist()
-
-  filters1 = character(0)
-  filters2 = character(0)
-  for( i in seq_along(raw_filters)){
-    if(grepl("Parameters: ", raw_filters[i])){
-      filters2 <- raw_filters[i] %>%
-      str_remove("Parameters: ") %>%
-        strsplit(", ")%>%
-        unlist()
-    }
-    else
-    {
-      filters1 <- raw_filters[i] %>%
-        str_remove("Timelines: ") %>%
-        strsplit(", ") %>%
-        unlist()
-
-    }
-  }
-  out <- list(
-    parameters = filters2,
-    timelines = filters1
-  )
-  out
 }
 
-
+sort_codes <- function(codes){
+  codes <- codes %>%
+    sapply(function(x){
+      strsplit(x," = ")
+    })
+  letters <- character(length(codes))
+  headers <- list()
+  for(i in seq_along(codes)){
+    letters[i] <- codes[[i]][1]
+    headers[[i]] <- codes[[i]][2]
+  }
+  names(headers) <- letters
+  houdini_global$header_code_table <- headers
+  headers
+}
 
 #returns a vector that represents the column in which a group ends
 get_groups <- function(data){

@@ -28,6 +28,7 @@ houdinitable <- function(data, col_keys = names(data),
     data[invis_cols_names] <- invis_cols
   }
 
+
   body <- houdini_tabpart(data = data, col_keys = col_keys, cwidth = cwidth, cheight = cheight)
 
   header_data <- data %>%

@@ -314,7 +314,7 @@ add_page_column <- function(data){
   PAGE <- c()
   page_num <- 0
   for(i in 1:length(first_col)){ #iterates through each row of first column
-    if(i %in% groups){ #if it reaches a buffer row place a buffer in the new column and increment the page number
+    if(i %in% groups){ #if it reaches a row found earlier increment the page number
       page_num <- page_num + 1
       PAGE <- PAGE %>%
         append(page_num)
@@ -348,7 +348,7 @@ add_page_column <- function(data){
 #'
 #' @return a filtered data frame
 #' @importFrom purrr is_empty
-#' @importFrom dplyr filter
+#' @importFrom dplyr filter select where
 #' @importFrom logger log_warn
 #' @keywords internal
 #'
@@ -358,10 +358,19 @@ parameter_filtering <- function(data, parameter){
     return(data)
   }
 
-  pattern <- sprintf("%s1",houdini_global$defaults$param.name)
-  if(!(pattern %in% names(data))){
+  # pattern <- sprintf("%s1",houdini_global$defaults$param.name)
+  # if(!(pattern %in% names(data))){
+  #   return(data)
+  # }
+
+  pattern <- data %>%
+    select(where(~ any(. %in% parameter, na.rm = TRUE)))
+  if(ncol(pattern) < 1){
     return(data)
+    print("None found")
   }
+  pattern <- names(pattern)
+
   parameter <- parameter %>%
     sapply(function(x){
       if(x %in% data[[pattern]])
@@ -372,7 +381,12 @@ parameter_filtering <- function(data, parameter){
         logger::log_warn("Parameter filter: {x} not found - parameter filter not applied", namespace = "Houdini Log")
         c()
       }
-    })
+    }) %>%
+    unlist()
+  parameter <- parameter[!is.null(parameter)]
+  for(i in seq_along(parameter)){
+    logger::log_info("Parameter filter: {parameter[i]} applied", namespace = "Houdini Log")
+  }
 
   new_data <- data %>%
     filter(.data[[pattern]] %in% parameter)
@@ -392,7 +406,7 @@ parameter_filtering <- function(data, parameter){
 #' @return a filtered data frame
 #' @importFrom purrr is_empty
 #' @importFrom dplyr filter
-#' @importFrom logger log_warn
+#' @importFrom logger log_warn log_info
 #' @keywords internal
 #'
 timeline_filtering <- function(data, parameter){
@@ -403,7 +417,6 @@ timeline_filtering <- function(data, parameter){
 
 
   first_col_name <- sprintf("%s1", houdini_global$defaults$rowlbls.name)
-
   parameter <- parameter %>%
     sapply(function(x){
       if(x %in% data[[first_col_name]])
@@ -414,8 +427,12 @@ timeline_filtering <- function(data, parameter){
         logger::log_warn("Timeline filter: {x} not found - timeline filter not applied", namespace = "Houdini Log")
         c()
       }
-    })
-
+    }) %>%
+    unlist()
+  parameter <- parameter[!is.null(parameter)]
+  for(i in seq_along(parameter)){
+    logger::log_info("Timeline filter: {parameter[i]} applied", namespace = "Houdini Log")
+  }
   page_group <- data %>%
     dplyr::filter(.data[[first_col_name]] %in% parameter) %>%
     with(PAGE)

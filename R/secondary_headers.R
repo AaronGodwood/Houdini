@@ -8,8 +8,8 @@
 #' @importFrom purrr is_empty
 #' @keywords internal
 #'
-apply_second_header <- function(data,second_labels,header_code){
-
+apply_second_header <- function(data,header_code){
+  second_labels <- houdini_global$header_code_table
 
   #only runs if there are secondary headers
   if(!purrr::is_empty(header_code)){

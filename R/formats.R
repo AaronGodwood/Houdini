@@ -1,5 +1,4 @@
-#Here temporarily for testing
-std_labels = c(A = "Part A (Placebo Controlled)", B = "Part B (Maintainence)", C = "Part A and B")
+
 
 
 
@@ -64,7 +63,7 @@ standard_format <- function(data, header_code = NULL, doc_width = 6.5, filters =
   if(!any( sapply( get_labels(data), function(x) grepl(delimiter,x)))){
     #if this is not the case apply the second layer of headers provided by the header code from the excel doc
     data <- data %>%
-      apply_second_header(std_labels,header_code)
+      apply_second_header(header_code)
   }
 
   #gets descriptor column names so these can be aligned left later
