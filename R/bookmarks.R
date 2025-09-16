@@ -39,7 +39,7 @@ find_all_bookmarks <- function(x){
   #names section numbers appropriately with bookmark names
   bm_jmptbl <- set_names(matches, sapply(bm_starts,function(node) xml2::xml_attr(node, "name")))
 
-  #returns 'jumptable' of bookmark names and their xml locations
+  #returns 'jumptable' of bookmark names and their xml locations and sets it globally
   houdini_global$bookmark_jmptbl <- bm_jmptbl
 }
 
@@ -57,9 +57,11 @@ cursor_to_bookmark <- function(x,id){
   if(purrr::is_empty(houdini_global$bookmark_jmptbl)){
     stop("Bookmark jumptable is empty, run find_all_bookmarks()")
   }
+  #gets jumptable from global env
   jmp_tbl <- houdini_global$bookmark_jmptbl
   if(id %in% names(jmp_tbl))
   {
+    #moves cursor to bookmark
     x$cursor$which <- jmp_tbl[id]
   }
   else
@@ -68,13 +70,7 @@ cursor_to_bookmark <- function(x,id){
   x
 }
 
-add_img <- function(x, img, width, height, pos = "after"){
-  unit <- "in"
 
-  file_type <- gsub("(.*)(\\.[a-zA-Z0-0]+)$", "\\2", src)
-  new_src <- tempfile(fileext = file_type)
-  file.copy(src, to = new_src)
-}
 
 #' Adds an xml table to an rdocx object at a specified bookmark
 #'
@@ -134,12 +130,10 @@ add_figure <- function(x, bookmark, image, width = 6.5, height = 6.5){
     cursor_to_bookmark(bookmark)
 
 
-  x <- body_add_img(x = x,width = width, height = height, src = image, pos = "on")
-  log_info("{bookmark} inserted", namespace = "Houdini Logs")
+  x <- add_img(x = x,width = width, height = height, src = image, pos = "next")
+  #log_info("{bookmark} inserted", namespace = "Houdini Logs")
   x
 }
-
-
 
 
 

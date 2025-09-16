@@ -28,7 +28,10 @@ output_docx <- function(x, target = NULL){
     stop(target, " should have '.docx' extension.")
   }
 
+
   write_xml(x$doc,paste0(x$package_dir,"/word/document.xml"))
+  write_xml(x$rels,paste0(x$package_dir,"/word/_rels/document.xml.rels"))
+  write_xml(x$content,paste0(x$package_dir,"/[Content_Types].xml"))
 
   invisible(pack_folder(folder = x$package_dir, target = target))
 
@@ -67,11 +70,15 @@ read_docx <- function(path){
   unpack_folder(file = path, folder = package_dir)
 
   doc <- read_xml(paste0(package_dir,"/word/document.xml"))
+  rels <- read_xml(paste0(package_dir,"/word/_rels/document.xml.rels"))
+  content <- read_xml(paste0(package_dir,"/[Content_Types].xml"))
   cursor <- houdini_cursor(doc)
 
   out <- structure(list(
     package_dir = package_dir,
     doc = doc,
+    rels = rels,
+    content = content,
     cursor = cursor),
     class = "hrdocx"
   )
@@ -228,7 +235,7 @@ absolute_path <- function(x){
 
 
 
-#' adds an xml string to an xml tree at the cursor position
+#' Adds an xml string to an xml tree at the cursor position
 #'
 #' @param x the xml tree that the string is to be added to
 #' @param str the xml string
@@ -278,13 +285,14 @@ add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
     xml_add_sibling(cursor_node, new_xml, .where = pos)
     houdini_global$bookmark_jmptbl[-seq_len(which(houdini_global$bookmark_jmptbl == x$cursor$which))] <- houdini_global$bookmark_jmptbl[-seq_len(which(houdini_global$bookmark_jmptbl == x$cursor$which))] + 1L
     x$cursor <- cursor_add_after(x$cursor, xml_name(new_xml))
-  }else {
+  }else if (pos== "before"){
     xml_add_sibling(cursor_node, new_xml, .where = pos)
     houdini_global$bookmark_jmptbl[seq_len(which(houdini_global$bookmark_jmptbl == (x$cursor$which-1)))] <- houdini_global$bookmark_jmptbl[seq_len(which(houdini_global$bookmark_jmptbl == (x$cursor$which-1)))] + 1L
     x$cursor <- cursor_add_before(x$cursor, xml_name(new_xml))
   }
   x
 }
+
 
 
 #' Creates a cursor object based on an xml tree

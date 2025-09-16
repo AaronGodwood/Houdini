@@ -28,7 +28,7 @@ prep_rtf <- function(table_name, file_location,filters,hide_data = FALSE){
 #' @importFrom logger log_warn
 #' @keywords internal
 #'
-prep_table <- function(table_name, file_location, filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
+prep_table <- function(table_name, file_location,  filters = "", footnotes = "", header_code = NULL, doc_width = 6.5){
 
 
   #pull raw data from .sas7bdat file and apply some cleaning - remove extraneous columns, format escape characters correctly
@@ -92,7 +92,7 @@ prep_table <- function(table_name, file_location, filters = "", footnotes = "", 
 #' @importFrom readxl read_excel
 #' @export
 #'
-apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf = FALSE){
+apparate <- function(input_doc,input_sheet,file_location, figure_location = "", hide_data = FALSE, rtf = FALSE){
 
   #testing
   #tic("Start-Finish")
@@ -156,7 +156,7 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
   footnotes <- Input_Sheet$Footnotes %>%
     replace(is.na(.),"")
   #gets any filters for the table/figure
-  timelines <- Input_Sheet$Timelines %>%
+  timelines <- Input_Sheet$Timepoints %>%
     replace(is.na(.),"")
   parameters <- Input_Sheet$Parameters %>%
     replace(is.na(.),"")
@@ -204,15 +204,22 @@ apparate <- function(input_doc,input_sheet,file_location, hide_data = FALSE, rtf
         }
         else
         {
-          logger::log_level(TBLSTART,"Figure {i}: {dataset_names[i]}",namespace = "Houdini Logs")
+          #logger::log_level(TBLSTART,"Figure {i}: {dataset_names[i]}",namespace = "Houdini Logs")
           #tic(str_glue("Figure {i}"))
+          if(figure_location != ""){
+            figure_name <- paste0(figure_location,"/",dataset_names[i])
+          }else{
+            figure_name <- dataset_names[i]
+          }
           img_width <- (get_png_size(dataset_names[i])[["width"]])/96
           img_height <- (get_png_size(dataset_names[i])[["height"]])/96
           new_height <- img_height*(width/img_width)
-          logger::log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+
           #toc()
           new_doc <- new_doc %>%
-            add_figure(bookmarks[i],dataset_names[i],width = width, height = new_height)
+            add_figure(bookmarks[i],figure_name,width = width, height = new_height)
+          logger::log_info("Figure {i}: {dataset_names[i]} inserted at bookmark: {bookmarks[i]}", namespace = "Houdini Logs")
+          new_doc
         }
       },
       error = function(e){
@@ -261,7 +268,7 @@ setup_log <- function()
 r <- function(){
   #location for some tables
   location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-  table_name <- "t_14_01_07_t_trt_dur.sas7bdat"
+  table_name <- "t_14_03_01_08_01_t_aesi_cat_pt.sas7bdat"
 
   table_names <- list.files(location2)
   table_names <- table_names[startsWith(table_names,"t")]
@@ -284,6 +291,8 @@ r <- function(){
   # input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
 
   input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
+  #input_doc <- "Houdini_Test_1.docx"
+  #input_doc <- "noimages.docx"
   input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 

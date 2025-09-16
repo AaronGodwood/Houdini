@@ -1,11 +1,13 @@
 
-#checks the input excel doc has the required columns
+#' Checks the input excel doc has the required columns
+#' @keywords internal
 check_excel <- function(doc){
-  required_cols <- c("Dataset","Bookmark","Footnotes","Timelines","Parameters")
+  required_cols <- c("Dataset","Bookmark","Footnotes","Timepoints","Parameters")
   return(any(sapply(required_cols, function(x){!(x %in% names(doc))})))
 }
 
-#combines two columns of strings
+#' Combines two columns of strings
+#' @keywords internal
 merge_columns <- function(col1,col2,separator = ""){
   merged <- mapply(function(cell1,cell2){
     if(cell1 !="")
@@ -19,7 +21,8 @@ merge_columns <- function(col1,col2,separator = ""){
 
 }
 
-#indents a label column with its specified indents
+#' Indents a label column with its specified indents
+#' @keywords internal
 indent <- function(column, indent_column){
   #creates a column of n spaces based on number in the indent col - NA goes to 0
   indents <- indent_column %>%
@@ -29,7 +32,8 @@ indent <- function(column, indent_column){
   merge_columns(indents,column)
 }
 
-#fills gaps of blank data in a column
+#' Fills gaps of blank data in a column with its repeating pattern
+#' @keywords internal
 fill_gaps <- function(data){
   unique_data <- data[data != ""] %>%
     smallest_pattern()
@@ -37,7 +41,8 @@ fill_gaps <- function(data){
   data <- rep(unique_data, length.out = length(data))
 }
 
-#gets the smallest repeating pattern in a run of data
+#' Gets the smallest repeating pattern in a run of data
+#' @keywords internal
 smallest_pattern <- function(col){
   n <- length(col)
   for(i in 1:(n/2)){
@@ -51,8 +56,7 @@ smallest_pattern <- function(col){
   return(col)
 }
 
-#gets all column names from a df that match a specfic pattern
-
+#' Gets all column names from a df that match a specfic pattern
 #'
 #' @importFrom dplyr select
 #' @keywords internal
@@ -63,14 +67,16 @@ get_col_names <- function(data, col_type){
   data
 }
 
-#checks if a name starts with the word table
+#' Checks if a name starts with the word table
+#' @keywords internal
 is_table <- function(name){
   name %>%
     startsWith("Table")
 }
 
 
-#gets dimensions of .png file
+#' Gets dimensions of .png file
+#' @keywords internal
 get_png_size <- function(image_path){
   con <- file(image_path,"rb")
   on.exit(close(con))
@@ -91,7 +97,9 @@ get_png_size <- function(image_path){
 
 }
 
-#sorts filters from excel doc into a named list e.g. parameters = c("filter1","filter2") timelines = c("filter3","filter4")
+#' Sorts filters from excel doc into a named list
+#'
+#' e.g. parameters = c("filter1","filter2") timelines = c("filter3","filter4")
 #'
 #'@keywords internal
 sort_filters <- function(timelines, parameters){
@@ -118,6 +126,8 @@ sort_filters <- function(timelines, parameters){
 
 }
 
+#' Sorts header codes into a global variable
+#' @keywords internal
 sort_codes <- function(codes){
   codes <- codes %>%
     sapply(function(x){
@@ -134,7 +144,8 @@ sort_codes <- function(codes){
   headers
 }
 
-#returns a vector that represents the column in which a group ends
+#' Returns a vector that represents the column in which a group ends
+#' @keywords internal
 get_groups <- function(data){
 
   delimiter <- houdini_global$defaults$delimiter

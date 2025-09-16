@@ -18,7 +18,7 @@ build_table <- function(raw_rtf,filters, hide_data = FALSE){
 compile_footer <- function(footer,max_ncells){
   footnotes <- footer$footnotes
   if(length(footnotes) == 0){
-    footnotes <- c(" ")
+    return("")
   }
   spans <- c(max_ncells,rep(0,(max_ncells-1)))
   xml_footers <- character(length(footnotes))
@@ -27,8 +27,10 @@ compile_footer <- function(footer,max_ncells){
     if(i == 1){
       top_footer <- TRUE
     }
+    if(!grepl("Source",footnotes[i])){
+      xml_footers[i] <- generate_xml_row(footnotes[i],part = "footer", spans = spans , keep_with_next = TRUE)
+    }
 
-    xml_footers[i] <- generate_xml_row(footnotes[i],part = "footer", spans = spans ,top_footer = top_footer, keep_with_next = TRUE)
   }
   paste0(xml_footers,collapse = "")
 }
@@ -69,7 +71,12 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
         logger::log_warn("Timeline filter: {x} not found - timeline filter not applied", namespace = "Houdini Log")
         c()
       }
-    })
+    }) %>%
+    unlist()
+  timelines <- timelines[!is.null(timelines)]
+  for(i in seq_along(timelines)){
+    logger::log_info("Timeline filter: {timelines[i]} applied", namespace = "Houdini Log")
+  }
   in_filter <- FALSE
   if(purrr::is_empty(timelines)){
     timelines <- unique(row_timelines)
@@ -85,8 +92,12 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
     generate_xml_grid()
   xml_rows <- character()
   prev_ncells <- 0
-
+  bottom_row <- FALSE
   for(i in seq_along(rows)){
+    if(i == length(rows)){
+      bottom_row <- TRUE
+    }
+
     row <- rows[[i]]
     if(row$ncells == 1 && prev_ncells == 1)
     {
@@ -126,7 +137,7 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
         in_filter <- FALSE
       }
       if(in_filter){
-        xml_rows <- c(xml_rows,generate_xml_row(row$texts, alignment = row$alignments, part = "body", keep_with_next = FALSE, spans = spans, hide_data = hide_data))
+        xml_rows <- c(xml_rows,generate_xml_row(row$texts, alignment = row$alignments, part = "body", keep_with_next = FALSE, spans = spans, hide_data = hide_data, bottom_row = bottom_row))
       }
 
       # if(produce_df && row$ncells == max_ncells){

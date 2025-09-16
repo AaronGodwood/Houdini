@@ -11,10 +11,11 @@
 #' 4-Order columns
 #' 5-If there is currently no secondary layer of headers apply the one provided by excel document
 #' 6-Add row & column buffers
-#' 7-Add a PAGE column that groups rows
+#' 7-Add a PAGE column that groups rows - used for filtering
 #' 8-Get column names you want to show up
-#' 9-Convert dataset to houdinitable
-#' 10-Apply central alignment to data columns & left alignment to descriptor columns
+#' 9 - Filter by timelines
+#' 10-Convert dataset to houdinitable
+#' 11-Apply central alignment to data columns & left alignment to descriptor columns
 #'
 #' @param data a data frame that represents a standard format dataset
 #' @param header_code a header code for if the dataset is missing a layer of headers
@@ -145,8 +146,9 @@ non_standard_format <- function(data){
     length()
 
   #gets the row label indent columns if they exist
+  indent_pattern <- sprintf("^%s[0-9]INDENTS$", houdini_global$defaults$rowlbls.name)
   LBLINDENTs <- data %>%
-    dplyr::select(grep("^ROWLBL[0-9]INDENT$",names(.)))        #URGENT THIS WORKS NOW BUT UNDERMINES GLOBAL SETTINGS PURPOSE
+    dplyr::select(grep(indent_pattern,names(.)))        #URGENT THIS WORKS NOW BUT UNDERMINES GLOBAL SETTINGS PURPOSE
   #if row label indent columns exist apply indents
   if(!(purrr::is_empty(LBLINDENTs))){
     for(i in 1:length(ROWLBLs))

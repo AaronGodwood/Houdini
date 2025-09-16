@@ -25,7 +25,7 @@ houdinitable <- function(data, col_keys = names(data),
     invis_cols <- lapply(invis_cols_names, function(x, n) character(n), nrow(data))
     invis_cols <- invis_cols %>%
       setNames(invis_cols_names)
-    data[invis_cols_names] <- invis_cols
+    data[invis_cols_names] <- NULL
   }
 
 

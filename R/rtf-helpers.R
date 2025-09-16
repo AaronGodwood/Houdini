@@ -1,4 +1,4 @@
-#' Splits up pages of an RTF document
+#' Splits up pages of an RTF document and filters based on header
 #'
 #' @param rtf raw rtf markup to be split
 #' @param filters any parameter filter to filter out certain pages
@@ -9,7 +9,7 @@
 #'
 get_pages <- function(rtf,filters){
 
-  parameters <- filters$parameters
+
   rtf <- rtf %>%
     strsplit(split = "\\\\sectd") %>%
     unlist()
@@ -25,6 +25,22 @@ get_pages <- function(rtf,filters){
       return(x$parameter)
     }) %>%
     unlist()
+  parameters <- filters$parameters %>%
+    sapply(function(x){
+      if(any(grepl(x,page_parameters, fixed = TRUE)))
+      {
+        x
+      }
+      else{
+        logger::log_warn("Parameter filter: {x} not found - parameter filter not applied", namespace = "Houdini Log")
+        c()
+      }
+    }) %>%
+    unlist()
+  parameters <- parameters[!is.null(parameter)]
+  for(i in seq_along(parameters)){
+    logger::log_info("Parameter filter: {parameters[i]} applied", namespace = "Houdini Log")
+  }
 
 
 
@@ -61,6 +77,7 @@ get_pages <- function(rtf,filters){
     header = headers[[1]],
     footer = footers[[1]]
   )
+
   out
 }
 
@@ -155,6 +172,8 @@ get_footer <- function(rtf_page){
   out
 }
 
+#' Gets the spans ( how may columns each cell spans) of a row based on the widths of its cells
+#' @keywords internal
 get_rtf_spans <- function(max_widths, widths){
   prev_span <- 0
   spans <- c()
@@ -166,6 +185,8 @@ get_rtf_spans <- function(max_widths, widths){
   spans
 }
 
+#' Gets the widths of a row with the max number of cells
+#' @keywords internal
 get_max_widths <- function(rows){
   max_ncells <- 0
   max_widths <- c()
@@ -179,6 +200,8 @@ get_max_widths <- function(rows){
   max_widths
 }
 
+#' Gets widths as non-cumulative values
+#' @keywords internal
 get_standard_widths <- function(max_widths){
   widths <- integer(length(max_widths))
   for(i in seq_along(max_widths)){
@@ -193,6 +216,8 @@ get_standard_widths <- function(max_widths){
   widths
 }
 
+#' Makes sure the texts attribute of a row object spans all columns of a table
+#' @keywords internal
 normalise_texts <- function(texts,spans){
   if(length(texts) == length(spans)){
     return(texts)

@@ -3,7 +3,7 @@
 #' @param ht a houdinitable object for which you want to add footers
 #' @param footers a character vector of vectors to be added as footnotes
 #'
-#' @return a houidnitbale object with footers added
+#' @return a houdinitable object with footers added
 #' @importFrom purrr is_empty
 #' @export
 #'
@@ -12,16 +12,19 @@ add_footer <- function(ht,footers){
   if(purrr::is_empty(footers)){
     return(ht)
   }
+  #adds footers to current footer df
   ht$footer$dataset <- ht$footer$dataset %>%
     sapply(function(x){
       c(x,footers)
     }) %>%
     t() %>%
     data.frame()
+  #gets spans of current footers
   spans <- ht$footer$dataset[FALSE, , drop = FALSE]
   for(i in 1:nrow(ht$footer$dataset)){
     spans[i,] = get_runs(ht$footer$dataset[i,])
   }
+  #makes sure the footers are integers and adds them to ht
   ht$footer$spans <- spans %>%
     lapply(as.numeric) %>%
     data.frame()
@@ -39,6 +42,7 @@ add_footer <- function(ht,footers){
 #' @export
 #'
 set_alignments <- function(ht,alignment, col_keys = NULL){
+  #if no columns specified add alignments to all columns
   if(is.null(col_keys)){
     alignments <- rep(alignment,length(ht$alignments))
     names(alignments) <- names(ht$alignments)
@@ -50,6 +54,7 @@ set_alignments <- function(ht,alignment, col_keys = NULL){
     stop("Col keys are not all present in houidnitable")
   }
   alignment <- match.arg(alignment, c("start", "center", "end"), several.ok = FALSE)
+  #adds alignments to specified cols
   for(i in seq_along(col_keys)){
     ht$alignments[[col_keys[i]]] <- alignment
   }
@@ -67,6 +72,7 @@ set_alignments <- function(ht,alignment, col_keys = NULL){
 #' @export
 #'
 set_widths <- function(ht,width, col_keys = NULL){
+  #if columns are not specified set width of all cols
   if(is.null(col_keys)){
     widths <- rep(width,length(ht$widths))
     names(widths) <- names(ht$widths)
@@ -84,6 +90,14 @@ set_widths <- function(ht,width, col_keys = NULL){
 
 }
 
+#' Automatically calculates and sets widths of ht cols based on content
+#'
+#' @param ht a houdinitable object to calculate column widths for
+#' @param data_cols a string vector of col names that all need to be the same width
+#'
+#' @return a houdinitable object with autocalculated widths
+#' @export
+#'
 auto_widths <- function(ht, data_cols){
   all_parts <- rbind(ht$header$dataset,ht$body$dataset)
   all_parts <- rbind(ht$header$dataset,all_parts)
@@ -113,7 +127,7 @@ auto_widths <- function(ht, data_cols){
   ht
 }
 
-#' Stops groups of data being split over a page in a word doc
+#' Stops groups of data being split over a page in a word doc - not actually needed anymore - left in as keepwithnext is disabled in xml compilation
 #'
 #' @param ht a houdinitable object for which you want data to be kept together
 #' @param column a list of data that defines the groups of data within a table

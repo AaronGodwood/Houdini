@@ -1,4 +1,5 @@
-
+#' Creates a section (used for header, body, footer) of a houdinitable
+#' @keywords internal
 houdini_tabpart <- function(data, col_keys = names(data),
                             cwidth = NULL, cheight = NULL) {
 
@@ -7,19 +8,9 @@ houdini_tabpart <- function(data, col_keys = names(data),
   spans <- data.frame(span_init)
 
 
-  if (length(cwidth) == length(col_keys)) {
-    colwidths <- cwidth
-  } else {
-    colwidths <- rep(cwidth, length(col_keys))
-  }
-
-  rowheights <- rep(cheight, nrow(data))
-
   out <- list(
     dataset = data,
     col_keys = col_keys,
-    colwidths = colwidths,
-    rowheights = rowheights,
     hrule = rep("auto", nrow(data)),
     spans = spans
   )

@@ -103,7 +103,7 @@ init_houdini_defaults <- function(){
 
 #' Returns the default settings for the Houdini package
 #'
-#' @return defalt settings of the houdini package
+#' @return default settings of the houdini package
 #' @export
 #'
 get_houdini_defaults <- function(){

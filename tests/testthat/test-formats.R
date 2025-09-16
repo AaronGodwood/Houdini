@@ -14,7 +14,7 @@ test_that("standard_format() works",{
     BUFFER4 = rep(NA,20),
     COL5 = c(NA,65:68,NA,69:72,NA,73:76,NA,77:80),
     PAGE = c(1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4))
-  expected_labels <- list("Visit","   ","","   ","Part A^*^Placebo","Part A^*^Treatment","   ","Part B^*^Placebo","Part B^*^Treatment","   ","Total")
+  expected_labels <- list("Visit"," ",""," ","Part A^*^Placebo","Part A^*^Treatment"," ","Part B^*^Placebo","Part B^*^Treatment"," ","Total")
 
   expected_data <- expected_data %>%
     replace_labels(expected_labels, add = TRUE)
@@ -23,6 +23,7 @@ test_that("standard_format() works",{
   expected_ht <- expected_ht %>%
     set_alignments("center",c("COL1","COL2","COL3","COL4","COL5")) %>%
     set_alignments("start",c("ROWLBL1","ROWLBL2")) %>%
+    auto_widths(c("COL1","COL2","COL3","COL4","COL5")) %>%
     paginate(expected_data[["PAGE"]])
 
   expect_equal(standard_format(data), expected_ht)
@@ -36,6 +37,7 @@ test_that("standard_format() works",{
   expected_ht <- expected_ht %>%
     set_alignments("center",c("COL1","COL2","COL3","COL4","COL5")) %>%
     set_alignments("start",c("ROWLBL1","ROWLBL2")) %>%
+    auto_widths(c("COL1","COL2","COL3","COL4","COL5")) %>%
     paginate(expected_data[["PAGE"]])
 
   expect_equal(standard_format(data, filters = filters), expected_ht)
