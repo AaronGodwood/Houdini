@@ -25,9 +25,12 @@ get_pages <- function(rtf,filters){
       return(x$parameter)
     }) %>%
     unlist()
+
   parameters <- filters$parameters %>%
     sapply(function(x){
-      if(any(grepl(x,page_parameters, fixed = TRUE)))
+      # x <- gsub("([\\+\\*\\?\\[\\]\\(\\)\\{\\}\\|\\.\\^\\$])", "\\\\\\1", x)
+      # x <- paste0("(^|\\s)",x)
+      if(x %in% page_parameters)
       {
         x
       }
@@ -37,7 +40,7 @@ get_pages <- function(rtf,filters){
       }
     }) %>%
     unlist()
-  parameters <- parameters[!is.null(parameter)]
+  parameters <- parameters[!is.null(parameters)]
   for(i in seq_along(parameters)){
     logger::log_info("Parameter filter: {parameters[i]} applied", namespace = "Houdini Log")
   }
@@ -47,21 +50,20 @@ get_pages <- function(rtf,filters){
   new_headers <- list()
   new_footers <- list()
   new_rtf <- c()
-  for(j in seq_along(parameters)){
-    for(i in seq_along(headers)){
-      if(grepl(parameters[j],headers[[i]]$parameter,fixed = TRUE)){
-        new_headers <- append(new_headers,headers[i])
-        new_footers <- append(new_footers,footers[i])
-        new_rtf <- c(new_rtf,rtf[i])
-      }
+
+  for(i in seq_along(headers)){
+    if(length(headers[[i]]$parameter) > 0 && headers[[i]]$parameter %in% parameters){
+      new_headers <- append(new_headers,headers[i])
+      new_footers <- append(new_footers,footers[i])
+      new_rtf <- c(new_rtf,rtf[i])
     }
+
   }
   if(length(new_rtf) == 0){
     new_rtf <- rtf
     new_headers <- headers
     new_footers <- footers
   }
-
 
   new_rtf <- new_rtf %>%
     lapply(function(x) {
@@ -109,7 +111,7 @@ get_header <- function(rtf_page){
         tableid = header[[3]]$texts,
         title = header[[4]]$texts,
         analysis = header[[5]]$texts,
-        parameter = header[[6]]$texts
+        parameter = stringr::str_extract(header[[6]]$texts, "(?<=:\\s).*")
       )
     },
     error = function(e){
@@ -149,7 +151,7 @@ get_footer <- function(rtf_page){
   footnotes <- c()
   if(length(footer) > 1){
     for(i in seq_along(footer)){
-      if(footer[[i]]$texts == "")
+      if(footer[[i]]$texts == "" || footer[[i]]$texts == " " )
       {
         break
       }
@@ -163,7 +165,7 @@ get_footer <- function(rtf_page){
     )
   }else{
     out <- list(
-      footnotes = c(" "),
+      footnotes = c(),
       info = footer[[1]]$texts
     )
   }

@@ -16,6 +16,7 @@ build_table <- function(raw_rtf,filters, hide_data = FALSE){
 
 
 compile_footer <- function(footer,max_ncells){
+
   footnotes <- footer$footnotes
   if(length(footnotes) == 0){
     return("")
@@ -23,15 +24,14 @@ compile_footer <- function(footer,max_ncells){
   spans <- c(max_ncells,rep(0,(max_ncells-1)))
   xml_footers <- character(length(footnotes))
   for(i in seq_along(footnotes)){
-    top_footer <- FALSE
-    if(i == 1){
-      top_footer <- TRUE
-    }
+
     if(!grepl("Source",footnotes[i])){
       xml_footers[i] <- generate_xml_row(footnotes[i],part = "footer", spans = spans , keep_with_next = TRUE)
     }
 
   }
+
+
   paste0(xml_footers,collapse = "")
 }
 

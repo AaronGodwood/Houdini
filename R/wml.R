@@ -237,11 +237,16 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
 
   if(is.na(text) || text == "NA"){
     text <- ""
-  }
-  else if(hide_data && (!grepl("[A-Za-z]", text) && text != "")){
-    text <- "<w:t xml:space=\"preserve\">XX</w:t>"
-  }
-  else{
+  }else if(hide_data && (!grepl("[A-Za-z]", text) && text != "" && text != " ")){
+    #text <- "<w:t xml:space=\"preserve\">XX</w:t>"
+    text <- process_text(text)
+    text <- gsub("[0-9]","x", text)
+
+  }else if(hide_data && header >= 1){
+    text <- process_text(text)
+    text <- gsub("[0-9]","X", text)
+
+  }else{
     text <- process_text(text)
   }
 

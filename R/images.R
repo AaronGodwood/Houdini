@@ -34,7 +34,7 @@ add_img <- function(x, src, width, height, pos = "after"){
   unit <- "in"
   ids <- xml_attr(xml_find_all(x$doc, "//wp:docPr"), "id") %>%
     as.integer()
-  print(ids)
+
   #ids <- ids[ids <1000]
   file_type <- gsub("(.*)(\\.[a-zA-Z0-0]+)$", "\\2", src)
   file_title <- gsub(file_type, "", src, fixed = TRUE)
@@ -44,7 +44,7 @@ add_img <- function(x, src, width, height, pos = "after"){
   attr(src, "alt") <- ""
 
   id <- get_next_rel_id(x$rels,ids)
-  print(id)
+
   image_name <- paste0(basename(file_title),id,file_type)
   x <- add_rel(x,id,image_name)
   x$content <- add_png_extension(x$content)
@@ -53,9 +53,8 @@ add_img <- function(x, src, width, height, pos = "after"){
   if(!dir.exists(media_dir)){
     dir.create(media_dir, recursive = TRUE)
   }
-  print(srcc)
+
   file.copy(srcc, file.path(media_dir, image_name))
-  print(file.exists(file.path(media_dir, image_name)))
 
   add_xml(x = x, str = xml_img, pos = pos)
   x

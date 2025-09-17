@@ -283,7 +283,7 @@ r <- function(){
 
   location5 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/tfls/tables/external/"
 
-  file_location <- location2
+  file_location <- location5
   location <- file_location
 
   # Read in word document
@@ -296,7 +296,7 @@ r <- function(){
   input_sheet <- "VELA-1 CSR Dry run test.xlsx"
 
 
-  apparate(input_doc,input_sheet,file_location,rtf = FALSE, hide_data = TRUE)
+  apparate(input_doc,input_sheet,file_location,rtf = TRUE, hide_data = TRUE)
 }
 
 
