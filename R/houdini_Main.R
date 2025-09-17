@@ -237,7 +237,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
   output_doc <- new_doc
   #outputs final document
   #tic("Output final doc")
-  output_docx(output_doc, target="Houdini_Test_1.docx")
+  output_docx(output_doc, target=paste(input_doc,"-Houdini_Ouput.docx"))
   logger::log_level(START,"Script Finish:", namespace = "Houdini Logs")
   #toc()
   #toc()
@@ -297,6 +297,7 @@ r <- function(){
 
 
   apparate(input_doc,input_sheet,file_location,rtf = TRUE, hide_data = TRUE)
+
 }
 
 
