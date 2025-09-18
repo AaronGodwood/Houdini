@@ -74,7 +74,7 @@ get_pages <- function(rtf,filters){
       x <- x %>%
         gsub(header, "",., fixed = TRUE) %>%
         gsub(footer, "",., fixed = TRUE) %>%
-        str_extract("(?s)(\\}\\\\trowd)(.*?)(\\\\pard(\\})?\\\r\\\n)") %>%
+        str_extract("(?s)(\\\\trowd)(.*?)(\\\\pard(\\})?\\\r\\\n)") %>%
         #str_extract("(?s)(?<=\\{\\\\\\*\\\\bkmkend IDX[0-9]?[0-9]?[0-9]?\\}).*") %>%
         strsplit("\\{\\\\row\\}\\\r\\\n") %>%
         unlist()

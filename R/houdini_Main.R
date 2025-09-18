@@ -185,8 +185,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
         {
           #tic(str_glue("Table {i}"))
           if(rtf){
-            name <- dataset_names[i] %>%
-              gsub("\\.sas7bdat","\\.rtf",.)
+            name <- dataset_names[i]
             test <- prep_rtf(name,file_location,filters[[i]],hide_data)
             new_doc <- new_doc %>%
               add_xml_table(bookmark = bookmarks[i],test)
