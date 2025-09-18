@@ -84,6 +84,7 @@ prep_table <- function(table_name, file_location,  filters = "", footnotes = "",
 #' @param input_doc a string stating the file name for a word document populated with bookmarks fro table insertion
 #' @param input_sheet a string stating the file name for a an excel sheet with information about what tables to insert and where to insert them
 #' @param file_location a string representing the file path that the data sets reside in
+#' @param figure_location a string representing the file path that the figures reside in
 #' @param hide_data A Boolean describing if the fucntion will hide data on output by replacing data with "XX"
 #' @param rtf a Boolean describing if the functions extracts data from rtf files or not, defaults to FALSE
 #'
@@ -264,40 +265,7 @@ setup_log <- function()
 
 
 
-r <- function(){
-  #location for some tables
-  location2 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/data/tfls/external/"
-  table_name <- "t_14_03_01_08_01_t_aesi_cat_pt.sas7bdat"
 
-  table_names <- list.files(location2)
-  table_names <- table_names[startsWith(table_names,"t")]
-
-
-  # Set up location of SAS datasets
-  location1 <- "/DATA/projects/slk/hs/hs301/blinded/dsmb_02/data/tfls/external/"
-
-  location3 <- "/DATA/projects/slk/ppp/ppp201/unblinded/instream/data/tfls/internal/"
-
-  location4 <- "/DATA/projects/slk/psa/psa301/blinded/instream/data/tfls/internal/"
-
-  location5 <- "/DATA/projects/slk/hs/hs301/blinded/primary_dryrun/tfls/tables/external/"
-
-  file_location <- location5
-  location <- file_location
-
-  # Read in word document
-  # input_doc <- "Houdini test with DSMB outputs.docx"
-  # input_sheet <- "Houdini DSMB Bookmark codes.xlsx"
-
-  input_doc <- "M1095_HS_301_ClinicalStudyReport_Shell_V2_Draft2_Review_23June_responses_With bookmarks.docx"
-  #input_doc <- "Houdini_Test_1.docx"
-  #input_doc <- "noimages.docx"
-  input_sheet <- "VELA-1 CSR Dry run test.xlsx"
-
-
-  apparate(input_doc,input_sheet,file_location,rtf = TRUE, hide_data = TRUE)
-
-}
 
 
 
