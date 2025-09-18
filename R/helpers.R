@@ -2,7 +2,7 @@
 #' Checks the input excel doc has the required columns
 #' @keywords internal
 check_excel <- function(doc){
-  required_cols <- c("Dataset","Bookmark","Footnotes","Timepoints","Parameters")
+  required_cols <- c("Dataset","Bookmark","Timepoints","Parameters")
   return(any(sapply(required_cols, function(x){!(x %in% names(doc))})))
 }
 
