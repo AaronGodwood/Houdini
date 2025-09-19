@@ -133,6 +133,7 @@ generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body",
     current_span <- current_span - 1
     cells[i] <- row[i] %>%
       escape_xml() %>%
+      rtf_to_unicode() %>%
       generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, bottom_row = bottom_row, hide_data = hide_data, landscape = landscape)#, alignment = alignment[i])
     current_span = current_span + spans[[i]]
   }
@@ -154,6 +155,18 @@ escape_xml <- function(text){
     gsub("<", "&lt;", .) %>%
     gsub(">", "&gt;", .)
 
+}
+
+#' Replaces Unicode formatting from rtf files with that for word xml
+#'
+#' @param text text to have unicode replaced in
+#'
+#' @return text with word xml unicode charcters
+#' @keywords internal
+#'
+rtf_to_unicode <- function(text){
+  pattern <- "\\{\\\\uc0\\\\u(-?\\d+)\\s\\}"
+  gsub(pattern, "&#\\1;", text)
 }
 
 #' Creates the grid part of a wordXML table
@@ -229,7 +242,7 @@ generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4
     borders = ""
     vAlign <- ""
   }
-  if(landscape){
+  if(landscape){ #this does not get used ever
     text_dir <- "<w:textDirection w:val=\"btLr\"/>"
   }else{
     text_dir <- ""

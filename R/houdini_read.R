@@ -28,11 +28,12 @@ output_docx <- function(x, target = NULL){
     stop(target, " should have '.docx' extension.")
   }
 
-
+  #writes documents back to word doc
   write_xml(x$doc,paste0(x$package_dir,"/word/document.xml"))
   write_xml(x$rels,paste0(x$package_dir,"/word/_rels/document.xml.rels"))
   write_xml(x$content,paste0(x$package_dir,"/[Content_Types].xml"))
 
+  #zips docs back to a .docx
   invisible(pack_folder(folder = x$package_dir, target = target))
 
 }
@@ -65,13 +66,14 @@ read_docx <- function(path){
     stop("read_docx only supports docx files")
   }
 
-
+  #creates a temp directory and unzips .docx file
   package_dir = tempfile()
   unpack_folder(file = path, folder = package_dir)
 
-  doc <- read_xml(paste0(package_dir,"/word/document.xml"))
-  rels <- read_xml(paste0(package_dir,"/word/_rels/document.xml.rels"))
-  content <- read_xml(paste0(package_dir,"/[Content_Types].xml"))
+  #reads xml files we need to modify
+  doc <- read_xml(paste0(package_dir,"/word/document.xml")) #tables and images defs go in here
+  rels <- read_xml(paste0(package_dir,"/word/_rels/document.xml.rels"))# needed to reference images
+  content <- read_xml(paste0(package_dir,"/[Content_Types].xml"))#needed to be able to show images
   cursor <- houdini_cursor(doc)
 
   out <- structure(list(
@@ -86,7 +88,7 @@ read_docx <- function(path){
   out
 }
 
-#'
+#' Gets dimensions of the document
 #'@importFrom xml2 xml_find_first
 #'@keywords internal
 docx_dim <- function(x){
@@ -148,7 +150,7 @@ section_dimensions <- function(node) {
   )
 }
 
-#'
+#' Zips up docx folder
 #' @importFrom zip zipr
 #' @keywords internal
 pack_folder <- function(folder, target){
@@ -186,7 +188,7 @@ pack_folder <- function(folder, target){
   target
 }
 
-#'
+#' Unzips docx folder
 #' @importFrom zip unzip
 #' @keywords internal
 unpack_folder <- function(file, folder){
@@ -260,6 +262,7 @@ add_xml <- function(x, str, pos = c("after", "before", "on","next")) {
     x$cursor <- cursor_append(x$cursor, .name)
     return(x)
   }
+  #next replaces the next node if its a table - how it replaces existing tables
   if(pos == "next"){
     x$cursor$which <- x$cursor$which + 1L
     cursor_node <- get_cursor_block(x$cursor,x$doc)

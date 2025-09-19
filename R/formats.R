@@ -148,7 +148,7 @@ non_standard_format <- function(data){
   #gets the row label indent columns if they exist
   indent_pattern <- sprintf("^%s[0-9]INDENTS$", houdini_global$defaults$rowlbls.name)
   LBLINDENTs <- data %>%
-    dplyr::select(grep(indent_pattern,names(.)))        #URGENT THIS WORKS NOW BUT UNDERMINES GLOBAL SETTINGS PURPOSE
+    dplyr::select(grep(indent_pattern,names(.)))
   #if row label indent columns exist apply indents
   if(!(purrr::is_empty(LBLINDENTs))){
     for(i in 1:length(ROWLBLs))

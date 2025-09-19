@@ -7,7 +7,7 @@ read_raw_rtf <- function(file_path){
 
 build_table <- function(raw_rtf,filters, hide_data = FALSE){
   rtf_pages <- get_pages(raw_rtf,filters)
-  table_properties <- generate_table_properties(width = 1, layout = "fixed") # will access width and layout from ht
+  table_properties <- generate_table_properties(width = 1, layout = "fixed")
   #filter
   xml_rows <- rtf_pages %>%
     compile_rows(filters,hide_data)
@@ -82,10 +82,7 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
     timelines <- unique(row_timelines)
   }
 
-  # if(produce_df){
-  #   df <- get_df_template(rows)
-  #   df_headers <- names(df)
-  # }
+
 
   xml_grid <- max_widths %>%
     get_standard_widths() %>%
@@ -140,19 +137,12 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
         xml_rows <- c(xml_rows,generate_xml_row(row$texts, alignment = row$alignments, part = "body", keep_with_next = FALSE, spans = spans, hide_data = hide_data, bottom_row = bottom_row))
       }
 
-      # if(produce_df && row$ncells == max_ncells){
-      #   df_row <- row$texts
-      #   df <- df %>%
-      #     rbind(df_row)
-      # }
+
     }
     prev_ncells <- row$ncells
 
   }
-  # if(produce_df){
-  #   names(df) <- df_headers
-  #   haven::write_sas()
-  # }
+
   xml_rows <- paste0(xml_rows, collapse = "")
   xml_footers <- compile_footer(rtf_rows$footer,max_ncells)
   paste0(xml_grid,xml_rows,xml_footers)

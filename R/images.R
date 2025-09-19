@@ -1,3 +1,4 @@
+#' adds rel to rels.xml that links xml in doc to image path
 #' @importFrom xml2 xml_find_first xml_ns read_xml xml_add_sibling xml_children
 add_rel <- function(x,id,image_name){
   rels_node <- xml_find_first(x$rels, "//d1:Relationships", xml_ns(x$rels))
@@ -6,8 +7,10 @@ add_rel <- function(x,id,image_name){
   x
 }
 
+#' Adds png extension to content_types.xml so that pngs can show up
 #' @importFrom xml2 xml_find_first xml_root xml_add_child xml_attrs
 add_png_extension <- function(content){
+  #checks if it exists alredy as adding it twice breaks the doc
   exists <- xml_find_all(content,"//d1:Default[@Extension='png']")
 
   if(length(exists) < 1){
@@ -19,6 +22,7 @@ add_png_extension <- function(content){
   content
 }
 
+#' Gets next unique id - takes both rIds and other Ids so we can use the same one all over for easyness
 #' @importFrom xml2 xml_ns xml_attr xml_find_all
 get_next_rel_id <- function(rels,ids = c()){
   new_ids <- xml_attr(xml_find_all(rels, "//d1:Relationships/*", xml_ns(rels)),"Id") %>%
@@ -44,11 +48,14 @@ add_img <- function(x, src, width, height, pos = "after"){
   attr(src, "alt") <- ""
 
   id <- get_next_rel_id(x$rels,ids)
-
+  #gets image name
   image_name <- paste0(basename(file_title),id,file_type)
+  #adds rel to rel.xml
   x <- add_rel(x,id,image_name)
+  #adds png extension to conetnt_types.xml
   x$content <- add_png_extension(x$content)
   xml_img <- gen_img_wml(src,id)
+  #adds image to media directory in unzipped word doc
   media_dir <- file.path(x$package_dir,"word","media")
   if(!dir.exists(media_dir)){
     dir.create(media_dir, recursive = TRUE)
@@ -61,8 +68,11 @@ add_img <- function(x, src, width, height, pos = "after"){
 
 }
 
-
+#' Produces XML for an image
 gen_img_wml <- function(src, id){
+  #honestly i don't know what a lot of this means
+  #my main points are that the id next to rId needs to be same as in the relationship in rels.xml
+  #other ids just need to be unique but as rId one is unique just use the same one
 
   dims <- attr(src, "dims")
   width <- dims$width

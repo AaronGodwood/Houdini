@@ -5,6 +5,16 @@
 
 
 
+#' Perpares an rtf table as an xml table
+#'
+#' @param table_name name of rtf table document
+#' @param file_location file path to that document
+#' @param filters any filters to filter the table by
+#' @param hide_data weather you want to replace all data with XX
+#'
+#' @return a table in Word XML format
+#' @keywords internal
+#'
 prep_rtf <- function(table_name, file_location,filters,hide_data = FALSE){
   raw_rtf <- sprintf("%s%s",file_location,table_name) %>%
     read_raw_rtf()
@@ -50,10 +60,9 @@ prep_table <- function(table_name, file_location,  filters = "", footnotes = "",
 
 
 
-  #will be removed post-testing
-  if(is.null(raw_data$COL1))
+  pattern <- sprintf("%s1", houdini_global$defaults$cols.name)
+  if(is.null(raw_data[[pattern]]))
   {
-
     raw_data <- raw_data %>%
       non_standard_format()
   }
@@ -70,7 +79,7 @@ prep_table <- function(table_name, file_location,  filters = "", footnotes = "",
     standard_format(header_code = header_code, doc_width = doc_width, filters = filters) %>%
     add_footnote(footnotes)
 
-  #returns sas_data
+  #returns houdinitable
   ht
 }
 
@@ -144,7 +153,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
     }
   )
   if(check_excel(Input_Sheet)){
-    stop("Check required columns in excel doc: Dataset, Bookmark, Footnotes, Notes")
+    stop("Check required columns in excel doc: Dataset, Bookmark, Notes")
   }
   #calculate number of tables
   n_tables <- Input_Sheet %>%
