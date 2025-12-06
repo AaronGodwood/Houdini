@@ -70,8 +70,15 @@ get_col_names <- function(data, col_type){
 #' Checks if a name starts with the word table
 #' @keywords internal
 is_table <- function(name){
-  name %>%
-    startsWith("Table")
+  condition1 <- name %>%
+    tolower() %>%
+    startsWith("table")
+
+  condition2 <- name %>%
+    tolower() %>%
+    startsWith("listing")
+
+  return((condition1 | condition2))
 }
 
 

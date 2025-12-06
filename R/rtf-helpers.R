@@ -11,6 +11,7 @@ get_pages <- function(rtf,filters){
 
 
   rtf <- rtf %>%
+    str_extract("(?s)(\\\\sectd)(.*)") %>%
     strsplit(split = "\\\\sectd") %>%
     unlist()
   rtf <- rtf[-1]
@@ -74,9 +75,9 @@ get_pages <- function(rtf,filters){
       x <- x %>%
         gsub(header, "",., fixed = TRUE) %>%
         gsub(footer, "",., fixed = TRUE) %>%
-        str_extract("(?s)(\\\\trowd)(.*?)(\\\\pard(\\})?\\\r\\\n)") %>%
+        str_extract("(?s)(\\\\trowd)(.*?)(\\\\pard(\\})?(\\\r)?\\\n)") %>%
         #str_extract("(?s)(?<=\\{\\\\\\*\\\\bkmkend IDX[0-9]?[0-9]?[0-9]?\\}).*") %>%
-        strsplit("\\{\\\\row\\}\\\r\\\n") %>%
+        strsplit("\\{\\\\row\\}(\\\r)?\\\n") %>%
         unlist()
       x[-length(x)]
     }) %>%
@@ -103,7 +104,7 @@ get_header <- function(rtf_page){
   header <- rtf_page %>%
     str_extract("(?s)(\\{\\\\header)(.*?)(\\{\\\\par\\}\\}\\})") %>%
     str_extract("(?s)(\\\\trowd)(.*)") %>%
-    strsplit("\\{\\\\row\\}\\\r\\\n") %>%
+    strsplit("\\{\\\\row\\}(\\\r)?\\\n") %>%
     unlist() %>%
     lapply(function(x) extract_rtf_row(x)) %>%
     unname()
@@ -150,7 +151,7 @@ get_footer <- function(rtf_page){
   footer <- rtf_page %>%
     str_extract("(?s)(\\{\\\\footer)(.*?)(\\\\pard\\}\\})") %>%
     str_extract("(?s)(\\\\trowd)(.*)") %>%
-    strsplit("\\{\\\\row\\}\\\r\\\n") %>%
+    strsplit("\\{\\\\row\\}(\\\r)?\\\n") %>%
     unlist() %>%
     lapply(function(x) extract_rtf_row(x)) %>%
     unname()

@@ -158,7 +158,7 @@ compile_rows <- function(rtf_rows, filters, hide_data = FALSE){#, produce_df = F
 #'
 extract_rtf_row <- function(row){
   sections <- row %>%
-    strsplit(split = "\\\r\\\n\\\\") %>%
+    strsplit(split = "(\\\r)?\\\n\\\\") %>%
     unlist()
   ncells <- ((length(sections)+1)/2)-1
   header <- grepl("\\\\trhdr",sections[1])
@@ -209,13 +209,14 @@ extract_rtf_row <- function(row){
 #'
 extract_text <- function(cell_prop){
   cell_prop <- cell_prop %>%
-    gsub("\\\r\\\n","",.)
+    gsub("(\\\r)?\\\n","",.)
   text <- str_match(cell_prop,"\\{(.*?)\\\\cell\\}")[,2]
   if(grepl("^\\\\",text)){
     text <- text %>%
       gsub("^[^ ]* ","",.)
   }
   text <- text %>%
+    gsub("\\\\~","",.) %>%
     gsub("\\{\\\\line\\}","\n",.)
   if(is.na(text)){
     return("")
