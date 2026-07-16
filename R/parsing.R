@@ -397,6 +397,41 @@ parse_rtf <- function(path) {
 }
 
 
+#' Prepare a combined table with filtering and exclusions applied
+#'
+#' Common pipeline used by html.R and xml.R public functions.
+#' @param pages Pre-parsed pages (from parse_rtf) or NULL
+#' @param path RTF file path (used only if pages is NULL)
+#' @param excluded_cols Integer vector of column indices to exclude
+#' @param excluded_rows Integer vector of data row indices to exclude
+#' @param excluded_header_rows Integer vector of header row indices to exclude
+#' @param parameters Parameter filter
+#' @param timelines Timeline filter
+#' @return list(combined, included_cols) where combined has rows filtered
+prepare_table <- function(pages = NULL, path = NULL,
+                          excluded_cols = NULL, excluded_rows = NULL,
+                          excluded_header_rows = NULL,
+                          parameters = NULL, timelines = NULL) {
+  if (is.null(pages)) pages <- parse_rtf(path)
+  pages    <- filter_pages(pages, parameters)
+  #TODO timeline filtering
+  combined <- combine_pages(pages)
+
+  n_cols <- length(combined$col_widths_twips)
+  n_data <- length(combined$data_rows)
+  n_hdr  <- length(combined$header_rows)
+
+  inc_cols <- setdiff(seq_len(n_cols), excluded_cols        %||% integer())  # can be used for Mark's request
+  inc_rows <- setdiff(seq_len(n_data), excluded_rows        %||% integer())
+  inc_hdrs <- setdiff(seq_len(n_hdr),  excluded_header_rows %||% integer())
+
+  combined$data_rows   <- combined$data_rows[inc_rows]
+  combined$header_rows <- combined$header_rows[inc_hdrs]
+
+  list(combined = combined, included_cols = inc_cols)
+}
+
+
 # --filtering
 
 #' Filter pages by parameter value
