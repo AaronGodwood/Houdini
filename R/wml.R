@@ -1,350 +1,218 @@
+# wml.R - structured table data -> minimal Word XML (OOXML / w: namespace)
 
-gen_xml_landscape <- function(ht, hide_data = FALSE){
-  header <- ht$header$dataset %>%
-    t() %>%
-    data.frame()
-  header_spans <- ht$header$spans  %>%
-    t() %>%
-    data.frame()
-  n_headers <- ncol(header)
-  footer <- ht$footer$dataset
-  footer_spans <- ht$footer$spans
-  body <- ht$body$dataset  %>%
-    t() %>%
-    data.frame()
-  widths <- ht$widths
-  alignments <- ht$alignments
-  table_properties <- generate_table_properties(width = 1, layout = "autofit") # will access width and layout from ht
-  table_grid <- generate_xml_grid(widths)
-  table <- cbind(header,body)
-  table_rows <- character(nrow(table))
-  for(i in seq_len(nrow(table))){
-    table_rows[i] <- generate_xml_row(table[i,],landscape = TRUE, n_headers = n_headers)
-  }
-  table_rows <- paste0(table_rows, collapse = "")
-  paste0("<w:tbl>",table_properties,table_grid,table_rows,"</w:tbl>")
+# -- Helpers
+
+xml_escape <- function(text) {
+  text <- gsub("&",  "&amp;",  text, fixed = TRUE)
+  text <- gsub("<",  "&lt;",   text, fixed = TRUE)
+  text <- gsub(">",  "&gt;",   text, fixed = TRUE)
+  text <- gsub("\"", "&quot;", text, fixed = TRUE)
+  text
+}
+
+# Returns a <w:tcBorders> block declaring only the specified sides as single lines.
+# If sides is empty, returns "" - no border declaration needed (Word default = none).
+cell_borders_xml <- function(sides = character()) {
+  if (length(sides) == 0L) return("")
+  tags <- vapply(sides, function(s) {
+    sprintf("<w:%s w:val=\"single\" w:sz=\"12\" w:space=\"0\" w:color=\"000000\"/>", s)
+  }, character(1))
+  sprintf("<w:tcBorders>%s</w:tcBorders>", paste(tags, collapse = ""))
+}
+
+# Run properties: font + size (+ optional bold)
+run_pr_xml <- function(bold = FALSE) {
+  b_tag <- if (bold) "<w:b/>" else ""
+  sprintf(
+    "<w:rPr>%s<w:rFonts w:ascii=\"Times New Roman\" w:hAnsi=\"Times New Roman\"/><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr>",
+    b_tag
+  )
+}
+
+# -- Row Builders
+
+# -Version 2 changed from 1 function to two a they were called in separate places anyway and makes code cleaner
+
+# Build a <w:tr> for a data row
+# col_index: 1-based index of each cell (for alignment: 1 = left, rest = centre)
+# is_last_data: add bottom border to cells
+xml_data_row <- function(row, is_last_data) {
+  borders <- cell_borders_xml(if (is_last_data) "bottom" else character())
+  run_pr  <- run_pr_xml(bold = FALSE)
+
+  cells <- lapply(seq_along(row$cells), function(ci) {
+    cell  <- row$cells[[ci]]
+    align <- if (!is.na(cell$align)) cell$align else if (ci == 1L) "left" else "center"
+
+    tc_pr   <- sprintf("<w:tcPr>%s<w:jc w:val=\"%s\"/></w:tcPr>", borders, align)
+    para_pr <- sprintf(
+      "<w:pPr><w:jc w:val=\"%s\"/><w:spacing w:before=\"0\" w:after=\"0\"/></w:pPr>",
+      align
+    )
+    run     <- sprintf("<w:r>%s<w:t xml:space=\"preserve\">%s</w:t></w:r>", run_pr, xml_escape(cell$text))
+    para    <- sprintf("<w:p>%s%s</w:p>", para_pr, run)
+
+    sprintf("<w:tc>%s%s</w:tc>", tc_pr, para)
+  })
+
+  sprintf("<w:tr>%s</w:tr>", paste(cells, collapse = ""))
 }
 
 
+# Build a <w:tr> for a header row
+# is_last_header: add bottom border to cells
+xml_header_row <- function(row, is_last_header) {
+  run_pr <- run_pr_xml(bold = TRUE)
+
+  cells <- lapply(seq_along(row$cells), function(ci) {
+    cell <- row$cells[[ci]]
+    if (isTRUE(cell$colspan == 0L)) return("")  # continuation, omit
+
+    grid_span <- if (!is.null(cell$colspan) && cell$colspan > 1L) {
+      sprintf("<w:gridSpan w:val=\"%d\"/>", cell$colspan)
+    } else ""
+
+    # Last header row: always border. Upper rows: border only if cell has text.
+    has_text <- nchar(trimws(cell$text)) > 0L
+    sides    <- if (is_last_header || has_text) "bottom" else character()
+    borders  <- cell_borders_xml(sides)
+
+    align <- if (!is.na(cell$align)) cell$align else if (ci == 1L) "left" else "center"
+
+    tc_pr <- sprintf(
+      "<w:tcPr>%s%s<w:jc w:val=\"%s\"/></w:tcPr>",
+      grid_span, borders, align
+    )
+
+    para_pr <- sprintf(
+      "<w:pPr><w:jc w:val=\"%s\"/><w:spacing w:before=\"0\" w:after=\"0\"/></w:pPr>",
+      align
+    )
+    run  <- sprintf("<w:r>%s<w:t xml:space=\"preserve\">%s</w:t></w:r>", run_pr, xml_escape(cell$text))
+    para <- sprintf("<w:p>%s%s</w:p>", para_pr, run)
+
+    sprintf("<w:tc>%s%s</w:tc>", tc_pr, para)
+  })
+
+  tr_pr <- "<w:trPr><w:tblHeader/></w:trPr>"
+  sprintf("<w:tr>%s%s</w:tr>", tr_pr, paste(cells, collapse = ""))
+}
+
+# --Table Builder
 
 
-#' Compiles a WordXML output from a houdini table object
-#'
-#' @param ht a houdinitable object to be compiled to Word XMl
-#'
-#' @return a string containing a compiled word table in WordXML format
-#' @keywords internal
-#'
-gen_xml <- function(ht, hide_data = FALSE){
+# Build OOXML <w:tbl> string from a combined table object
+# cols: integer vector of 1-based column indices to include (NULL = all)
+# row_start / row_end: 1-based data row range (NULL = all)
+# text_width_twips: if supplied, scale column widths proportionally to this total
+build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
+                      text_width_twips = NULL) {
+  header_rows      <- combined$header_rows
+  data_rows        <- combined$data_rows
+  col_widths_twips <- combined$col_widths_twips
 
-  header <- ht$header$dataset
-  header_spans <- ht$header$spans
-  footer <- ht$footer$dataset
-  footer_spans <- ht$footer$spans
-  body <- ht$body$dataset
-  widths <- ht$widths
-  alignments <- ht$alignments
-  table_properties <- generate_table_properties(width = 1, layout = "fixed") # will access width and layout from ht
-  table_grid <- generate_xml_grid(widths)
-  table_rows <- character(nrow(body))
-  header_rows <- character(nrow(header))
-  footer_rows <- character(nrow(footer))
-  for(i in seq_len(nrow(body))){
-    if(i == nrow(body)){
-      bottom_row <- TRUE
-    }else{
-      bottom_row <- FALSE
+  n_cols_total <- length(col_widths_twips)
+  if (n_cols_total == 0L && length(header_rows) > 0L) {
+    n_cols_total <- length(header_rows[[1]]$cells)
+  }
+
+  cols      <- resolve_cols(cols, n_cols_total, header_rows)
+  data_rows <- slice_rows(data_rows, row_start, row_end)
+
+  # Filter cells to selected columns
+  filter_cells <- function(row) {
+    row$cells <- row$cells[cols]
+    row
+  }
+  header_rows <- lapply(header_rows, filter_cells)
+  data_rows   <- lapply(data_rows,   filter_cells)
+
+  # Column widths for the selected columns
+  selected_widths <- col_widths_twips[cols]
+  total_width     <- sum(selected_widths)
+
+  # Scale proportionally to fill text_width_twips, preserving column ratios.
+  # If no target width supplied (or source total is zero), use widths as-is.
+  if (!is.null(text_width_twips) && total_width > 0L) {
+    scale          <- text_width_twips / total_width
+    selected_widths <- pmax(1L, round(selected_widths * scale))
+    # Absorb any rounding remainder into the widest column
+    diff <- text_width_twips - sum(selected_widths)
+    if (diff != 0L) {
+      widest <- which.max(selected_widths)
+      selected_widths[widest] <- selected_widths[widest] + diff
     }
-    table_rows[i] <- generate_xml_row(body[i,],alignment = alignments,keep_with_next = FALSE ,bottom_row = bottom_row,hide_data = hide_data) #keep with next has been changed to false for all body elements o request of MW
-  }
-  for(i in seq_len(nrow(header))){
-    header_num <- nrow(header) - i + 1
-    header_rows[i] <- generate_xml_row(header[i,],alignment = alignments, header = header_num, bold = TRUE, part = "header", spans = header_spans[i,],keep_with_next = TRUE)
-  }
-  for(i in seq_len(nrow(footer))){
-    top_footer <- FALSE
-    if(i == 1){
-      top_footer <- TRUE
-    }
-
-    footer_rows[i] <- generate_xml_row(footer[i,],part = "footer", spans = footer_spans[i,], keep_with_next = TRUE)
-  }
-  table_rows <- paste0(table_rows, collapse = "")
-  header_rows <- paste0(header_rows, collapse = "")
-  footer_rows <- paste0(footer_rows,collapse = "")
-  paste0("<w:tbl>",table_properties,table_grid,header_rows,table_rows,footer_rows,"</w:tbl>")
-}
-
-
-
-#' Generates a WordXML output for a row element part of a table
-#'
-#'
-#' Here <tblHeader/> tag is added which means that these rows repeat over a page
-#' Here the height is set to auto so the height of the cell fits to its contents
-#'
-#' @param row a row of a data frame to be compiled to a wordXML row
-#' @param bold a Boolean that says weather or not the row should be bold
-#' @param alignment a string that represents the text alignment of the cell in the row e.g. "start", "end" or "center"
-#' @param part a string that says what part of the table the row is in e.g. "header", "footer" or "body"
-#' @param keep_with_next a Boolean that says if the row should be kept on the same page as the next row in a word doc
-#' @param header a number that says if the row is a header row and if it is weather it is the bottom most or not
-#' @param spans an integer vector representing any spans (merged cells) in the row
-#' @param top_footer a Boolean that says if the row is the topmost footer row
-#' @param landscape if the table needs to be generated in landscape
-#' @param n_headers tells the function how many headers there are, for use with a landscape table
-#'
-#' @return a WordXMl output of a row element
-#' @keywords internal
-#'
-generate_xml_row <- function(row, bold = FALSE, alignment = NULL, part = "body", keep_with_next = FALSE, header = 0, spans = NULL, bottom_row = FALSE, hide_data = FALSE, landscape = FALSE, n_headers = 0){
-  header_num <- header
-  if(is.null(alignment)){
-    alignment = rep("start", length(row))
-  }
-  if(is.null(spans))
-  {
-    spans = rep(0, length(row))
-  }
-  if(part == "header"){
-    header <- "<w:tblHeader/>"
-
-  }
-  else
-  {
-    header <- ""
+    total_width <- text_width_twips
   }
 
-  row_properties <- paste0("<w:trPr><w:trHeight w:val=\"360\" w:hRule=\"auto\"/><w:cantSplit/>",header,"</w:trPr>")
+  # tblGrid - one gridCol per selected column (scaled widths in twips)
+  grid_cols <- paste(
+    sprintf("<w:gridCol w:w=\"%d\"/>", selected_widths),
+    collapse = ""
+  )
+  tbl_grid <- sprintf("<w:tblGrid>%s</w:tblGrid>", grid_cols)
 
-  cells <- character(length(row))
-  current_span = 1
-  for(i in seq_along(row)){
-    if(i < n_headers && landscape == TRUE){
-      header_num <- 2
-      bold <- TRUE
-    }else if(i == n_headers && landscape == TRUE){
-      header_num <- 1
-      bold <- TRUE
-    }else if(landscape == TRUE){
-      header_num <- 0
-      bold <- FALSE
-    }
-    current_span <- current_span - 1
-    cells[i] <- row[i] %>%
-      escape_xml() %>%
-      rtf_to_unicode() %>%
-      generate_xml_cell(bold = bold, alignment = alignment[i], header = header_num, span = spans[i], in_span = current_span,keep_with_next = keep_with_next, bottom_row = bottom_row, hide_data = hide_data, landscape = landscape)#, alignment = alignment[i])
-    current_span = current_span + spans[[i]]
-  }
-
-  paste0("<w:tr>",row_properties, paste0(cells, collapse = ""), "</w:tr>")
-
-}
-
-#' Replaces certain special characters with their XML counterparts
-#'
-#' @param text text to have special characters replaced
-#'
-#' @return text with special characters replaced
-#' @keywords internal
-#'
-escape_xml <- function(text){
-  text %>%
-    gsub("&", "&amp;", .) %>%
-    gsub("<", "&lt;", .) %>%
-    gsub(">", "&gt;", .)
-
-}
-
-#' Replaces Unicode formatting from rtf files with that for word xml
-#'
-#' @param text text to have unicode replaced in
-#'
-#' @return text with word xml unicode charcters
-#' @keywords internal
-#'
-rtf_to_unicode <- function(text){
-  pattern <- "\\{\\\\uc0\\\\u(-?\\d+)\\s\\}"
-  gsub(pattern, "&#\\1;", text)
-}
-
-#' Creates the grid part of a wordXML table
-#'
-#' @param widths a vector that describes the widths of each column
-#'
-#' @return a table grid xml string
-#' @keywords internal
-#'
-generate_xml_grid <- function(widths){
-  cols <- character(length(widths))
-  for(i in seq_along(widths)){
-    cols[i] <- paste0("<w:gridCol w:w=\"",widths[i],"\"/>")
-  }
-  paste0("<w:tblGrid>",paste0(cols, collapse = ""),"</w:tblGrid>")
-}
-
-
-#' Generates a WordXML output for a cell of a table
-#'
-#'This contains the formatting for each cell:
-#'-Font size is declared here (1 unit here is 1/2 a unit in word font size e.g. 20 here is 10 in word)
-#'-Font is declared here (ascii is standards and then hAnsi is for special characters ect)
-#'-Cell alignment (start for left aligned, center for center and end for right)
-#'-Sets spacing before and after text to 0 so no random space around text
-#'
-#'
-#'
-#' @param text a string representing the contents of the cell
-#' @param bold a Boolean that says weather the text should be bold (will be bold if the cell is part of  header row)
-#' @param alignment a string representing the text alignment of the cell (should be either start, end or center)
-#' @param width a float that represents the width of the cell
-#' @param header an integer that says what part of the header the cell is in e.g. (0 - not a header, 1 - bottom row of headers, 2+ - not bottom row of headers)
-#' - If the header is a bottom row or not a bottom row and has content it gets aligned to the bottom of the cell and gets a border below it
-#' @param span an integer that represents if this cell is the start of a span (merged section) of cells so it says to take up the space of n columns
-#' @param in_span an number that if greater than 0 says its in the span of another cell so not to generate
-#' @param keep_with_next a Boolean that says that the cells in this row should be kept on the same page as the cells of the next row
-#' @param top_footer a Boolean that says if it is the topmost row of footers which if true will add a border above it
-#'
-#' @return a string representing a WordXMl table cell
-#' @keywords internal
-#'
-generate_xml_cell <- function(text, bold = FALSE, alignment = "start", width = 4000, header = 0, span = 0, in_span = 0, keep_with_next= FALSE, bottom_row = FALSE, hide_data = FALSE,landscape = FALSE){
-  if(in_span > 0)
-  {
-    return("")
-  }
-  if(bold){
-    bold <- "<w:b/>"
-  }
-  else
-  {
-    bold <- ""
-  }
-  if(keep_with_next){
-    keep_with_next <- "<w:keepNext/>"
-  }
-  else{
-    keep_with_next <- ""
-  }
-  if((header >= 2 && text != "") || (header == 1)){
-    if(landscape){
-      borders <- "<w:tcBorders><w:right w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
-      vAlign <- "<w:vAlign w:val=\"center\"/>"
-    }else{
-      borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
-      vAlign <- "<w:vAlign w:val=\"bottom\"/>"
-      keep_with_next <- "<w:keepNext/>"
-    }
-  }
-  else
-  {
-    borders = ""
-    vAlign <- ""
-  }
-  if(landscape){ #this does not get used ever
-    text_dir <- "<w:textDirection w:val=\"btLr\"/>"
-  }else{
-    text_dir <- ""
-  }
-
-  if(is.na(text) || text == "NA"){
-    text <- ""
-  }else if(hide_data && (!grepl("[A-Za-z]", text) && text != "" && text != " ")){
-    #text <- "<w:t xml:space=\"preserve\">XX</w:t>"
-    text <- process_text(text)
-    text <- gsub("[0-9]","x", text)
-
-  }else if(hide_data && header >= 1){
-    text <- process_text(text)
-    text <- gsub("[0-9]","X", text)
-
-  }else{
-    text <- process_text(text)
-  }
-
-  if(span != 0){
-    merge = paste0("<w:gridSpan w:val=\"",span,"\"/>")
-  }
-  else{
-    merge = ""
-  }
-  if(bottom_row){
-    borders <- "<w:tcBorders><w:bottom w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/></w:tcBorders>"
-  }
-
-
-  font <- "<w:rFonts w:ascii=\"Times New Roman\" w:hAnsi=\"Times New Roman\"/>"
-  font_size <- "<w:sz w:val=\"20\"/>"
-
-  cell <- paste0(
-    "<w:tcPr>",vAlign,borders,merge,"</w:tcPr>",#"<w:tcW w:w=\"",width,"\" w:type=\"pct\"/>",
-    "<w:p>",
-    "<w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\"/>",keep_with_next,text_dir,"<w:jc w:val=\"", alignment,"\"/></w:pPr>",
-    "<w:r><w:rPr>",font,font_size, bold, "</w:rPr>",text,"</w:r>",
-    "</w:p>"
+  # tblPr - explicit fixed width matching the text area
+  tbl_pr <- sprintf(
+    "<w:tblPr><w:tblW w:w=\"%d\" w:type=\"dxa\"/></w:tblPr>",
+    total_width
   )
 
-  paste0("<w:tc>", cell, "</w:tc>")
+  # Header rows
+  hdr_xml <- paste(lapply(seq_along(header_rows), function(i) {
+    xml_header_row(header_rows[[i]], is_last_header = (i == length(header_rows)))
+  }), collapse = "")
+
+  # Data rows
+  dat_xml <- paste(lapply(seq_along(data_rows), function(i) {
+    xml_data_row(data_rows[[i]], is_last_data = (i == length(data_rows)))
+  }), collapse = "")
+
+  sprintf("<w:tbl>%s%s%s%s</w:tbl>", tbl_pr, tbl_grid, hdr_xml, dat_xml)
 }
 
-#' Generates the table properties part of a WordXML table
+
+# --Public Function (used by other parts of the package e.g. docx.r)
+
+
+
+#' Generate Word XML for an RTF table
 #'
-#'Here a Top border is declared but no other borders - others come from cells in header or footer rows
-#'Here the width of the whole table is declared with 5000pct being 100%
-#'
-#'
-#' @param width the width the whole table should be as a fraction of the entire document
-#' @param layout
-#'
-#' @return an XML output of the table properties part of a wordXMLtable
-#' @keywords internal
-#'
-generate_table_properties <- function(width = 1, layout){
-  width <- width * 5000
-  properties <- paste0(
-    "<w:tblLayout w:type=\"",layout,"\"/>",
-    "<w:tblW w:w=\"",width,"\" w:type=\"pct\"/>",
-    "<w:tblBorders>",
-    "<w:top w:val=\"single\" w:sz=\"12\" w:color=\"000000\"/>",
-    "<w:bottom w:val=\"none\"/>",
-    "<w:left w:val=\"none\"/>",
-    "<w:right w:val=\"none\"/>",
-    "<w:insideH w:val=\"none\"/>",
-    "<w:insideV w:val=\"none\"/>",
-    "</w:tblBorders>"
+#' @param path Path to the .rtf file
+#' @param excluded_cols Integer vector of 1-based column indices to exclude (NULL = none)
+#' @param excluded_rows Integer vector of 1-based data row indices to exclude (NULL = none)
+#' @param excluded_header_rows Integer vector of 1-based header row indices to exclude
+#' @param parameters Character vector of parameter values to keep (NULL = all)
+#' @param timelines Character vector of timeline labels to keep (NULL = all)
+#' @param text_width_twips Target table width in twips (NULL = use RTF widths)
+#' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
+#' @return Character string containing a <w:tbl> XML fragment
+get_table_xml <- function(path,
+                          excluded_cols        = NULL,
+                          excluded_rows        = NULL,
+                          excluded_header_rows = NULL,
+                          parameters           = NULL,
+                          timelines            = NULL,
+                          text_width_twips     = NULL,
+                          pages                = NULL) {
+  prep <- prepare_table(
+    pages = pages, path = path,
+    excluded_cols = excluded_cols, excluded_rows = excluded_rows,
+    excluded_header_rows = excluded_header_rows,
+    parameters = parameters, timelines = timelines
   )
-
-  paste0("<w:tblPr>", properties, "</w:tblPr>")
+  build_xml(prep$combined, cols = prep$included_cols,
+            text_width_twips = text_width_twips)
 }
 
 
-#' Adds in line breaks to text sections that contain \\n
-#'
-#' \\n means nothing in XML so they lines have to be put into individual text tags with linebreak tags in between
-#'xml:space = preserve means that spaces at the beginning of cell stay otherwise they disappear
-#'
-#' @param text the section of text that line breaks need to be added to
-#'
-#' @return an XML output of a series of text tags with line breaks if they occur
-#' @keywords internal
-#'
-process_text <- function(text){
-  if(grepl("\\\n",text)){
-    texts <- strsplit(text,"\\\n") %>%
-      unlist()
-    texts[1:(length(texts)-1)] <- texts[-(length(texts))] %>%
-      sapply(function(x){
-        paste0("<w:t xml:space=\"preserve\">", x, "</w:t><w:br/>")
-      })
-    texts[length(texts)] <- paste0("<w:t xml:space=\"preserve\">", texts[length(texts)], "</w:t>")
-    new_text <- paste0(texts,collapse = "")
-  }else{
-    new_text <- paste0("<w:t xml:space=\"preserve\">", text, "</w:t>")
-  }
 
-  new_text
-}
+
+
+
+
+
+
 
 
 
