@@ -1,4 +1,4 @@
-# wml.R - structured table data -> minimal Word XML (OOXML / w: namespace)
+# xml.R - structured table data -> minimal Word XML (OOXML / w: namespace)
 
 # -- Helpers
 
