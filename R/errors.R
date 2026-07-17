@@ -16,6 +16,7 @@
 #
 
 houdini_error <- function(kind, message, hint, fields = list()) {
+  logger::log_error(sprintf("%s - %s",message,hint))
   structure(
     c(
       list(message = message, hint = hint, call = NULL),
