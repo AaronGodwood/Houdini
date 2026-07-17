@@ -1,66 +1,115 @@
+# Read raw bytes and convert to UTF-8 string, handling CP1252/Latin-1.
+# readLines(encoding=) never errors on wrong encodings, it just mis-marks the
+# string - so detect real UTF-8 with validUTF8() and convert otherwise.
 rtf_read_raw <- function(path) {
-  lines <- tryCatch(
-    readLines(path, encoding = "UTF-8", warn = FALSE),
-    error = function(e)
-      readLines(path, encoding = "latin1", warn = FALSE)
-  )
-  text <- paste(lines, collapse = "\n")
-  #normalise any different line endings e.g. \r\n or \n
+  bytes <- readBin(path, what = "raw", n = file.size(path))
+  bytes <- bytes[bytes != as.raw(0L)]
+  text  <- rawToChar(bytes)
+  if (validUTF8(text)) {
+    Encoding(text) <- "UTF-8"
+  } else {
+    # SAS/Word on Windows write CP1252 (latin1 plus smart quotes, dashes, ...)
+    text <- iconv(text, from = "CP1252", to = "UTF-8", sub = "?")
+  }
+  # Normalise any residual \r\n or \r
   text <- gsub("\r\n", "\n", text, fixed = TRUE)
-  gsub("\r", "\n", text, fixed = TRUE)
+  gsub("\r",   "\n", text, fixed = TRUE)
 }
 
 # Resolve RTF escape sequences in a text string:
-#   \'xx  -> the character for hex xx (in latin1, then to UTF-8)
-#   \uN   -> Unicode code point N (followed by a fallback char we skip)
+#   \'xx  -> the character for hex xx (CP1252, converted to UTF-8)
+#   \uN   -> Unicode code point N, followed by \ucN fallback chars we skip
+#   \ucN  -> sets the fallback length for subsequent \uN escapes (default 1);
+#            consumed and not emitted
+# A fallback "character" may itself be a \'xx escape (counts as one).
 rtf_unescape_r <- function(text) {
-  # Handle \uN escapes: find all, replace in reverse order to preserve positions
-  m <- gregexpr("\\\\u(-?[0-9]+)\\??.", text, perl = TRUE)[[1]]
-  if (m[1L] != -1L) {
-    lens <- attr(m, "match.length")
-    for (i in rev(seq_along(m))) {
-      matched <- substr(text, m[i], m[i] + lens[i] - 1L)
-      n <- suppressWarnings(as.integer(sub("\\\\u(-?[0-9]+).*", "\\1", matched)))
-      if (is.na(n)) next
-      if (n < 0L) n <- n + 65536L
-      text <- paste0(substr(text, 1L, m[i] - 1L),
-                     intToUtf8(n),
-                     substr(text, m[i] + lens[i], nchar(text)))
-    }
-  }
+  if (!grepl("\\\\(u|')", text, perl = TRUE)) return(text)
 
-  # Handle \'xx hex escapes the same way
-  m <- gregexpr("\\\\'([0-9a-fA-F]{2})", text, perl = TRUE)[[1]]
-  if (m[1L] != -1L) {
-    lens <- attr(m, "match.length")
-    for (i in rev(seq_along(m))) {
-      hex <- substr(text, m[i] + 2L, m[i] + 3L)
+  n   <- nchar(text)
+  out <- character()
+  pos <- 1L
+  uc  <- 1L
+
+  repeat {
+    m <- regexpr("\\\\(uc[0-9]+|u-?[0-9]+|'[0-9a-fA-F]{2})",
+                 substr(text, pos, n), perl = TRUE)
+    if (m == -1L) {
+      out <- c(out, substr(text, pos, n))
+      break
+    }
+    start <- pos + m[1L] - 1L
+    len   <- attr(m, "match.length")
+    out   <- c(out, substr(text, pos, start - 1L))
+    tok   <- substr(text, start, start + len - 1L)
+    pos   <- start + len
+
+    if (startsWith(tok, "\\uc")) {
+      uc <- as.integer(substr(tok, 4L, len))
+      if (substr(text, pos, pos) == " ") pos <- pos + 1L  # delimiter
+    } else if (startsWith(tok, "\\u")) {
+      cp <- as.integer(substr(tok, 3L, len))
+      if (cp < 0L) cp <- cp + 65536L
+      out <- c(out, intToUtf8(cp))
+      if (substr(text, pos, pos) == " ") pos <- pos + 1L  # delimiter
+      # Skip the uc fallback characters; stop early at structure we shouldn't eat
+      k <- uc
+      while (k > 0L && pos <= n) {
+        ch <- substr(text, pos, pos)
+        if (ch == "\\") {
+          if (substr(text, pos + 1L, pos + 1L) == "'") pos <- pos + 4L else break
+        } else if (ch == "{" || ch == "}") {
+          break
+        } else {
+          pos <- pos + 1L
+        }
+        k <- k - 1L
+      }
+    } else {
+      # \'xx hex escape
+      hex <- substr(tok, 3L, 4L)
       ch  <- rawToChar(as.raw(strtoi(hex, 16L)))
-      ch  <- iconv(ch, from = "latin1", to = "UTF-8", sub = "?")
-      text <- paste0(substr(text, 1L, m[i] - 1L),
-                     ch,
-                     substr(text, m[i] + lens[i], nchar(text)))
+      out <- c(out, iconv(ch, from = "CP1252", to = "UTF-8", sub = "?"))
     }
   }
 
-  text
+  paste(out, collapse = "")
+}
+
+# Fast hex string to raw vector conversion.
+# Processes in chunks of 4000 bytes (8000 hex chars) to limit intermediate
+# string allocation compared to one-pair-at-a-time substring calls.
+hex_to_raw <- function(hex) {
+  n <- nchar(hex) %/% 2L
+  chunk <- 4000L
+  parts <- vector("list", ceiling(n / chunk))
+  pi <- 1L
+  pos <- 1L
+  while (pos <= n * 2L) {
+    end <- min(pos + chunk * 2L - 1L, n * 2L)
+    piece <- substr(hex, pos, end)
+    nb <- nchar(piece) %/% 2L
+    starts <- seq(1L, by = 2L, length.out = nb)
+    parts[[pi]] <- as.raw(strtoi(substring(piece, starts, starts + 1L), 16L))
+    pi <- pi + 1L
+    pos <- end + 1L
+  }
+  unlist(parts)
 }
 
 
-#Finds the position of the closing brace "}" matching the opening brace "{" at 'start'
-# Converts text to raw bytes for O(1) indexing instead of per character substr calls
-find_matching_brace_r <- function(text, start){
+# Find the position of the closing brace matching the opening brace at `start`.
+# Converts to raw bytes for O(1) indexing instead of per-character substr calls.
+find_matching_brace_r <- function(text, start) {
   bytes <- charToRaw(text)
   n <- length(bytes)
-  open <- charToRaw("{")
+  open  <- charToRaw("{")
   close <- charToRaw("}")
   depth <- 0L
   pos <- start
-
-  while( pos <= n) {
+  while (pos <= n) {
     b <- bytes[pos]
-    if(b == open) depth <- depth + 1L
-    else if (b == close){
+    if (b == open) depth <- depth + 1L
+    else if (b == close) {
       depth <- depth - 1L
       if (depth == 0L) return(pos)
     }
@@ -133,168 +182,380 @@ remove_group <- function(text, tag) {
   text
 }
 
+# -- Table Blocks
+
+#
+# A "block" is a rectangular set of table rows stored column-wise as matrices
+# (one row per table row), rather than nested lists of per-cell objects:
+#   text    - character (n x k), "" where a row has no cell in that column
+#   align   - character (n x k), NA where the cell declares no alignment
+#   colspan - integer   (n x k), 1 normal, >1 merge head, 0 merge continuation
+#   width   - integer   (n x k), cell width in twips
+#   present - logical   (n x k), FALSE where row r has no cell in column c
+#   is_header - logical(n)
+#   row_id    - integer(n), stable identity assigned by parse_rtf (NA before)
+# Filtering and combining reduce to matrix subsetting, and a large document
+# is a handful of big vectors instead of millions of tiny list objects.
+
+block_new <- function() {
+  m_chr <- matrix(character(), 0L, 0L)
+  m_int <- matrix(integer(),   0L, 0L)
+  list(
+    text = m_chr, align = m_chr, colspan = m_int, width = m_int,
+    present = matrix(logical(), 0L, 0L),
+    is_header = logical(), row_id = integer()
+  )
+}
+
+block_nrow <- function(b) length(b$is_header)
+block_ncol <- function(b) ncol(b$text)
+
+
+# Subset a block to the given rows (logical or integer index)
+block_rows <- function(b, idx) {
+  b$text      <- b$text[idx, , drop = FALSE]
+  b$align     <- b$align[idx, , drop = FALSE]
+  b$colspan   <- b$colspan[idx, , drop = FALSE]
+  b$width     <- b$width[idx, , drop = FALSE]
+  b$present   <- b$present[idx, , drop = FALSE]
+  b$is_header <- b$is_header[idx]
+  b$row_id    <- b$row_id[idx]
+  b
+}
+
+# Widen a block to at least k columns, filling with "absent cell" values
+block_pad <- function(b, k) {
+  extra <- k - block_ncol(b)
+  if (extra <= 0L) return(b)
+  n <- block_nrow(b)
+  b$text    <- cbind(b$text,    matrix("",            n, extra))
+  b$align   <- cbind(b$align,   matrix(NA_character_, n, extra))
+  b$colspan <- cbind(b$colspan, matrix(0L,            n, extra))
+  b$width   <- cbind(b$width,   matrix(0L,            n, extra))
+  b$present <- cbind(b$present, matrix(FALSE,         n, extra))
+  b
+}
+
+
+# Subset a block to the given column indices (row fields unchanged)
+block_cols <- function(b, cols) {
+  if (block_nrow(b) == 0L) return(b)
+  b <- block_pad(b, max(cols, 0L))
+  b$text    <- b$text[, cols, drop = FALSE]
+  b$align   <- b$align[, cols, drop = FALSE]
+  b$colspan <- b$colspan[, cols, drop = FALSE]
+  b$width   <- b$width[, cols, drop = FALSE]
+  b$present <- b$present[, cols, drop = FALSE]
+  b
+}
+
+
+# Stack blocks vertically, padding narrower blocks with absent cells
+block_rbind_all <- function(blocks) {
+  blocks <- blocks[vapply(blocks, block_nrow, integer(1)) > 0L]
+  if (length(blocks) == 0L) return(block_new())
+  if (length(blocks) == 1L) return(blocks[[1L]])
+  k <- max(vapply(blocks, block_ncol, integer(1)))
+  blocks <- lapply(blocks, block_pad, k = k)
+  list(
+    text      = do.call(rbind, lapply(blocks, `[[`, "text")),
+    align     = do.call(rbind, lapply(blocks, `[[`, "align")),
+    colspan   = do.call(rbind, lapply(blocks, `[[`, "colspan")),
+    width     = do.call(rbind, lapply(blocks, `[[`, "width")),
+    present   = do.call(rbind, lapply(blocks, `[[`, "present")),
+    is_header = unlist(lapply(blocks, `[[`, "is_header"), use.names = FALSE),
+    row_id    = unlist(lapply(blocks, `[[`, "row_id"),    use.names = FALSE)
+  )
+}
+
 # -- Table Parsing
 
+
+# findInterval re-validates `vec` on every call (anyNA + is.unsorted + an
+# as.double copy) - O(length(vec)) work that turns per-row lookups over large
+# sections quadratic. Positions here are always sorted doubles, so skip the
+# checks where this R version allows it (R >= 4.3).
+fint <- if (getRversion() >= "4.3.0") {
+  function(x, vec) findInterval(x, vec)#, checkSorted = FALSE, checkNA = FALSE)
+} else {
+  findInterval
+}
+
+
+# Start positions of all matches of `pattern`, ascending; numeric(0) if none.
+# Doubles, not integers, so fint() avoids a per-call as.double copy.
+token_positions <- function(text, pattern) {
+  p <- gregexpr(pattern, text, perl = TRUE)[[1]]
+  if (p[1L] == -1L) numeric() else as.double(p)
+}
+
+
+# Elements of the sorted position vector `pos` that fall within [lo, hi]
+pos_within <- function(pos, lo, hi) {
+  if (length(pos) == 0L) return(numeric())
+  i1 <- fint(lo - 1L, pos) + 1L
+  i2 <- fint(hi, pos)
+  if (i1 > i2) numeric() else pos[i1:i2]
+}
+
+# Does any element of the sorted position vector `pos` fall within [lo, hi]?
+any_within <- function(pos, lo, hi) {
+  length(pos) != 0L && fint(hi, pos) > fint(lo - 1L, pos)
+}
+
+grid_align_row <- function(texts, aligns, flag_first, flag_cont, ge, grid_widths){
+
+  n_c <- length(texts)
+  n_def <- length(ge)
+  size <- length(grid_widths) + n_c
+  text <- character(size)
+  align <- rep(NA_character_, size)
+  span <- integer(size)
+  width <- integer(size)
+  present <- integer(size)
+
+  used <- 0L #rightmost output col written
+  prev_end <- 0L #rightmost grid col covered so far
+  ci <- 1L
+  while(ci <= n_c){
+    if(ci <= n_def){
+      j <- ci +1L
+      if(flag_first[ci]) while(j <= n_c && flag_cont[j]) j <- j + 1L
+      end <- ge[min(j-1L, n_def)]
+      s <- end- prev_end
+      if (s > 0L){
+        gs <- prev_end + 1L
+        idx <- gs:end
+        present[idx] <- TRUE
+        text[idx] <- texts[ci]
+        width[idx] <- grid_widths[idx]
+        align[gs] <- aligns[ci]
+        span[gs] <- s
+        prev_end <- end
+        used <- end
+      }
+      ci <- j
+    } else {
+
+      used <- used + 1L
+      present[used] <- TRUE
+      text[used] <- texts[ci]
+      align[used] <- aligns[ci]
+      span[used] <- 1L
+      ci <- ci + 1L
+    }
+  }
+
+  idx <- seq_len(used)
+  list(text = text[idx], align = align[idx], span = span[idx],
+       width = width[idx], present = present[idx])
+
+}
+
 # Given RTF text for one section (header or body), parse all rows.
-# Returns a list of row objects:
-#   list(is_header, cells = list(list(text, width_twips, colspan)))
+# Returns a block (see section above).
+#
+# Each token type is located with a single regex scan over the whole section;
+# per-row and per-cell tests then become sorted-position lookups instead of
+# fresh regex passes over row substrings.
 parse_rtf_table <- function(section_text) {
-  rows <- list()
+  trowd_pos <- token_positions(section_text, "\\\\trowd(?![a-zA-Z])")
+  if (length(trowd_pos) == 0L) return(block_new())
 
-  # Tokenise: find each \trowd ... \row block
-  # We'll scan linearly through \trowd markers
-  trowd_positions <- gregexpr("\\\\trowd(?![a-zA-Z])", section_text, perl = TRUE)[[1]]
-  if (identical(trowd_positions, -1L)) return(rows)
+  row_pos <- token_positions(section_text, "\\\\row(?![a-zA-Z])")
+  if (length(row_pos) == 0L) return(block_new())
 
-  row_positions   <- gregexpr("\\\\row(?![a-zA-Z])",   section_text, perl = TRUE)[[1]]
-  if (identical(row_positions, -1L))   return(rows)
+  trhdr_pos    <- token_positions(section_text, "\\\\trhdr(?![a-zA-Z])")
+  clmgf_pos    <- token_positions(section_text, "\\\\clmgf(?![a-zA-Z])")
+  clmrg_pos    <- token_positions(section_text, "\\\\clmrg(?![a-zA-Z])")
+  cell_pos     <- token_positions(section_text, "\\\\cell(?![a-zA-Z])")
+  ql_pos       <- token_positions(section_text, "\\\\ql(?![a-zA-Z])")
+  qr_pos       <- token_positions(section_text, "\\\\qr(?![a-zA-Z])")
+  qc_pos       <- token_positions(section_text, "\\\\qc(?![a-zA-Z])")
+  bold_on_pos  <- token_positions(section_text, "\\\\b(?![a-zA-Z0-9])")
+  bold_off_pos <- token_positions(section_text, "\\\\b0(?![a-zA-Z])")
 
-  for (ti in seq_along(trowd_positions)) {
-    row_start <- trowd_positions[ti]
+  cellx_m   <- gregexpr("\\\\cellx([0-9]+)", section_text, perl = TRUE)
+  cellx_pos <- cellx_m[[1]]
+  if (cellx_pos[1L] == -1L) {
+    cellx_pos  <- numeric()
+    cellx_vals <- integer()
+  } else {
+    cellx_pos  <- as.double(cellx_pos)
+    cellx_vals <- as.integer(gsub("\\\\cellx", "",
+                                  regmatches(section_text, cellx_m)[[1]]))
+  }
 
-    # Find the matching \row that comes after this \trowd
-    row_end_candidates <- row_positions[row_positions > row_start]
-    if (length(row_end_candidates) == 0L) next
-    row_end <- row_end_candidates[1]
+  n_max      <- length(trowd_pos)
+  row_texts  <- vector("list", n_max)
+  row_aligns <- vector("list", n_max)
+  row_ff  <- vector("list", n_max) #merge first flag
+  row_fc <- vector("list", n_max) #merge continuation flag
+  row_bounds <- vector("list", n_max) #cumulative cell bounds
+  row_hdr    <- logical(n_max)
+  nr         <- 0L
 
-    row_text <- substr(section_text, row_start, row_end + 3L)  # include \row
+  for (ti in seq_along(trowd_pos)) {
+    row_start <- trowd_pos[ti]
+
+    # First \row after this \trowd closes the row
+    ri <- fint(row_start, row_pos) + 1L
+    if (ri > length(row_pos)) next
+    row_close <- row_pos[ri] + 3L  # last char of "\row"
 
     # --- is_header: \trhdr present? ---
-    is_hdr <- grepl("\\\\trhdr(?![a-zA-Z])", row_text, perl = TRUE)
+    is_hdr <- any_within(trhdr_pos, row_start, row_close)
 
     # --- cell boundary positions (\cellxN) ---
-    cellx_matches <- gregexpr("\\\\cellx([0-9]+)", row_text, perl = TRUE)
-    cellx_vals <- as.integer(regmatches(row_text, cellx_matches)[[1]] |>
-                               gsub("\\\\cellx", "", x = _))
-
-    # --- merge flags per cell position ---
-    # \clmgf = first of merge, \clmrg = continuation
-    # These appear in the row definition before \cellxN values
-    # We pair them by order with cellx_vals
-    clmgf_pos <- gregexpr("\\\\clmgf(?![a-zA-Z])", row_text, perl = TRUE)[[1]]
-    clmrg_pos <- gregexpr("\\\\clmrg(?![a-zA-Z])",  row_text, perl = TRUE)[[1]]
-    has_clmgf <- !identical(clmgf_pos, -1L)
-    has_clmrg <- !identical(clmrg_pos, -1L)
-
-    # Build cell definition list (one entry per \cellx)
-    n_cells_def <- length(cellx_vals)
-    cell_defs <- vector("list", n_cells_def)
-    for (ci in seq_len(n_cells_def)) {
-      w <- if (ci == 1L) cellx_vals[1] else cellx_vals[ci] - cellx_vals[ci - 1L]
-      cell_defs[[ci]] <- list(width_twips = w, is_merge_first = FALSE, is_merge_cont = FALSE)
+    di1 <- fint(row_start - 1L, cellx_pos) + 1L
+    di2 <- fint(row_close, cellx_pos)
+    if (di1 <= di2) {
+      cx_pos_row <- cellx_pos[di1:di2]
+      cx_vals    <- cellx_vals[di1:di2]
+    } else {
+      cx_pos_row <- numeric()
+      cx_vals    <- integer()
     }
 
-    # Tag merge cells: find \clmgf / \clmrg occurrences and their nearest following \cellx
-    # Simpler approach: find all cell-def blocks between \trowd and first \cell
-    # Each block starts at a \clmgf or \clmrg before its \cellxN
-    if (has_clmgf || has_clmrg) {
-      # Find positions of all \cellx in the row_text
-      cx_pos <- gregexpr("\\\\cellx[0-9]+", row_text, perl = TRUE)[[1]]
-      if (!identical(cx_pos, -1L)) {
-        for (ci in seq_along(cx_pos)) {
-          # What's between previous cellx (or \trowd) and this cellx?
-          prev <- if (ci == 1L) 1L else cx_pos[ci - 1L]
-          seg  <- substr(row_text, prev, cx_pos[ci])
-          cell_defs[[ci]]$is_merge_first <- grepl("\\\\clmgf(?![a-zA-Z])", seg, perl = TRUE)
-          cell_defs[[ci]]$is_merge_cont  <- grepl("\\\\clmrg(?![a-zA-Z])",  seg, perl = TRUE)
-        }
-      }
+    n_cells_def <- length(cx_vals)
+
+
+    # --- merge flags per cell position ---
+    # \clmgf = first of merge, \clmrg = continuation; each belongs to the
+    # next \cellx that follows it in the row definition
+    merge_first <- logical(n_cells_def)
+    merge_cont  <- logical(n_cells_def)
+    for (p in pos_within(clmgf_pos, row_start, row_close)) {
+      k <- fint(p, cx_pos_row) + 1L
+      if (k <= n_cells_def) merge_first[k] <- TRUE
+    }
+    for (p in pos_within(clmrg_pos, row_start, row_close)) {
+      k <- fint(p, cx_pos_row) + 1L
+      if (k <= n_cells_def) merge_cont[k] <- TRUE
     }
 
     # --- extract cell contents (\cell boundaries) ---
-    # Split on \cell to get cell content chunks
-    cell_chunks <- strsplit(row_text, "\\\\cell(?![a-zA-Z])", perl = TRUE)[[1]]
-    # Last chunk is after the final \cell (contains \row etc.), discard it
-    if (length(cell_chunks) > 1L) cell_chunks <- cell_chunks[-length(cell_chunks)]
+    # Chunk i runs from just after the previous \cell (or the row start)
+    # up to just before \cell i; text after the final \cell is discarded.
+    # A row with no \cell yields one chunk spanning the whole row.
+    cp <- pos_within(cell_pos, row_start, row_close)
+    if (length(cp) > 0L) {
+      chunk_starts <- c(row_start, cp[-length(cp)] + 5L)
+      chunk_ends   <- cp - 1L
+    } else {
+      chunk_starts <- row_start
+      chunk_ends   <- row_close
+    }
+    cell_chunks <- substring(section_text, chunk_starts, chunk_ends)
 
     n_cells_content <- length(cell_chunks)
 
+    # Merge flags per content cell (FALSE beyond the defined cells)
+    flag_first <- logical(n_cells_content)
+    flag_cont  <- logical(n_cells_content)
+    nd <- min(n_cells_content, n_cells_def)
+    if (nd > 0L) {
+      flag_first[seq_len(nd)] <- merge_first[seq_len(nd)]
+      flag_cont[seq_len(nd)]  <- merge_cont[seq_len(nd)]
+    }
+
     # --- bold fallback for header detection ---
     if (!is_hdr && n_cells_content > 0L) {
-      non_empty <- cell_chunks[nchar(trimws(cell_chunks)) > 0L]
+      # has any non-whitespace character (= nchar(trimws(x)) > 0, but one
+      # vectorised regex call instead of trimws's two sub() calls per row)
+      non_empty <- which(grepl("[^ \t\r\n]", cell_chunks, perl = TRUE))
       if (length(non_empty) > 0L) {
-        all_bold <- all(sapply(non_empty, function(ch) {
-          # Has \b (bold on) and no \b0 (bold off) after it
-          grepl("\\\\b(?![a-zA-Z0-9])", ch, perl = TRUE) &&
-            !grepl("\\\\b0(?![a-zA-Z])", ch, perl = TRUE)
-        }))
+        all_bold <- TRUE
+        for (ci in non_empty) {
+          # Has \b (bold on) and no \b0 (bold off)
+          if (!any_within(bold_on_pos, chunk_starts[ci], chunk_ends[ci]) ||
+              any_within(bold_off_pos, chunk_starts[ci], chunk_ends[ci])) {
+            all_bold <- FALSE
+            break
+          }
+        }
         if (all_bold) is_hdr <- TRUE
       }
     }
 
     # --- clean cell text ---
-    cells <- vector("list", n_cells_content)
-    for (ci in seq_len(n_cells_content)) {
-      raw_cell <- cell_chunks[ci]
+    texts <- vapply(cell_chunks, rtf_cell_to_text_r, character(1),
+                    USE.NAMES = FALSE)
 
-      # Extract alignment from RTF control words before stripping
-      cell_align <- if (grepl("\\\\ql(?![a-zA-Z])", raw_cell, perl = TRUE)) {
+    # Alignment from RTF control words within each cell chunk
+    aligns <- rep(NA_character_, n_cells_content)
+    for (ci in seq_len(n_cells_content)) {
+      cs <- chunk_starts[ci]
+      ce <- chunk_ends[ci]
+      aligns[ci] <- if (any_within(ql_pos, cs, ce)) {
         "left"
-      } else if (grepl("\\\\qr(?![a-zA-Z])", raw_cell, perl = TRUE)) {
+      } else if (any_within(qr_pos, cs, ce)) {
         "right"
-      } else if (grepl("\\\\qc(?![a-zA-Z])", raw_cell, perl = TRUE)) {
+      } else if (any_within(qc_pos, cs, ce)) {
         "center"
       } else {
         NA_character_
       }
-
-      # Strip RTF control words and groups, leaving plain text
-      cell_text <- rtf_cell_to_text_r(raw_cell)
-
-      w_twips <- if (ci <= length(cell_defs)) cell_defs[[ci]]$width_twips else 0L
-      is_cont  <- ci <= length(cell_defs) && isTRUE(cell_defs[[ci]]$is_merge_cont)
-      is_first <- ci <= length(cell_defs) && isTRUE(cell_defs[[ci]]$is_merge_first)
-
-      cells[[ci]] <- list(
-        text           = cell_text,
-        width_twips    = w_twips,
-        align          = cell_align,
-        is_merge_first = is_first,
-        is_merge_cont  = is_cont
-      )
     }
 
-    # --- resolve merged cells: repeat first-cell text into continuations ---
-    if (n_cells_content > 1L) {
-      last_first_text <- ""
-      for (ci in seq_len(n_cells_content)) {
-        if (isTRUE(cells[[ci]]$is_merge_first)) {
-          last_first_text <- cells[[ci]]$text
-        } else if (isTRUE(cells[[ci]]$is_merge_cont)) {
-          cells[[ci]]$text <- last_first_text
-        }
-      }
-    }
 
-    # --- compute colspan for each cell ---
-    # A merged group: is_merge_first followed by N is_merge_cont cells -> colspan = N+1
-    if (n_cells_content > 0L) {
-      ci <- 1L
-      while (ci <= n_cells_content) {
-        if (isTRUE(cells[[ci]]$is_merge_first)) {
-          span <- 1L
-          j <- ci + 1L
-          while (j <= n_cells_content && isTRUE(cells[[j]]$is_merge_cont)) {
-            span <- span + 1L
-            j <- j + 1L
-          }
-          cells[[ci]]$colspan <- span
-          # Mark continuation cells with colspan 0 (to be skipped in output)
-          for (k in seq(ci + 1L, length.out = span - 1L)) {
-            if (k <= n_cells_content) cells[[k]]$colspan <- 0L
-          }
-          ci <- j
-        } else {
-          cells[[ci]]$colspan <- 1L
-          ci <- ci + 1L
-        }
-      }
-    }
-
-    rows <- c(rows, list(list(is_header = is_hdr, cells = cells)))
+    nr <- nr + 1L
+    row_texts[[nr]]  <- texts
+    row_aligns[[nr]] <- aligns
+    row_ff[[nr]]  <- flag_first
+    row_fc[[nr]]  <- flag_cont
+    row_bounds[[nr]]  <- cx_vals
+    row_hdr[nr]      <- is_hdr
   }
 
-  rows
+
+  # --- column grid
+
+  all_b <- sort(unique(as.double(unlist(row_bounds[seq_len(nr)]))))
+  if(length(all_b) > 0L){
+    cl <- cumsum(c(1L, as.integer(diff(all_b) > 10)))
+    is_last <- c(cl[-1L] != cl[-length(cl)], TRUE)
+    grid_widths <- as.integer(round(diff(c(0, all_b[is_last]))))
+  } else {
+    cl <- integer()
+    grid_widths <- integer()
+  }
+
+
+  # -- express every row on the grid
+  rows <- vector("list", nr)
+  for(i in seq_len(nr)){
+    bounds <- row_bounds[[i]]
+    ge <- if (length(bounds) > 0L) cl[fint(bounds, all_b)] else integer()
+    rows[[i]] <- grid_align_row(row_texts[[i]], row_aligns[[i]],row_ff[[i]],
+                                row_fc[[i]], ge, grid_widths)
+  }
+
+  # --- assemble the block matrices ---
+  lens <- vapply(rows, function(r) length(r$text), integer(1))
+  k <- if (nr > 0L) max(lens, 0L) else 0L
+  text    <- matrix("",            nr, k)
+  align   <- matrix(NA_character_, nr, k)
+  colspan <- matrix(0L,            nr, k)
+  width   <- matrix(0L,            nr, k)
+  present <- matrix(FALSE,         nr, k)
+  for (i in seq_len(nr)) {
+    if (lens[i] > 0L) {
+      idx <- seq_len(lens[i])
+      text[i, idx]    <- rows[[i]]$text
+      align[i, idx]   <- rows[[i]]$align
+      colspan[i, idx] <- rows[[i]]$span
+      width[i, idx]   <- rows[[i]]$width
+      present[i, idx] <- rows[[i]]$present
+    }
+  }
+
+  list(
+    text = text, align = align, colspan = colspan, width = width,
+    present = present,
+    is_header = row_hdr[seq_len(nr)],
+    row_id    = rep(NA_integer_, nr)
+  )
 }
 
 # Strip RTF markup from a cell's raw text, returning clean plain text
@@ -312,15 +573,17 @@ rtf_cell_to_text_r <- function(raw) {
     new_text <- gsub("\\{((?:[^{}\\\\]|\\\\[a-zA-Z]+[-]?[0-9]*[ ]?)*)\\}",
                      "\\1", text, perl = TRUE)
     # Strip any remaining control words that were the only content
-    new_text <- gsub("\\{\\\\[a-zA-Z]+[-]?[0-9]*[ ]?\\}", "", new_text, perl = TRUE)
+    # (but not \uN / \ucN, which rtf_unescape decodes later)
+    new_text <- gsub("\\{\\\\(?!u-?[0-9]|uc[0-9])[a-zA-Z]+[-]?[0-9]*[ ]?\\}", "", new_text, perl = TRUE)
     if (identical(new_text, text)) break
     text <- new_text
   }
 
-  # Remove remaining RTF control words (\word or \word123)
-  text <- gsub("\\\\[a-zA-Z]+[-]?[0-9]*\\s?", "", text, perl = TRUE)
-  # Remove remaining control symbols (\<symbol>)
-  text <- gsub("\\\\.", "", text, perl = TRUE)
+  # Remove remaining RTF control words (\word or \word123), but preserve
+  # \uN and \ucN - they are decoded (not stripped) by rtf_unescape below
+  text <- gsub("\\\\(?!u-?[0-9]|uc[0-9])[a-zA-Z]+[-]?[0-9]*\\s?", "", text, perl = TRUE)
+  # Remove remaining control symbols (\<symbol>), preserving \'xx hex escapes
+  text <- gsub("\\\\(?!')[^a-zA-Z]", "", text, perl = TRUE)
   # Remove stray braces
   text <- gsub("[{}]", "", text, fixed = FALSE)
 
@@ -338,40 +601,33 @@ parse_page <- function(page_text){
   footer_text <- extract_group(page_text, "\\footer") # TODO make use of footer -- worked in old tokeniser
 
   body_text <- remove_groups(page_text, c(
-    "\\header", "\\footer", "\\fonttbl", "\\colortbl")) # may need more -- test
+    "\\header", "\\footer", "\\fonttbl", "\\colortbl","\\stylesheet","\\info")) # may need more -- test
 
-  # Parse header table rows
-  header_rows <- if (!is.na(header_text)) parse_rtf_table(header_text) else list()
+  # Parse the page-header table and pull the parameter from its lowest row
+  header_tbl <- if (!is.na(header_text)) {
+    parse_rtf_table(header_text)
+  } else {
+    block_new()
+  }
+  parameter <- extract_parameter(header_tbl)
 
-  # Extract parameter for filtering
-  # TODO
-  parameter <- extract_parameter(header_rows)
 
-  # Parse body table rows
-  body_rows <- parse_rtf_table(body_text)
-
-  # Split body rows into header rows (is_hdr == TRUE) and data rows
-  # Note: header of page and the header of the table in the body are different
-  is_hdr <- vapply(body_rows, `[[`, logical(1), "is_header")
+  # Parse the body table and split into header rows and data rows
+  body <- parse_rtf_table(body_text)
   list(
     parameter = parameter,
-    header_rows = body_rows[is_hdr],
-    data_rows = body_rows[!is_hdr]  # TODO add in footnotes from footer
+    header    = block_rows(body, body$is_header),
+    data      = block_rows(body, !body$is_header)
   )
 
 }
 
-# Extract "Parameter: <value>" from lowest row of RTF header section
-extract_parameter <- function(header_rows) {
-  if(length(header_rows) == 0L) return(NA_character_)
-
-  # Check rows from bottom up
-  for(i in rev(seq_along(header_rows))) {
-    row <- header_rows[[i]]
-    for(cell in row$cells) {
-      m <- regmatches(cell$text,
-                      regexpr("(?i)^Parameter:\\s*(.+)$", cell$text, perl = TRUE))
-      if(length(m) > 0L && nchar(m) > 0L) {
+# Extract "Parameter: <value>" from the lowest row of the RTF header section
+extract_parameter <- function(header_tbl) {
+  for (i in rev(seq_len(block_nrow(header_tbl)))) {
+    for (txt in header_tbl$text[i, header_tbl$present[i, ]]) {
+      m <- regmatches(txt, regexpr("(?i)^Parameter:\\s*(.+)$", txt, perl = TRUE))
+      if (length(m) > 0L && nchar(m) > 0L) {
         return(trimws(sub("(?i)^Parameter:\\s*", "", m, perl = TRUE)))
       }
     }
@@ -387,13 +643,26 @@ extract_parameter <- function(header_rows) {
 #' @param path Path to the .rtf file
 #' @return List of page objects, each with:
 #'   \item{parameter}{character or NA}
-#'   \item{header_rows}{list of row objects}
-#'   \item{data_rows}{list of row objects}
-#'   Each row object: list(is_header, cells = list(list(text, width_twips, colspan, ...)))
+#'   \item{header}{block of header rows (see section 4)}
+#'   \item{data}{block of data rows, with stable \code{row_id}s}
 parse_rtf <- function(path) {
   text  <- rtf_read_raw(path)
   pages <- rtf_split_pages(text)
-  lapply(pages, parse_page)
+  pages <- lapply(pages, parse_page)
+
+  # Stable row identity: number data rows sequentially across all pages in
+  # document order. Row exclusions are stored against these IDs rather than
+  # view positions, so an exclusion keeps pointing at the same row when
+  # parameter/timeline filters change the set of visible rows.
+  next_id <- 1L
+  for (pi in seq_along(pages)) {
+    n <- block_nrow(pages[[pi]]$data)
+    if (n > 0L) {
+      pages[[pi]]$data$row_id <- seq.int(next_id, length.out = n)
+      next_id <- next_id + n
+    }
+  }
+  pages
 }
 
 
@@ -403,7 +672,9 @@ parse_rtf <- function(path) {
 #' @param pages Pre-parsed pages (from parse_rtf) or NULL
 #' @param path RTF file path (used only if pages is NULL)
 #' @param excluded_cols Integer vector of column indices to exclude
-#' @param excluded_rows Integer vector of data row indices to exclude
+#' @param excluded_rows Integer vector of stable data-row IDs to exclude
+#'   (as assigned by \code{parse_rtf}; equal to the row's position in the
+#'   unfiltered combined table)
 #' @param excluded_header_rows Integer vector of header row indices to exclude
 #' @param parameters Parameter filter
 #' @param timelines Timeline filter
@@ -414,19 +685,24 @@ prepare_table <- function(pages = NULL, path = NULL,
                           parameters = NULL, timelines = NULL) {
   if (is.null(pages)) pages <- parse_rtf(path)
   pages    <- filter_pages(pages, parameters)
-  #TODO timeline filtering
+  #pages    <- filter_timelines(pages, timelines)
   combined <- combine_pages(pages)
 
   n_cols <- length(combined$col_widths_twips)
-  n_data <- length(combined$data_rows)
-  n_hdr  <- length(combined$header_rows)
+  n_data <- block_nrow(combined$data)
+  n_hdr  <- block_nrow(combined$header)
 
-  inc_cols <- setdiff(seq_len(n_cols), excluded_cols        %||% integer())  # can be used for Mark's request
-  inc_rows <- setdiff(seq_len(n_data), excluded_rows        %||% integer())
+  inc_cols <- setdiff(seq_len(n_cols), excluded_cols        %||% integer())
   inc_hdrs <- setdiff(seq_len(n_hdr),  excluded_header_rows %||% integer())
 
-  combined$data_rows   <- combined$data_rows[inc_rows]
-  combined$header_rows <- combined$header_rows[inc_hdrs]
+  # Data rows are dropped by stable row ID, not by position in the (possibly
+  # filtered) view; rows without an ID fall back to their current position
+  row_ids <- combined$data$row_id
+  row_ids[is.na(row_ids)] <- seq_len(n_data)[is.na(row_ids)]
+  keep_rows <- !(row_ids %in% (excluded_rows %||% integer()))
+
+  combined$data   <- block_rows(combined$data, keep_rows)
+  combined$header <- block_rows(combined$header, inc_hdrs)
 
   list(combined = combined, included_cols = inc_cols)
 }
@@ -461,32 +737,127 @@ get_parameters <- function(pages) {
 
 # --combining pages
 
+
 #' Combine multiple pages into a single flat table
 #'
 #' Header rows are taken from the first page only.
 #' Data rows are concatenated across all pages.
 #' @param pages Filtered list of page objects
-#' @return list(header_rows, data_rows, col_widths_twips)
+#' @return list(header, data, col_widths_twips) where header/data are blocks
 combine_pages <- function(pages) {
   if (length(pages) == 0L) {
-    return(list(header_rows = list(), data_rows = list(), col_widths_twips = numeric()))
+    return(list(header = block_new(), data = block_new(),
+                col_widths_twips = numeric()))
   }
 
-  header_rows <- pages[[1]]$header_rows
-  data_rows   <- unlist(lapply(pages, `[[`, "data_rows"), recursive = FALSE)
+  header <- pages[[1]]$header
+  data   <- block_rbind_all(lapply(pages, `[[`, "data"))
 
-  # Column widths from first page's first data (or header) row
-  ref_rows <- if (length(header_rows) > 0L) header_rows else data_rows
-  col_widths_twips <- if (length(ref_rows) > 0L) {
-    vapply(ref_rows[[1]]$cells, `[[`, numeric(1), "width_twips")
+  # Column widths from the first header (or data) row
+  ref <- if (block_nrow(header) > 0L) header else data
+  col_widths_twips <- if (block_nrow(ref) > 0L) {
+    as.numeric(ref$width[1L, ref$present[1L, ]])
   } else {
     numeric()
   }
 
   list(
-    header_rows      = header_rows,
-    data_rows        = data_rows,
+    header           = header,
+    data             = data,
     col_widths_twips = col_widths_twips
+  )
+}
+
+
+
+
+
+
+
+# -- images
+
+#' Check weather an RTF file contains an embedded image (PNG)
+#'
+#' @param path Path to the .rtf file
+#' @return TRUE if a \\pngblip group is found, FALSE otherwise
+is_image_rtf <- function(path) {
+  # Read only enough to find the marker - expected format is just an image nothing else
+  # Raw text scan suits this purpose
+  text <- rtf_read_raw(path)
+  grepl("\\\\pngblip(?![a-zA-Z])", text, perl = TRUE)
+}
+
+
+
+#' Extract the first PNG image from an RTF file
+#'
+#' Locates the first \code{\\{\\pict ... \\pngblip ... <hex>\\}} group, decodes the
+#' hex-encoded bytes to raw, and returns the image data plus its declared
+#' dimensions in twips (\code{\\picwgoal} / \code{\\pichgoal}).
+#'
+#' @param path Path to the .rtf file
+#' @return list(png_bytes = raw, width_twips = integer, height_twips = integer)
+#'   or NULL if no PNG found
+extract_png <- function(path) {
+  text <- rtf_read_raw(path)
+  n    <- nchar(text)
+
+  # Find the first \pict group that contains \pngblip. Earlier \pict groups
+  # may be WMF/EMF renditions of the same image, so keep scanning past them.
+  pict_text   <- NULL
+  search_from <- 1L
+  repeat {
+    m <- regexpr("\\\\pict(?![a-zA-Z])", substr(text, search_from, n), perl = TRUE)
+    if (m == -1L) return(NULL)
+    pict_pos <- search_from + m[1L] - 1L
+
+    # Walk back to opening brace
+    brace_pos <- NA_integer_
+    for (i in seq(pict_pos - 1L, max(1L, pict_pos - 5L), by = -1L)) {
+      if (substr(text, i, i) == "{") { brace_pos <- i; break }
+    }
+    if (is.na(brace_pos)) { search_from <- pict_pos + 5L; next }
+
+    end_pos <- find_matching_brace(text, brace_pos)
+    if (is.na(end_pos)) return(NULL)
+
+    candidate <- substr(text, brace_pos, end_pos)
+    if (grepl("\\\\pngblip(?![a-zA-Z])", candidate, perl = TRUE)) {
+      pict_text <- candidate
+      break
+    }
+    search_from <- end_pos + 1L
+  }
+
+  # Drop {\*...} destination groups (e.g. {\*\blipuid <32 hex chars>}) so
+  # their hex payload can't be mistaken for image data below
+  pict_text <- gsub("\\{\\\\\\*[^{}]*\\}", "", pict_text, perl = TRUE)
+
+  # Extract \picwgoal and \pichgoal
+  w_match <- regmatches(pict_text, regexpr("\\\\picwgoal([0-9]+)", pict_text, perl = TRUE))
+  h_match <- regmatches(pict_text, regexpr("\\\\pichgoal([0-9]+)", pict_text, perl = TRUE))
+  width_twips  <- if (length(w_match) > 0L) as.integer(sub("\\\\picwgoal", "", w_match)) else NA_integer_
+  height_twips <- if (length(h_match) > 0L) as.integer(sub("\\\\pichgoal", "", h_match)) else NA_integer_
+
+  # Extract the hex data: it starts on the line after the last RTF control word.
+  # RTF control words are \word or \wordN; the hex blob follows on its own line(s).
+  # Strategy: find the position right after the last \controlword (with optional
+  # numeric argument) in the pict group, then take the rest up to the closing brace.
+  last_ctrl <- gregexpr("\\\\[a-zA-Z]+[-]?[0-9]*", pict_text, perl = TRUE)[[1]]
+  if (identical(last_ctrl, -1L)) return(NULL)
+  last_end <- last_ctrl[length(last_ctrl)] +
+    attr(last_ctrl, "match.length")[length(last_ctrl)] - 1L
+  hex_region <- substr(pict_text, last_end + 1L, nchar(pict_text))
+  # Keep only hex characters, strip everything else (whitespace, braces)
+  hex_clean <- gsub("[^0-9a-fA-F]", "", hex_region, perl = TRUE)
+  if (nchar(hex_clean) == 0L) return(NULL)
+  if (nchar(hex_clean) %% 2L != 0L) return(NULL)
+  png_bytes <- hex_to_raw(hex_clean)
+
+  list(
+    png_bytes    = png_bytes,
+    width_twips  = width_twips,
+    height_twips = height_twips
   )
 }
 
