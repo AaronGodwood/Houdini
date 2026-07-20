@@ -115,6 +115,8 @@ open_docx <- function(docx_path) {
 
   # Build bookmark jump table once: name -> <w:p> node reference
   bm_nodes   <- xml_find_all(doc, ".//w:bookmarkStart", ns = c(w = W_NS))
+  ids <- as.integer(xml_attr(bm_nodes,"id"))
+  next_bmk_id <- if(length(ids)) max(ids, na.rm = TRUE) +1L else 1000L
   jump_table <- list()
   for (bm in bm_nodes) {
     name <- xml_attr(bm, "name")
@@ -140,6 +142,7 @@ open_docx <- function(docx_path) {
   session$rels_doc       <- rels_doc
   session$ct_doc         <- ct_doc
   session$jump_table     <- jump_table
+  session$next_bmk_id    <- next_bmk_id
   session$next_img_id    <- next_img_id
   session$text_width_emu <- text_width_emu
   session
@@ -180,8 +183,49 @@ inject_table <- function(session, bookmark_name, xml_string) {
     stop(err_bookmark_missing(bookmark_name))
   }
 
-  xml_add_sibling(para_node, read_xml(xml_string), .where = "after") ##For table replacement use add_xml() as a guide (currently has lots of cursor tracking stuff in it thats not needed)
+  add_xml(para_node, read_xml(xml_string), where = "on") ##For table replacement use add_xml() as a guide (currently has lots of cursor tracking stuff in it thats not needed)
   invisible(TRUE)
+}
+
+# Add a PNG file to word/media/ and register it in word/_rels/document.xml.rels.
+# Returns the relationship ID (e.g. "rId10") for use in the drawing XML.
+# Mutates session$next_img_id (counter) and session$rels_doc (live xml2 doc).
+add_image_relationship <- function(session, png_bytes) {
+  # Write PNG bytes to word/media/
+  img_id  <- session$next_img_id
+  img_name <- sprintf("image%d.png", img_id)
+  img_path <- file.path(session$tmp_dir, "word", "media", img_name)
+  dir.create(dirname(img_path), showWarnings = FALSE, recursive = TRUE)
+  writeBin(png_bytes, img_path)
+
+  session$next_img_id <- img_id + 1L
+
+  # Choose a relationship ID that doesn't clash with existing ones
+  rel_id <- sprintf("rIdImg%d", img_id)
+
+  # Add <Relationship> to word/_rels/document.xml.rels
+  new_rel <- sprintf(
+    '<Relationship xmlns="%s" Id="%s" Type="%s" Target="media/%s"/>',
+    REL_NS, rel_id, IMG_REL_TYPE, img_name
+  )
+  xml_add_child(xml_root(session$rels_doc), read_xml(new_rel))
+
+  # Ensure [Content_Types].xml has a Default entry for png
+  CT_NS <- "http://schemas.openxmlformats.org/package/2006/content-types"
+  existing_png <- xml_find_first(
+    session$ct_doc,
+    ".//ct:Default[@Extension='png']",
+    ns = c(ct = CT_NS)
+  )
+  if (inherits(existing_png, "xml_missing")) {
+    new_ct <- sprintf(
+      '<Default xmlns="%s" Extension="png" ContentType="image/png"/>',
+      CT_NS
+    )
+    xml_add_child(xml_root(session$ct_doc), read_xml(new_ct))
+  }
+
+  rel_id
 }
 
 
@@ -259,6 +303,35 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
   xml_add_sibling(para_node, read_xml(drawing_xml), .where = "after") ## similarly to above use add_xml as a guide for replacement
   invisible(TRUE)
 }
+
+add_xml <- function(node, xml_block, where = "after"){
+
+  #next_bmk_id <- session$next_bmk_id
+  #session$next_bmk_id <- session$next_bmk_id + 1L
+  #name <- sprintf("_Houdini%d",next_bmk_id)
+
+  if(where == "on"){
+    next_node <- xml_find_first(node,"following-sibling::*[1]")
+
+    if(xml_name(next_node) == "tbl"){
+      xml_replace(next_node,xml_block)
+      #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "before")
+      #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkEnd w:xmlns="%s" w:id="%d"/>',W_NS,next_bmk_id)), .where = "after")
+      return(invisible(TRUE))
+    }
+
+    where <- "after"
+
+  }
+
+  #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkEnd w:xmlns="%s" w:id="%d"/>',W_NS,next_bmk_id)), .where = "after")
+  xml_add_sibling(node,xml_block, .where = where)
+  #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "after")
+
+  invisible(TRUE)
+}
+
+
 
 
 
