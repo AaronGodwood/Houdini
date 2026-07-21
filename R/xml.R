@@ -3,10 +3,12 @@
 # -- Helpers
 
 xml_escape <- function(text) {
+
   text <- gsub("&",  "&amp;",  text, fixed = TRUE)
   text <- gsub("<",  "&lt;",   text, fixed = TRUE)
   text <- gsub(">",  "&gt;",   text, fixed = TRUE)
   text <- gsub("\"", "&quot;", text, fixed = TRUE)
+  text <- gsub("\\n", "</w:t><w:br/><w:t xml:space=\"preserve\">", text)
   text
 }
 
@@ -55,7 +57,7 @@ xml_cell <- function(text, align, grid_span, borders, run_pr, header = FALSE) {
 
 # -- Row Builders
 
-# -Version 2 changed from 1 function to two a they were called in separate places anyway and makes code cleaner
+
 
 # Build a <w:tr> for row `r` of a header block
 # is_last_header: add bottom border to cells

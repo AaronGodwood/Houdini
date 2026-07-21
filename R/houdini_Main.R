@@ -213,7 +213,8 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
   full_paths <- file.path(file_location, rtf_files)
   rtf_paths <- setNames(as.list(full_paths), tbl_names)
 
-  process_document(input_doc,config_data,rtf_paths,sels,paste0(getwd(),"/",input_doc,"Houdini_Output.docx", collapse = ""))
+  status <- process_document(input_doc,config_data,rtf_paths,sels,paste0(getwd(),"/",input_doc,"Houdini_Output.docx", collapse = ""))
+  write_log(input_doc, input_sheet, config_data,sels, rtf_paths, status, file_location)
 
 
 
@@ -236,6 +237,67 @@ setup_log <- function()
   logger::log_appender(appender_file(file_name))
   #sets log level
   logger::log_threshold(DEBUG)
+}
+
+
+write_log <- function(input_doc, input_sheet = NULL,config_data,sels,rtf_paths,status, file_location){
+  df    <- config_data
+
+
+  lines <- character()
+
+  lines <- c(lines,
+             "  Houdini Document Generation Log",
+             paste0("Generated : ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+             paste0("User      : ", Sys.info()[["user"]]),
+             paste0("Word file : ", if (!is.null(input_doc)) input_doc else "(not set)"),
+             paste0("Excel File :", if(!is.null(input_sheet)) input_sheet else "(not set)"),
+             paste0("RTF folder: ", file_location %||% "(not set)"),
+             ""
+  )
+
+  valid_rows <- which(nzchar(trimws(df$Bookmark)) & nzchar(trimws(df$Table)))
+
+  if (length(valid_rows) == 0L) {
+    lines <- c(lines, "(no table mappings defined)")
+  } else {
+    gen_status <- status
+
+    fmt_vec <- function(x, none = "(all)") {
+      if (is.null(x) || length(x) == 0L) none else paste(x, collapse = "; ")
+    }
+
+    for (i in valid_rows) {
+      bm_val  <- trimws(df$Bookmark[i])
+      tbl_val <- trimws(df$Table[i])
+      sel     <- sels[[as.character(i)]] %||% list()
+      err     <- gen_status[[as.character(i)]]
+
+      if (!is.null(err)) {
+        err_msg  <- if (inherits(err, "houdini_error")) conditionMessage(err) else as.character(err)
+        err_hint <- if (inherits(err, "houdini_error")) err$hint else NULL
+        lines <- c(lines,
+                   paste0("Row       : ", i),
+                   paste0("Bookmark  : ", bm_val),
+                   paste0("Table     : ", tbl_val, ".rtf"),
+                   paste0("Status    : ERROR - ", err_msg),
+                   if (!is.null(err_hint)) paste0("Hint      : ", err_hint) else NULL,
+                   ""
+        )
+      } else {
+        lines <- c(lines,
+                   paste0("Row       : ", i),
+                   paste0("Bookmark  : ", bm_val),
+                   paste0("Table     : ", tbl_val, ".rtf"),
+                   paste0("Parameters: ", fmt_vec(sel$parameters)),
+                   paste0("Timelines : ", fmt_vec(sel$timelines)),
+                   ""
+        )
+      }
+    }
+  }
+  path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
+  writeLines(lines, path)
 }
 
 

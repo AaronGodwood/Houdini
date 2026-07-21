@@ -568,29 +568,33 @@ rtf_cell_to_text_r <- function(raw) {
 
   # Iteratively strip innermost {...} groups: remove control words inside, keep plain text.
   # Two-pass per iteration: first strip control words inside the group, then remove braces.
-  for (i in seq_len(20L)) {
-    # Strip RTF control words inside innermost groups (no nested braces)
-    new_text <- gsub("\\{((?:[^{}\\\\]|\\\\[a-zA-Z]+[-]?[0-9]*[ ]?)*)\\}",
-                     "\\1", text, perl = TRUE)
-    # Strip any remaining control words that were the only content
-    # (but not \uN / \ucN, which rtf_unescape decodes later)
-    new_text <- gsub("\\{\\\\(?!u-?[0-9]|uc[0-9])[a-zA-Z]+[-]?[0-9]*[ ]?\\}", "", new_text, perl = TRUE)
-    if (identical(new_text, text)) break
-    text <- new_text
-  }
+  # for (i in seq_len(20L)) {
+  #   # Strip RTF control words inside innermost groups (no nested braces)
+  #   new_text <- gsub("\\{((?:[^{}\\\\]|\\\\[a-zA-Z]+[-]?[0-9]*[ ]?)*)\\}",
+  #                    "\\1", text, perl = TRUE)
+  #   # Strip any remaining control words that were the only content
+  #   # (but not \uN / \ucN, which rtf_unescape decodes later)
+  #   new_text <- gsub("\\{\\\\(?!u-?[0-9]|uc[0-9])[a-zA-Z]+[-]?[0-9]*[ ]?\\}", "", new_text, perl = TRUE)
+  #   if (identical(new_text, text)) break
+  #   text <- new_text
+  # }
 
   # Remove remaining RTF control words (\word or \word123), but preserve
   # \uN and \ucN - they are decoded (not stripped) by rtf_unescape below
-  text <- gsub("\\\\(?!u-?[0-9]|uc[0-9])[a-zA-Z]+[-]?[0-9]*\\s?", "", text, perl = TRUE)
+
+  text <- gsub("\\\\(?!u-?[0-9]|uc[0-9]|line)[a-zA-Z]+[-]?[0-9]*\\s?", "", text, perl = TRUE)
   # Remove remaining control symbols (\<symbol>), preserving \'xx hex escapes
   text <- gsub("\\\\(?!')[^a-zA-Z]", "", text, perl = TRUE)
-  # Remove stray braces
+  #remove rtf generated \n s and then replace rtf \\line control words with \n
+  text <- gsub("\\n","", text, perl = TRUE)
+  text <- gsub("\\\\line", "\n", text, perl = TRUE)
+  # Remove stray brace,s
   text <- gsub("[{}]", "", text, fixed = FALSE)
 
   # Apply unicode/hex unescaping on what remains
   text <- rtf_unescape_r(text)
 
-  trimws(text)
+  text
 }
 
 # -- Page Parsing
