@@ -166,13 +166,13 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
 
 
   #gets header data - this functionality may not be needed later
-  header_codes <- Input_Sheet$Header %>%
-    replace(is.na(.), "") %>%
-    sapply(function(x){
-      strsplit(x,split = "")
-      })
-  codes <- Input_Sheet$Code[!is.na(Input_Sheet$Code)] %>%
-    sort_codes()
+  #header_codes <- Input_Sheet$Header %>%
+   # replace(is.na(.), "") %>%
+  #  sapply(function(x){
+  #    strsplit(x,split = "")
+  #    })
+  #codes <- Input_Sheet$Code[!is.na(Input_Sheet$Code)] %>%
+  #  sort_codes()
 
 
   config_data <- data.frame(
@@ -187,7 +187,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
   # Parse optional filter columns into table_selections
   # Recognised column names (case-insensitive): parameters, timelines
   param_col  <- which(col_lower == "parameters")[1L]
-  tline_col  <- which(col_lower == "timelines")[1L]
+  tline_col  <- which(col_lower == "timepoints")[1L]
 
   sels <- list()
 
@@ -213,7 +213,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
   full_paths <- file.path(file_location, rtf_files)
   rtf_paths <- setNames(as.list(full_paths), tbl_names)
 
-  process_document(input_doc,config_data,rtf_paths,sels,paste("/projects/houdini/Houdini_Example2/",input_doc,"Houdini_Output.docx"))
+  process_document(input_doc,config_data,rtf_paths,sels,paste0(getwd(),"/",input_doc,"Houdini_Output.docx", collapse = ""))
 
 
 

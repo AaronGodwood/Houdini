@@ -686,7 +686,7 @@ prepare_table <- function(pages = NULL, path = NULL,
   if (is.null(pages)) pages <- parse_rtf(path)
   pages    <- filter_pages(pages, parameters)
   #pages    <- filter_timelines(pages, timelines)
-  combined <- combine_pages(pages)
+  combined <- filter_timelines(combine_pages(pages),timelines)
 
   n_cols <- length(combined$col_widths_twips)
   n_data <- block_nrow(combined$data)
@@ -722,6 +722,28 @@ filter_pages <- function(pages, parameters) {
   }, logical(1))]
 }
 
+#' Filter pages by timeline value
+#'
+#' Pages with NA timeline are always kept.
+#' @param combined Output of parse_rtf()
+#' @param timelines Character vector of timeline values to include
+filter_timelines <- function(combined, timelines) {
+  if (is.null(timelines) || length(timelines) == 0L) return(combined)
+  col1 <- block_cols(combined$data,1)$text
+
+  labels <- col1
+
+  labels[labels == ""] <- NA
+  non_na <- labels[!is.na(labels)]
+  idx <- cumsum(!is.na(labels))
+  filled <- c(NA_character_,non_na)[idx+1]
+
+  keep <- filled %in% timelines | is.na(filled)
+  rows <- which(keep)
+  combined$data <- block_rows(combined$data,rows)
+  combined
+}
+
 
 
 
@@ -733,6 +755,20 @@ get_parameters <- function(pages) {
   params <- vapply(pages, `[[`, character(1), "parameter")
   unique(params[!is.na(params)])
 }
+
+#' Get all unique timeline values across pages
+#'
+#' @param combined Output of parse_rtf()
+#' @return Character vector of unique timeline values
+get_timelines <- function(combined) {
+  col1 <- block_cols(combined$data, 1)$text
+  timelines <- col1[grepl("Week\\s[0-9]+",col1, perl = TRUE)]
+  unique(timelines[!is.na(timelines)])
+}
+
+
+
+
 
 
 # --combining pages
