@@ -581,8 +581,9 @@ rtf_cell_to_text_r <- function(raw) {
 
   # Remove remaining RTF control words (\word or \word123), but preserve
   # \uN and \ucN - they are decoded (not stripped) by rtf_unescape below
-
   text <- gsub("\\\\(?!u-?[0-9]|uc[0-9]|line)[a-zA-Z]+[-]?[0-9]*\\s?", "", text, perl = TRUE)
+  # Replace \\~ with spaces (appears in some tables as a space escape character)
+  text <- gsub("\\\\~"," ", text, perl = TRUE)
   # Remove remaining control symbols (\<symbol>), preserving \'xx hex escapes
   text <- gsub("\\\\(?!')[^a-zA-Z]", "", text, perl = TRUE)
   #remove rtf generated \n s and then replace rtf \\line control words with \n
@@ -605,7 +606,7 @@ parse_page <- function(page_text){
   footer_text <- extract_group(page_text, "\\footer") # TODO make use of footer -- worked in old tokeniser
 
   body_text <- remove_groups(page_text, c(
-    "\\header", "\\footer", "\\fonttbl", "\\colortbl","\\stylesheet","\\info")) # may need more -- test
+    "\\header", "\\footer", "\\fonttbl", "\\colortbl","\\stylesheet","\\info"))
 
   # Parse the page-header table and pull the parameter from its lowest row
   header_tbl <- if (!is.na(header_text)) {
@@ -766,7 +767,7 @@ get_parameters <- function(pages) {
 #' @return Character vector of unique timeline values
 get_timelines <- function(combined) {
   col1 <- block_cols(combined$data, 1)$text
-  timelines <- col1[grepl("Week\\s[0-9]+",col1, perl = TRUE)]
+  timelines <- col1[grepl("^Week\\s[0-9]+$",col1, perl = TRUE) | grepl("^Baseline$",col1, perl = TRUE)]
   unique(timelines[!is.na(timelines)])
 }
 
