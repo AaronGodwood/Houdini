@@ -39,12 +39,28 @@ find_ancestor <- function(node, tag) {
   NULL
 }
 
+
+#Classify where a bookmark sits by walking its ancestor chain in document.xml
+#Returns the first disqualifying context found e.g. it exist in a table cell ect.
+bookmark_context <- function(node) {
+  current <- node
+  for(i in seq_len(40L)){
+    nm <- xml_name(current)
+    if(nm == "tc") return("table")
+    if(nm == "txbxContent") return("textbox")
+    if (nm == "document") break #reached top of doc
+    current <- xml_parent(current)
+  }
+  "body"
+}
+
 # --Bookmark Extraction
 
 #' Extract bookmark names from a Word document
 #'
 #' @param docx_path Path to the .docx file
-#' @return Named character vector: bookmark name -> bookmark id
+#' @return Named character vector: bookmark name -> bookmark id (also carries a \code{"context"} attribute
+#' that is retrieved with \code{bookmark_contexts()})
 extract_bookmarks <- function(docx_path) {
   tmp <- tempfile()
   dir.create(tmp)
@@ -63,7 +79,21 @@ extract_bookmarks <- function(docx_path) {
   bm_ids   <- xml_attr(nodes, "id")
 
   keep <- !is.na(bm_names) & nchar(bm_names) > 0L & !startsWith(bm_names, "_")
-  setNames(bm_ids[keep], bm_names[keep])
+  contexts <- vapply(nodes[keep], bookmark_context, character(1))
+
+  out <- setNames(bm_ids[keep], bm_names[keep])
+  attr(out,"context") <- setNames(contexts, bm_names[keep])
+  out
+}
+
+#' Contexts of extracted bookmarks
+#'
+#' @param bm The value returned by \code{extract_bookmarks()}
+#' @return Named character vector (name -> context), or an empty vector if
+#' \code{bm} carries no context attribute
+bookmarks_contexts <- function(bm){
+  ctx <- attr(bm, "context")
+  if (is.null(ctx)) setNames(character(), character()) else ctx
 }
 
 # --Text width extraction
@@ -122,7 +152,7 @@ open_docx <- function(docx_path) {
     name <- xml_attr(bm, "name")
     if (is.na(name) || startsWith(name, "_")) next
     para <- find_ancestor(bm, "p")
-    if (!is.null(para)) jump_table[[name]] <- para
+    if (!is.null(para)) jump_table[[name]] <- list(para = para, context = bookmark_context(bm))
   }
 
   # Detect next available image index from existing media files
@@ -177,13 +207,17 @@ close_docx <- function(session, output_path) {
 #' @param xml_string A <w:tbl> XML string (from get_table_xml())
 #' @return Invisibly TRUE on success, FALSE if bookmark not found
 inject_table <- function(session, bookmark_name, xml_string) {
-  para_node <- session$jump_table[[bookmark_name]]
+  entry <- session$jump_table[[bookmark_name]]
 
-  if (is.null(para_node)) {
+  if (is.null(entry)) {
     stop(err_bookmark_missing(bookmark_name))
   }
 
-  add_xml(para_node, read_xml(xml_string), where = "on") ##For table replacement use add_xml() as a guide (currently has lots of cursor tracking stuff in it thats not needed)
+  if(entry$context != "body"){
+    stop(err_bookmark_bad_context(bookmark_name, entry$context))
+  }
+
+  add_xml(entry$para, read_xml(xml_string), where = "on") ##For table replacement use add_xml() as a guide (currently has lots of cursor tracking stuff in it thats not needed)
   invisible(TRUE)
 }
 
@@ -242,11 +276,16 @@ add_image_relationship <- function(session, png_bytes) {
 #' @param height_twips Original image height in twips (from extract_png())
 #' @return Invisibly TRUE on success, FALSE if bookmark not found
 inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_twips) {
-  para_node <- session$jump_table[[bookmark_name]]
+  entry <- session$jump_table[[bookmark_name]]
 
-  if (is.null(para_node)) {
+  if (is.null(entry)) {
     stop(err_bookmark_missing(bookmark_name))
   }
+
+  if(entry$context != "body"){
+    stop(err_bookmark_bad_context(bookmark_name, entry$context))
+  }
+  para_node <- entry$para
 
   # Scale to text width maintaining aspect ratio
   target_w_emu <- session$text_width_emu
@@ -390,7 +429,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
       tryCatch({
         inject_image(session, bm_name, img$png_bytes, img$width_twips, img$height_twips)
         logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
-      }, error = function(e) status[[i]] <<- err_image_inject_failed(bm_name, e)
+      }, error = function(e) status[[i]] <<- e #err_image_inject_failed(bm_name, e)
       )
 
     } else {
@@ -408,7 +447,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
         )
         inject_table(session, bm_name, xml_str)
         logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
-      }, error = function(e) status[[i]] <<- err_xml_inject_failed(bm_name, e))
+      }, error = function(e) status[[i]] <<- e )#err_xml_inject_failed(bm_name, e))
     }
   }
 
