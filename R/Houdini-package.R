@@ -1,3 +1,4 @@
+#' @useDynLib Houdini, .registration = TRUE
 #' @keywords internal
 "_PACKAGE"
 

@@ -1,3 +1,23 @@
+
+# Whether the compiled C fast-path is available. Resolved lazily on first use
+# and cached: the DLL registered by useDynLib() is not guaranteed to be loaded
+# at the moment this file is sourced during namespace construction, so an eager
+# check here can spuriously report FALSE and silently disable the C path.
+.c_available <- local({
+  cached <- NA
+  function() {
+    if (!is.na(cached)) return(cached)
+    cached <<- tryCatch({
+      getNativeSymbolInfo("C_find_matching_brace", PACKAGE = "Houdini")
+      TRUE
+    }, error = function(e) FALSE)
+    cached
+  }
+})
+
+
+
+
 # Read raw bytes and convert to UTF-8 string, handling CP1252/Latin-1.
 # readLines(encoding=) never errors on wrong encodings, it just mis-marks the
 # string - so detect real UTF-8 with validUTF8() and convert otherwise.
@@ -118,6 +138,11 @@ find_matching_brace_r <- function(text, start) {
   NA_integer_
 }
 
+find_matching_brace <- function(text, start) {
+  if (.c_available()) .Call(C_find_matching_brace, text, as.integer(start))
+  else find_matching_brace_r(text, start)
+}
+
 # Remove all groups tagged with any given tags
 remove_groups <- function(text, tags) {
   for (tag in tags){
@@ -154,7 +179,7 @@ extract_group <- function(text, tag){
   }
   if(is.na(brace_pos)) return(NA_character_)
 
-  end_pos <- find_matching_brace_r(text, brace_pos)
+  end_pos <- find_matching_brace(text, brace_pos)
   if(is.na(end_pos)) return(NA_character_)
 
   substr(text, brace_pos+1L, end_pos-1L)
@@ -173,7 +198,7 @@ remove_group <- function(text, tag) {
     }
     if (is.na(brace_pos)) break
 
-    end_pos <- find_matching_brace_r(text, brace_pos)
+    end_pos <- find_matching_brace(text, brace_pos)
     if (is.na(end_pos)) break
 
     text <- paste0(substr(text, 1L, brace_pos - 1L),
