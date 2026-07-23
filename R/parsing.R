@@ -714,9 +714,13 @@ prepare_table <- function(pages = NULL, path = NULL,
                           excluded_header_rows = NULL,
                           parameters = NULL, timelines = NULL) {
   if (is.null(pages)) pages <- parse_rtf(path)
-  pages    <- filter_pages(pages, parameters)
+  param_filtered    <- filter_pages(pages, parameters)
+  pages <- param_filtered$pages
+  warnings <- param_filtered$warnings
   #pages    <- filter_timelines(pages, timelines)
-  combined <- filter_timelines(combine_pages(pages),timelines)
+  tl_filtered <- filter_timelines(combine_pages(pages),timelines)
+  combined <- tl_filtered$combined
+  warnings <- c(warnings,tl_filtered$warnings)
 
   n_cols <- length(combined$col_widths_twips)
   n_data <- block_nrow(combined$data)
@@ -734,11 +738,50 @@ prepare_table <- function(pages = NULL, path = NULL,
   combined$data   <- block_rows(combined$data, keep_rows)
   combined$header <- block_rows(combined$header, inc_hdrs)
 
-  list(combined = combined, included_cols = inc_cols)
+  list(combined = combined, included_cols = inc_cols, warns = warnings)
 }
 
 
 # --filtering
+
+
+
+#' Resolve column specification to integer indices
+#'
+#' Handles NULL (all), integer vector, or character names matched against headers.
+#' @param cols Column spec (NULL, integer vector, or character names)
+#' @param n_cols_total Total number of columns
+#' @param header Header block (for name matching)
+#' @return Integer vector of valid 1-based column indices
+resolve_cols <- function(cols, n_cols_total, header) {
+  if (is.null(cols) || length(cols) == 0L) return(seq_len(n_cols_total))
+
+  cols_int <- suppressWarnings(as.integer(cols))
+  if (anyNA(cols_int)) {
+    ref_names <- if (block_nrow(header) > 0L) {
+      header$text[1L, header$present[1L, ]]
+    } else character()
+    cols_int <- match(as.character(cols), ref_names)
+    cols_int <- cols_int[!is.na(cols_int)]
+  }
+  cols_int <- cols_int[cols_int >= 1L & cols_int <= n_cols_total]
+  if (length(cols_int) == 0L) seq_len(n_cols_total) else cols_int
+}
+
+
+#' Resolve a start/end row range to integer indices
+#'
+#' @param n Number of rows available
+#' @param row_start 1-based start (NULL = 1)
+#' @param row_end 1-based end (NULL = last)
+#' @return Integer vector of row indices (possibly empty)
+slice_range <- function(n, row_start = NULL, row_end = NULL) {
+  if (n == 0L) return(integer())
+  rs <- if (is.null(row_start)) 1L else max(1L, as.integer(row_start))
+  re <- if (is.null(row_end))   n   else min(n, as.integer(row_end))
+  if (rs <= re) seq.int(rs, re) else integer()
+}
+
 
 #' Filter pages by parameter value
 #'
@@ -746,10 +789,23 @@ prepare_table <- function(pages = NULL, path = NULL,
 #' @param pages Output of parse_rtf()
 #' @param parameters Character vector of parameter values to include
 filter_pages <- function(pages, parameters) {
-  if (is.null(parameters) || length(parameters) == 0L) return(pages)
-  pages[vapply(pages, function(p) {
-    is.na(p$parameter) || p$parameter %in% parameters
-  }, logical(1))]
+  if (is.null(parameters) || length(parameters) == 0L) return(list(pages = pages, warnings = list()))
+
+  #gets parameters present in the table and only applies those filters
+  page_params <- get_parameters(pages)
+  present_params <-  parameters[parameters %in% page_params]
+
+  #warns about not found filters for logging purposes
+  not_present <- parameters[!parameters %in% page_params]
+  warnings <- lapply(not_present, function(p) warn_filter_not_found(p,"Parameter"))
+
+  if (is.null(present_params) || length(present_params) == 0L) return(list(pages = pages, warnings = warnings))
+
+
+
+  list(pages = pages[vapply(pages, function(p) {
+    is.na(p$parameter) || p$parameter %in% present_params
+  }, logical(1))], warnings = warnings)
 }
 
 #' Filter pages by timeline value
@@ -758,7 +814,19 @@ filter_pages <- function(pages, parameters) {
 #' @param combined Output of parse_rtf()
 #' @param timelines Character vector of timeline values to include
 filter_timelines <- function(combined, timelines) {
-  if (is.null(timelines) || length(timelines) == 0L) return(combined)
+  if (is.null(timelines) || length(timelines) == 0L) return(list(combined = combined, warnings = list()))
+
+  #gets parameters present in the table and only applies those filters
+  combined_tls <- get_timelines(combined)
+  present_tls <-  timelines[timelines %in% combined_tls]
+
+  #warns about not found filters for logging purposes
+  not_present <- timelines[!timelines %in% combined_tls]
+  warnings <- lapply(not_present, function(p) warn_filter_not_found(p,"Timepoint"))
+
+  if (is.null(present_tls) || length(present_tls) == 0L) return(list(combined = combined, warnings = warnings))
+
+  #gets first column where timepoint lables are present if they exist
   col1 <- block_cols(combined$data,1)$text
 
   labels <- col1
@@ -768,10 +836,10 @@ filter_timelines <- function(combined, timelines) {
   idx <- cumsum(!is.na(labels))
   filled <- c(NA_character_,non_na)[idx+1]
 
-  keep <- filled %in% timelines | is.na(filled)
+  keep <- filled %in% present_tls | is.na(filled)
   rows <- which(keep)
   combined$data <- block_rows(combined$data,rows)
-  combined
+  list(combined = combined, warnings = warnings)
 }
 
 
@@ -820,9 +888,10 @@ combine_pages <- function(pages) {
   data   <- block_rbind_all(lapply(pages, `[[`, "data"))
 
   # Column widths from the first header (or data) row
-  ref <- if (block_nrow(header) > 0L) header else data
+  #ref <- if (block_nrow(header) > 0L) header else data
+  ref <- data
   col_widths_twips <- if (block_nrow(ref) > 0L) {
-    as.numeric(ref$width[1L, ref$present[1L, ]])
+    as.numeric(ref$width[1L,])
   } else {
     numeric()
   }

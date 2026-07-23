@@ -411,7 +411,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
       progress_cb(i, n_rows, sprintf("Injecting %s\u2026", bm_name))
 
     if (!tbl_name %in% names(rtf_paths)) {
-      status[[i]] <- err_rtf_unreadable(tbl_name, "file not found in RTF folder")
+      status[[i]]$err <- err_rtf_unreadable(tbl_name, "file not found in RTF folder")
       next
     }
 
@@ -421,7 +421,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
       img <- tryCatch(
         extract_png(rtf_path),
         error = function(e) {
-          status[[i]] <<- err_image_extract_failed(rtf_path, e)
+          status[[i]]$err <<- err_image_extract_failed(rtf_path, e)
           NULL
         }
       )
@@ -429,14 +429,14 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
       tryCatch({
         inject_image(session, bm_name, img$png_bytes, img$width_twips, img$height_twips)
         logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
-      }, error = function(e) status[[i]] <<- e #err_image_inject_failed(bm_name, e)
+      }, error = function(e) status[[i]]$err <<- e #err_image_inject_failed(bm_name, e)
       )
 
     } else {
       sel <- selections[[as.character(i)]]
       tw_twips <- round(session$text_width_emu / TWIPS_TO_EMU)
       tryCatch({
-        xml_str <- get_table_xml(
+        output <- get_table_xml(
           rtf_path,
           excluded_cols        = sel$excluded_cols,
           excluded_rows        = sel$excluded_rows,
@@ -445,9 +445,11 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
           timelines            = sel$timelines,
           text_width_twips     = tw_twips
         )
+        xml_str <- output$xml
+        status[[i]]$warn <- output$warns
         inject_table(session, bm_name, xml_str)
         logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
-      }, error = function(e) status[[i]] <<- e )#err_xml_inject_failed(bm_name, e))
+      }, error = function(e) status[[i]]$err <<- e )#err_xml_inject_failed(bm_name, e))
     }
   }
 

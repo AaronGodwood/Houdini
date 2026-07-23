@@ -16,7 +16,7 @@
 #
 
 houdini_error <- function(kind, message, hint, fields = list()) {
-  logger::log_error(sprintf("%s - %s",message,hint))
+  #logger::log_error(sprintf("%s - %s",message,hint))
   structure(
     c(
       list(message = message, hint = hint, call = NULL),
@@ -26,6 +26,22 @@ houdini_error <- function(kind, message, hint, fields = list()) {
       paste0("houdini_error_", kind),
       "houdini_error",
       "error",
+      "condition"
+    )
+  )
+}
+
+
+houdini_warning <- function(kind, message, hint, fields = list()) {
+  structure(
+    c(
+      list(message = message, hint = hint, call = NULL),
+      fields
+    ),
+    class = c(
+      paste0("houdini_warning_", kind),
+      "houdini_warning",
+      "warning",
       "condition"
     )
   )
@@ -93,7 +109,7 @@ err_rtf_unreadable <- function(path, cause = NULL) {
   houdini_error(
     "rtf_unreadable",
     msg,
-    "Check that the file exists, is not open in another application, and is a valid RTF file.",
+    "Check that the file exists, is not open in another application and is a valid RTF file.",
     list(path = path)
   )
 }
@@ -192,6 +208,68 @@ err_exclusion_out_of_range <- function(bookmark, indices, max_col) {
   )
 }
 
+
+#
+# Docx errors
+#
+
+#' docx file cannot be read
+#' @param path File path
+#' @param cause Underlying condition or message string
+err_docx_unreadable <- function(path, cause = NULL){
+  cause_msg <- if (!is.null(cause)) {
+    if (inherits(cause, "condition")) conditionMessage(cause) else as.character(cause)
+  } else ""
+  msg <- sprintf("Cannot read Word Document '%s'.", basename(path))
+  if (nzchar(cause_msg)) msg <- paste0(msg, " ", cause_msg)
+  houdini_error(
+    "docx_unreadable",
+    msg,
+    "Check that the file exists, is not open in another application or has permissions restrictions.",
+    list(path = path)
+  )
+}
+
+#' excel file cannot be read
+#' @param path File path
+#' @param cause Underlying condition or message string
+err_excel_unreadable <- function(path, cause = NULL){
+  cause_msg <- if (!is.null(cause)) {
+    if (inherits(cause, "condition")) conditionMessage(cause) else as.character(cause)
+  } else ""
+  msg <- sprintf("Cannot read Excel Document '%s'.", basename(path))
+  if (nzchar(cause_msg)) msg <- paste0(msg, " ", cause_msg)
+  houdini_error(
+    "docx_unreadable",
+    msg,
+    "Check that the file exists, is not open in another application or has permissions restrictions.",
+    list(path = path)
+  )
+}
+
+
+
+#
+# Filtering Warnings
+#
+
+#' Filter not found
+#' @param filter_name The filter that cannot be found
+#' @param filter_type The filter type (expected to be parameter or timepoint)
+warn_filter_not_found <- function(filter_name, filter_type = NULL) {
+  filter_text <- if(!is.null(filter_type)) sprintf("%s filter", filter_type) else "Filter"
+  msg <- sprintf("%s: %s not found so not applied.",filter_text, filter_name)
+  houdini_warning(
+    "filter_not_found",
+    msg,
+    sprintf("Check that the %s exists and is spelt correctly.",tolower(filter_text)),
+    #list(filter_name = filter_name)
+  )
+}
+
+
+
+
 #
 # Utility: extract hint from any condition
 #
@@ -208,4 +286,40 @@ err_format <- function(e) {
   msg  <- conditionMessage(e)
   hint <- err_hint(e)
   if (!is.null(hint)) paste0(msg, "\nHint: ", hint) else msg
+}
+
+
+
+#' Format a Log Entry
+#'
+log_entry <- function(config_data = NULL, sels = NULL, status = NULL) {
+  fmt_vec <- function(x, none = "(all)") {
+    if (is.null(x) || length(x) == 0L) none else paste(x, collapse = "; ")
+  }
+  bm_val  <- trimws(config_data$Bookmark[i])
+  tbl_val <- trimws(config_data$Table[i])
+  sel     <- sels[[as.character(i)]] %||% list()
+  err     <- gen_status[[as.character(i)]]
+
+  if (!is.null(err)) {
+    err_msg  <- if (inherits(err, "houdini_error")) conditionMessage(err) else as.character(err)
+    err_hint <- if (inherits(err, "houdini_error")) err$hint else NULL
+    lines <- c(lines,
+               paste0("Row       : ", i),
+               paste0("Bookmark  : ", bm_val),
+               paste0("Table     : ", tbl_val, ".rtf"),
+               paste0("Status    : ERROR - ", err_msg),
+               if (!is.null(err_hint)) paste0("Hint      : ", err_hint) else NULL,
+               ""
+    )
+  } else {
+    lines <- c(lines,
+               paste0("Row       : ", i),
+               paste0("Bookmark  : ", bm_val),
+               paste0("Table     : ", tbl_val, ".rtf"),
+               paste0("Parameters: ", fmt_vec(sel$parameters)),
+               paste0("Timelines : ", fmt_vec(sel$timelines)),
+               ""
+    )
+  }
 }

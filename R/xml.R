@@ -131,8 +131,8 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
     n_cols_total <- sum(header$present[1L, ])
   }
 
-  #cols <- resolve_cols(cols, n_cols_total, header)
-  #data <- block_rows(data, slice_range(block_nrow(data), row_start, row_end))
+  cols <- resolve_cols(cols, n_cols_total, header)
+  data <- block_rows(data, slice_range(block_nrow(data), row_start, row_end))
 
   # Filter to selected columns
   header <- block_cols(header, cols)
@@ -219,8 +219,8 @@ get_table_xml <- function(path,
     excluded_header_rows = excluded_header_rows,
     parameters = parameters, timelines = timelines
   )
-  build_xml(prep$combined, cols = prep$included_cols,
-            text_width_twips = text_width_twips)
+  list(xml = build_xml(prep$combined, cols = prep$included_cols,
+            text_width_twips = text_width_twips), warns = prep$warns)
 }
 
 

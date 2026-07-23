@@ -214,7 +214,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
   rtf_paths <- setNames(as.list(full_paths), tbl_names)
 
   status <- process_document(input_doc,config_data,rtf_paths,sels,paste0(getwd(),"/",input_doc,"Houdini_Output.docx", collapse = ""))
-  write_log(input_doc, input_sheet, config_data,sels, rtf_paths, status, file_location)
+  write_log(input_doc, input_sheet, config_data,sels, status, file_location)
 
 
 
@@ -240,7 +240,7 @@ setup_log <- function()
 }
 
 
-write_log <- function(input_doc, input_sheet = NULL,config_data,sels,rtf_paths,status, file_location){
+write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, file_location){
   df    <- config_data
 
 
@@ -271,7 +271,8 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,rtf_paths,s
       bm_val  <- trimws(df$Bookmark[i])
       tbl_val <- trimws(df$Table[i])
       sel     <- sels[[as.character(i)]] %||% list()
-      err     <- gen_status[[as.character(i)]]
+      err     <- gen_status[[as.character(i)]]$err
+      warn    <- gen_status[[as.character(i)]]$warn
 
       if (!is.null(err)) {
         err_msg  <- if (inherits(err, "houdini_error")) conditionMessage(err) else as.character(err)
@@ -290,9 +291,19 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,rtf_paths,s
                    paste0("Bookmark  : ", bm_val),
                    paste0("Table     : ", tbl_val, ".rtf"),
                    paste0("Parameters: ", fmt_vec(sel$parameters)),
-                   paste0("Timelines : ", fmt_vec(sel$timelines)),
-                   ""
+                   paste0("Timepoints : ", fmt_vec(sel$timelines))
         )
+
+        if(!is.null(warn) && length(warn) > 0){
+          for(i in seq_along(warn)){
+            warn_msg  <- if (inherits(warn[[i]], "houdini_warning")) conditionMessage(warn[[i]]) else as.character(warn[[i]])
+            warn_hint <- if (inherits(warn[[i]], "houdini_warning")) warn[[i]]$hint else NULL
+            lines <- c(lines,
+                       paste0("Status    : WARNING - ", warn_msg),
+                       if (!is.null(warn_hint)) paste0("Hint      : ", warn_hint) else NULL)
+          }
+        }
+        lines <- c(lines, "")
       }
     }
   }
