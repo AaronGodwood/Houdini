@@ -106,8 +106,8 @@ xml_data_row <- function(b, r, is_last_data) {
     align <- cell_align_or_default(b$align[r, ci], ci)
     cells[ci] <- xml_cell(b$text[r, ci], align, grid_span, borders, run_pr)
   }
-
-  sprintf("<w:tr>%s</w:tr>", paste(cells, collapse = ""))
+  tr_pr <- "<w:trPr><w:cantSplit/></w:trPr>"
+  sprintf("<w:tr>%s%s</w:tr>",tr_pr, paste(cells, collapse = ""))
 }
 
 
@@ -165,7 +165,7 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
 
   # tblPr - explicit fixed width matching the text area
   tbl_pr <- sprintf(
-    "<w:tblPr><w:tblW w:w=\"%d\" w:type=\"dxa\"/><w:tblBorders><w:top w:val=\"single\" w:sz=\"12\" w:space=\"0\" w:color=\"000000\"/></w:tblBorders></w:tblPr>",
+    "<w:tblPr><w:tblLayout w:type=\"fixed\"/><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblBorders><w:top w:val=\"single\" w:sz=\"12\" w:space=\"0\" w:color=\"000000\"/></w:tblBorders></w:tblPr>",
     total_width
   )
 

@@ -33,7 +33,7 @@ find_ancestor <- function(node, tag) {
   for (i in seq_len(20L)) {
     if (xml_name(current) == tag) return(current)
     parent <- xml_parent(current)
-    if (inherits(parent, "xml_document")) return(NULL)
+    if (xml_name(parent) == "document") return(NULL)
     current <- parent
   }
   NULL
