@@ -641,13 +641,22 @@ parse_page <- function(page_text){
   }
   parameter <- extract_parameter(header_tbl)
 
+  footer_tbl <- if (!is.na(footer_text)) {
+    extract_footnotes(parse_rtf_table(footer_text))
+  } else {
+    block_new()
+  }
+
+
 
   # Parse the body table and split into header rows and data rows
   body <- parse_rtf_table(body_text)
+  footer_tbl$colspan <- matrix(block_ncol(body))
   list(
     parameter = parameter,
     header    = block_rows(body, body$is_header),
-    data      = block_rows(body, !body$is_header)
+    data      = block_rows(body, !body$is_header),
+    footer    = block_new()
   )
 
 }
@@ -664,6 +673,15 @@ extract_parameter <- function(header_tbl) {
   }
   NA_character_
 }
+
+# Extract Footnotes from the RTF footer section (everything above first blank row)
+extract_footnotes <- function(footer_tbl){
+  first_blank <- which(vapply(footer_tbl$text, function(t) t =="", logical(1)))[1]
+  if(is.na(first_blank) || first_blank > 2) return(block_new())
+  block_rows(footer_tbl,seq_len(first_blank-1))
+}
+
+
 
 
 # -- top level parse function
@@ -714,10 +732,11 @@ prepare_table <- function(pages = NULL, path = NULL,
                           excluded_header_rows = NULL,
                           parameters = NULL, timelines = NULL) {
   if (is.null(pages)) pages <- parse_rtf(path)
+
   param_filtered    <- filter_pages(pages, parameters)
   pages <- param_filtered$pages
   warnings <- param_filtered$warnings
-  #pages    <- filter_timelines(pages, timelines)
+
   tl_filtered <- filter_timelines(combine_pages(pages),timelines)
   combined <- tl_filtered$combined
   warnings <- c(warnings,tl_filtered$warnings)
@@ -885,7 +904,9 @@ combine_pages <- function(pages) {
   }
 
   header <- pages[[1]]$header
+  footer <- pages[[1]]$footer
   data   <- block_rbind_all(lapply(pages, `[[`, "data"))
+  #data <- block_categorise(data)
 
   # Column widths from the first header (or data) row
   #ref <- if (block_nrow(header) > 0L) header else data
@@ -899,7 +920,50 @@ combine_pages <- function(pages) {
   list(
     header           = header,
     data             = data,
+    footer           = footer,
     col_widths_twips = col_widths_twips
+  )
+}
+
+# -- info function
+
+
+#' Get summary info about an RTF file for the UI
+#'
+#' @param path Path to the .rtf file
+#' @return list(n_cols, n_rows, col_names, parameters, timelines)
+get_table_info <- function(path) {
+  table_info_from_pages(parse_rtf(path))
+}
+
+#' Get summary info from already-parsed pages (used by app.R's cache)
+#'
+#' @param pages Output of parse_rtf()
+#' @return list(n_cols, n_rows, col_names, parameters, timelines)
+table_info_from_pages <- function(pages) {
+  combined <- combine_pages(pages)
+
+  ref <- if (block_nrow(combined$header) > 0L) {
+    combined$header
+  } else if (block_nrow(combined$data) > 0L) {
+    combined$data
+  } else {
+    NULL
+  }
+
+  n_cols    <- if (!is.null(ref)) sum(ref$present[1L, ]) else 0L
+  col_names <- if (!is.null(ref)) {
+    ref$text[1L, ref$present[1L, ]]
+  } else {
+    character()
+  }
+
+  list(
+    n_cols     = n_cols,
+    n_rows     = block_nrow(combined$data),
+    col_names  = col_names,
+    parameters = get_parameters(pages),
+    timelines  = get_timelines(combined)
   )
 }
 

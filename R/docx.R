@@ -428,7 +428,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
       if (is.null(img)) next
       tryCatch({
         inject_image(session, bm_name, img$png_bytes, img$width_twips, img$height_twips)
-        logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
+        #logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
       }, error = function(e) status[[i]]$err <<- e #err_image_inject_failed(bm_name, e)
       )
 
@@ -448,7 +448,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
         xml_str <- output$xml
         status[[i]]$warn <- output$warns
         inject_table(session, bm_name, xml_str)
-        logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
+        #logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
       }, error = function(e) status[[i]]$err <<- e )#err_xml_inject_failed(bm_name, e))
     }
   }

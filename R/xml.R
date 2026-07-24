@@ -111,8 +111,6 @@ xml_data_row <- function(b, r, is_last_data) {
 }
 
 
-
-
 # --Table Builder
 
 
@@ -124,6 +122,7 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
                       text_width_twips = NULL) {
   header           <- combined$header
   data             <- combined$data
+  footer           <- combined$footer
   col_widths_twips <- combined$col_widths_twips
 
   n_cols_total <- length(col_widths_twips)
@@ -181,11 +180,18 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
     xml_data_row(data, i, is_last_data = (i == n_dat))
   }, character(1)), collapse = "")
 
+  n_ftr <- block_nrow(footer)
+  ftr_xml <- paste(vapply(seq_len(n_ftr), function(i) {
+    xml_data_row(footer, i, is_last_data = FALSE)
+  }, character(1)), collapse = "")
+
+
+
   # Declare the w: namespace on the fragment so it parses standalone
   # (inject_table feeds it to xml2::read_xml before splicing it in)
   sprintf(
-    "<w:tbl xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">%s%s%s%s</w:tbl>",
-    tbl_pr, tbl_grid, hdr_xml, dat_xml
+    "<w:tbl xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">%s%s%s%s%s</w:tbl>",
+    tbl_pr, tbl_grid, hdr_xml, dat_xml, ftr_xml
   )
 }
 
