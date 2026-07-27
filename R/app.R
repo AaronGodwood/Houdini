@@ -38,9 +38,44 @@ houdini_app <- function() {
     )
   }
 
+  ui_config_panel <- function() {
+    # Middle panel: config table
+    column(4,
+           h4("Table Configuration", class = "section-header"),
+           p("Map bookmarks to RTF tables. Click a row to configure filters and preview."),
+
+           div(style = "height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;",
+               rHandsontableOutput("config_table")
+           ),
+
+           div(style = "display:flex;justify-content:space-between;align-items:flex-start;",
+               div(class = "action-buttons",
+                   actionButton("add_row",    "Add Row",    class = "btn-outline-secondary"),
+                   actionButton("remove_row", "Remove Row", class = "btn-outline-secondary"),
+                   actionButton("clear_all",  "Clear All",  class = "btn-outline-danger"),
+                   actionButton("fill_bookmarks", "Add All Bookmarks",
+                                class = "btn-outline-secondary",
+                                title = "Add a row for each bookmark not already in the grid"),
+
+                   fileInput("import_excel", NULL, accept = ".xlsx",
+                             placeholder = "Import Excel...",
+                             buttonLabel = "Import Excel",
+                             width = "160px")
+               ),
+               downloadButton("export_excel", "Export Excel",
+                              class = "btn-outline-secondary",
+                              style = "margin-top:15px;")
+           ),
+
+           uiOutput("filter_panel"),
+           uiOutput("reset_row_btn")
+    )
+  }
+
   ui <- fluidPage(
     titlePanel("Houdini V2"),
-    ui_input_panel()
+    ui_input_panel(),
+    ui_config_panel()
   )
 
   server <- function(input, output, session) {
@@ -68,6 +103,23 @@ houdini_app <- function() {
 
     # parse_rtf cache: table_name -> parse_rtf() result (list of pages)
     parse_cache <- reactiveVal(list())
+
+    # Get cached parsed pages for a table, parsing on first access
+    get_cached_pages <- function(tbl_name) {
+      cache <- parse_cache()
+      if (!is.null(cache[[tbl_name]])) return(cache[[tbl_name]])
+      paths <- rtf_paths()
+      if (!tbl_name %in% names(paths)) return(NULL)
+      pages <- parse_rtf(paths[[tbl_name]])
+      cache[[tbl_name]] <- pages
+      parse_cache(cache)
+      pages
+    }
+
+    # selections keyed by row index (character):
+    #   list(excluded_cols, excluded_rows, excluded_header_rows, parameters, timelines)
+    table_selections    <- reactiveVal(list())
+    last_gen_status     <- reactiveVal(NULL)
 
     register_word_file <- function(){
       observeEvent(input$word_file, {
@@ -158,8 +210,188 @@ houdini_app <- function() {
       })
     }
 
+
+
+    register_config_grid <- function(){
+      output$config_table <- renderRHandsontable({
+        df <- config_data()
+        if (nrow(df) == 0) {
+          df <- data.frame(Bookmark = rep("", 5), Table = rep("", 5),
+                           stringsAsFactors = FALSE)
+        }
+
+        bm  <- available_bookmarks()
+        tbl <- available_tables()
+
+        hot <- rhandsontable(df, rowHeaders = TRUE, selectCallback = TRUE,
+                             overflow = "visible") |>
+          hot_cols(colWidths = c(160, 160))
+
+        hot <- if (length(bm) > 0) {
+          hot |> hot_col("Bookmark", type = "dropdown", source = c("", names(bm)), strict = FALSE)
+        } else {
+          hot |> hot_col("Bookmark", type = "text")
+        }
+
+        hot <- if (length(tbl) > 0) {
+          hot |> hot_col("Table", type = "dropdown", source = c("", tbl), strict = FALSE)
+        } else {
+          hot |> hot_col("Table", type = "text")
+        }
+
+        hot
+      })
+
+
+
+
+
+      observeEvent(input$fill_bookmarks, {
+        bm_names <- names(available_bookmarks())
+        if (length(bm_names) == 0L) {
+          showNotification("Load a Word document with bookmarks first", type = "warning")
+          return()
+        }
+
+        df       <- config_data()
+        existing <- trimws(df$Bookmark)
+        missing  <- setdiff(bm_names, existing[nzchar(existing)])
+        if (length(missing) == 0L) {
+          showNotification("All bookmarks are already in the grid", type = "default")
+          return()
+        }
+
+        # Reuse rows that have a blank Bookmark first, then append the remainder,
+        # so we don't leave the initial placeholder rows empty above the new ones.
+        blank_rows <- which(!nzchar(existing))
+        n_reuse    <- min(length(blank_rows), length(missing))
+        if (n_reuse > 0L) {
+          df$Bookmark[blank_rows[seq_len(n_reuse)]] <- missing[seq_len(n_reuse)]
+        }
+        remainder <- missing[seq_len(length(missing) - n_reuse) + n_reuse]
+        if (length(remainder) > 0L) {
+          df <- rbind(df, data.frame(Bookmark = remainder, Table = "",
+                                     stringsAsFactors = FALSE))
+        }
+
+        config_data(df)
+        showNotification(
+          sprintf("Added %d bookmark%s", length(missing),
+                  if (length(missing) == 1L) "" else "s"),
+          type = "message"
+        )
+      })
+
+      observeEvent(input$add_row, {
+        df <- config_data()
+        config_data(rbind(df, data.frame(Bookmark = "", Table = "",
+                                         stringsAsFactors = FALSE)))
+      })
+
+      observeEvent(input$remove_row, {
+        df <- config_data()
+        if (nrow(df) > 1) {
+          removed <- nrow(df)
+          config_data(df[-removed, , drop = FALSE])
+          # Drop the removed row's selections so a later Add Row doesn't inherit them
+          sels <- table_selections()
+          if (!is.null(sels[[as.character(removed)]])) {
+            sels[[as.character(removed)]] <- NULL
+            table_selections(sels)
+          }
+          if (identical(current_row_index(), removed)) {
+            current_row_index(NULL)
+            current_table_name(NULL)
+          }
+        }
+      })
+
+      observeEvent(input$clear_all, {
+        config_data(data.frame(Bookmark = rep("", 5), Table = rep("", 5),
+                               stringsAsFactors = FALSE))
+        table_selections(list())
+      })
+
+
+      # EXCEL IMPORT
+
+      observeEvent(input$import_excel, {
+        req(input$import_excel)
+        path <- input$import_excel$datapath
+
+        xl <- tryCatch(
+          readxl::read_excel(path, col_types = "text"),
+          error = function(e) {
+            showNotification(paste("Could not read Excel file:", conditionMessage(e)), type = "error")
+            NULL
+          }
+        )
+        if (is.null(xl)) return()
+
+        # Must have Bookmark and Table columns (case-insensitive)
+        col_lower <- tolower(names(xl))
+        bm_col  <- which(col_lower == "bookmark")[1L]
+        tbl_col <- which(col_lower == "dataset")[1L]
+
+        if (is.na(bm_col) || is.na(tbl_col)) {
+          showNotification(
+            "Excel file must contain 'Bookmark' and 'Dataset' columns", type = "error"
+          )
+          return()
+        }
+
+        # Build config_data frame - strip any .rtf extension from Tables
+
+        new_config <- data.frame(
+          Bookmark  = as.character(xl[[bm_col]]),
+          Table = tools::file_path_sans_ext(as.character(xl[[tbl_col]])),
+          stringsAsFactors = FALSE
+        )
+        # Replace NA with empty string
+        new_config$Bookmark[is.na(new_config$Bookmark)]   <- ""
+        new_config$Table[is.na(new_config$Table)] <- ""
+
+        config_data(new_config)
+
+        # Parse optional filter columns into table_selections
+        # Recognised column names (case-insensitive): parameters, timelines
+        param_col  <- which(col_lower == "parameters")[1L]
+        tline_col  <- which(col_lower == "timepoints")[1L]
+
+        split_semi <- function(x) {
+          if (is.na(x) || !nzchar(trimws(x))) return(character())
+          trimws(strsplit(x, ";", fixed = TRUE)[[1L]])
+        }
+
+        # Fresh selections keyed by row index - discard any previous state
+        sels <- list()
+
+        for (i in seq_len(nrow(new_config))) {
+          tname <- new_config$Table[i]
+          if (!nzchar(tname)) next
+
+          params <- if (!is.na(param_col)) split_semi(xl[[param_col]][i]) else character()
+          tlines <- if (!is.na(tline_col)) split_semi(xl[[tline_col]][i]) else character()
+
+          sels[[as.character(i)]] <- list(
+            excluded_cols        = NULL,
+            excluded_rows        = NULL,
+            excluded_header_rows = NULL,
+            parameters           = if (length(params) > 0L) params else NULL,
+            timelines            = if (length(tlines) > 0L) tlines else NULL
+          )
+        }
+
+        table_selections(sels)
+        showNotification(
+          paste("Imported", nrow(new_config), "rows from Excel"), type = "message"
+        )
+      })
+    }
+
     register_word_file()
     register_rtf_folder()
+    register_config_grid()
 
   }
 
