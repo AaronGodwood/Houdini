@@ -5,7 +5,7 @@ split_semi <- function(x) {
 }
 
 split_ints <- function(x){
-  v <- as.integer(split_semi(x))
+  v <- as.integer(split_semi(as.character(x)))
   v <- v[!is.na(v)]
   if(length(v) > 0) v else NULL
 }
@@ -103,12 +103,12 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
 
   #progress function for console output
   cb <- if(quiet) NULL else{
-    function(i, n, msg) message(sprintf("[%d/%d] %s", i, n, msg),)
+    function(i, n, msg) message(sprintf("[%d/%d] %s", i, n, msg))
   }
 
   #runs main process and logs results
 
-  output_path <-  paste0(getwd(),"/",input_doc," Houdini_Output.docx", collapse = "")
+  output_path <-  paste0(getwd(),"/",input_doc,"_Houdini_Output.docx", collapse = "")
 
   status <- process_document(input_doc, cfg, rtf_paths, sels, output_path,
                              progress_cb = cb)
