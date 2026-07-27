@@ -439,7 +439,7 @@ houdini_app <- function() {
 
       output$download_result <- downloadHandler(
         filename = function() {
-          if (!is.null(input$word_file)) paste0(input$word_file$name, " Houdini_Output.docx")
+          if (!is.null(input$word_file)) paste0("Houdini_Output_",input$word_file$name)
           else "output.docx"
         },
         content = function(file) {
@@ -493,9 +493,186 @@ houdini_app <- function() {
       )
     }
 
+
+    register_validation <- function(){
+      # PER-ROW VALIDATION
+
+      # Returns a list of length nrow(config_data()).
+      # Each element: list(type = "error"|"warning"|"", msg = "plain text message")
+      row_warnings <- reactive({
+        df    <- config_data()
+        bm    <- available_bookmarks()
+        bmctx <- bookmarks_contexts(bm)
+        tbls  <- available_tables()
+        paths <- rtf_paths()
+        cache <- table_info_cache()
+        sels  <- table_selections()
+
+        # Pre-compute duplicate bookmark and table name sets (cross-row checks)
+        all_bm_vals  <- trimws(df$Bookmark)
+        all_tbl_vals <- trimws(df$Table)
+        nonempty_bms  <- all_bm_vals[nzchar(all_bm_vals)]
+        nonempty_tbls <- all_tbl_vals[nzchar(all_tbl_vals)]
+        dup_bookmarks <- unique(nonempty_bms[duplicated(nonempty_bms)])
+        dup_tables    <- unique(nonempty_tbls[duplicated(nonempty_tbls)])
+
+        lapply(seq_len(nrow(df)), function(i) {
+          bm_val  <- trimws(df$Bookmark[i])
+          tbl_val <- trimws(df$Table[i])
+
+          if (!nzchar(bm_val) && !nzchar(tbl_val)) return(list(type = "", msg = "", hint = NULL))
+
+          errors   <- character()
+          warnings <- character()
+          hints    <- character()
+
+          # Half-complete row
+          if (nzchar(bm_val) && !nzchar(tbl_val)) {
+            warnings <- c(warnings, "Bookmark set but no table selected")
+            hints    <- c(hints, "Select an RTF table in the Table column for this row.")
+          }
+          if (!nzchar(bm_val) && nzchar(tbl_val)) {
+            warnings <- c(warnings, "Table set but no bookmark selected")
+            hints    <- c(hints, "Select a bookmark in the Bookmark column for this row.")
+          }
+
+          # Bookmark not in Word document
+          if (nzchar(bm_val) && length(bm) > 0L && !bm_val %in% names(bm)) {
+            e <- err_bookmark_missing(bm_val)
+            errors <- c(errors, conditionMessage(e))
+            hints  <- c(hints,  e$hint)
+          }
+
+          #Bookmark exists but sits in a table cell
+          if(nzchar(bm_val) && bm_val %in% names(bm) && !identical(bmctx[[bm_val]], "body") && !is.null(bmctx[[bm_val]])){
+            e <- err_bookmark_bad_context(bm_val,bmctx[[bm_val]])
+            errors <- c(errors, conditionMessage(e))
+            hints  <- c(hints,  e$hint)
+          }
+
+          # Duplicate bookmark across rows
+          if (nzchar(bm_val) && bm_val %in% dup_bookmarks) {
+            dup_rows <- which(all_bm_vals == bm_val)
+            e <- err_bookmark_duplicate(bm_val, dup_rows)
+            errors <- c(errors, conditionMessage(e))
+            hints  <- c(hints,  e$hint)
+          }
+
+          # Table not in RTF folder
+          if (nzchar(tbl_val) && length(tbls) > 0L && !tbl_val %in% tbls) {
+            e <- err_rtf_unreadable(tbl_val, "not found in RTF folder")
+            errors <- c(errors, conditionMessage(e))
+            hints  <- c(hints,  e$hint)
+          }
+
+          # Same RTF mapped to multiple bookmarks (warning only - may be intentional)
+          if (nzchar(tbl_val) && tbl_val %in% dup_tables) {
+            dup_rows <- which(all_tbl_vals == tbl_val)
+            warnings <- c(warnings, sprintf(
+              "Table '%s' is mapped in multiple rows: %s",
+              tbl_val, paste(dup_rows, collapse = ", ")
+            ))
+            hints <- c(hints, "This is allowed but unusual. Verify that both bookmarks should receive the same table.")
+          }
+
+          if (nzchar(tbl_val) && length(paths) > 0L && tbl_val %in% names(paths)) {
+            info <- cache[[tbl_val]]
+            sel  <- sels[[as.character(i)]]
+
+            if (!is.null(info) && !isTRUE(info$is_image)) {
+              # Only validate against a non-empty known list - if the table has no
+              # parameters/timelines detected, we can't meaningfully validate imports
+              if (!is.null(sel$parameters) && length(sel$parameters) > 0L &&
+                  length(info$parameters) > 0L) {
+                bad_p <- setdiff(sel$parameters, info$parameters)
+                if (length(bad_p) > 0L) {
+                  warnings <- c(warnings,
+                                paste0("Unknown parameter(s): ", paste(bad_p, collapse = ", ")))
+                  hints <- c(hints,
+                             "These parameter values were not found in the RTF file. They may have been renamed or removed.")
+                }
+              }
+              if (!is.null(sel$timelines) && length(sel$timelines) > 0L &&
+                  length(info$timelines) > 0L) {
+                bad_t <- setdiff(sel$timelines, info$timelines)
+                if (length(bad_t) > 0L) {
+                  warnings <- c(warnings,
+                                paste0("Unknown timeline(s): ", paste(bad_t, collapse = ", ")))
+                  hints <- c(hints,
+                             "These timeline labels were not found in the RTF file. Re-open the table and reselect timelines.")
+                }
+              }
+              if (!is.null(sel$excluded_cols) && length(sel$excluded_cols) > 0L &&
+                  info$n_cols > 0L) {
+                bad_c <- sel$excluded_cols[
+                  sel$excluded_cols < 1L | sel$excluded_cols > info$n_cols
+                ]
+                if (length(bad_c) > 0L) {
+                  e <- err_exclusion_out_of_range(bm_val, bad_c, info$n_cols)
+                  warnings <- c(warnings, conditionMessage(e))
+                  hints    <- c(hints,    e$hint)
+                }
+              }
+            }
+          }
+
+          hint_str <- if (length(hints) > 0L) paste(unique(hints), collapse = " ") else NULL
+
+          if (length(errors) > 0L)
+            return(list(type = "error",   msg = paste(errors,   collapse = "; "), hint = hint_str))
+          if (length(warnings) > 0L)
+            return(list(type = "warning", msg = paste(warnings, collapse = "; "), hint = hint_str))
+
+          list(type = "", msg = "", hint = NULL)
+        })
+      })
+
+      # Scrollable warnings panel - all rows with issues, shown below the preview
+      output$row_warning_display <- renderUI({
+        warns <- row_warnings()
+        df    <- config_data()
+
+        items <- lapply(seq_along(warns), function(i) {
+          w <- warns[[i]]
+          if (!nzchar(w$type)) return(NULL)
+
+          is_error <- w$type == "error"
+          bg  <- if (is_error) "#f8d7da" else "#fff3cd"
+          bdr <- if (is_error) "#f5c2c7" else "#ffecb5"
+          ico <- if (is_error) "\u26a0" else "\u26a0"
+          lbl <- if (is_error) "Error" else "Warning"
+
+          bm_val  <- trimws(df$Bookmark[i])
+          tbl_val <- trimws(df$Table[i])
+          row_lbl <- paste0("Row ", i,
+                            if (nzchar(bm_val))  paste0(" \u2013 ", bm_val)  else "",
+                            if (nzchar(tbl_val)) paste0(" / ", tbl_val) else "")
+
+          div(style = sprintf(
+            "padding:5px 8px;margin-bottom:4px;border-radius:4px;
+             background:%s;border:1px solid %s;font-size:0.82em;", bg, bdr),
+            strong(paste0(ico, " ", lbl, ": ")), row_lbl,
+            tags$br(),
+            span(style = "color:#555;", w$msg),
+            if (!is.null(w$hint)) tagList(tags$br(),
+                                          span(style = "color:#777;font-style:italic;", paste0("Hint: ", w$hint))
+            )
+          )
+        })
+
+        items <- Filter(Negate(is.null), items)
+        if (length(items) == 0L) return(NULL)
+
+        div(style = "margin-top:12px;max-height:350px;overflow-y:auto;",
+            h5(style = "margin:0 0 6px;font-size:0.9em;color:#666;", "Validation warnings"),
+            items)
+      })
+    }
+
     register_word_file()
     register_rtf_folder()
     register_config_grid()
+    register_validation()
     register_downloads()
 
   }
