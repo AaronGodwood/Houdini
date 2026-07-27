@@ -299,7 +299,7 @@ houdini_app <- function() {
       })
 
       observeEvent(input$fill_bookmarks, {
-        print(names(available_bookmarks()))
+
         bm_names <- names(available_bookmarks())[grepl("(^[Tt]able)|(^[Ff]igure)",names(available_bookmarks()))]
         if (length(bm_names) == 0L) {
           showNotification("Load a Word document with bookmarks first", type = "warning")
