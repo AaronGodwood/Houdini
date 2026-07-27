@@ -56,7 +56,9 @@ houdini_app <- function() {
                    actionButton("fill_bookmarks", "Add All Bookmarks",
                                 class = "btn-outline-secondary",
                                 title = "Add a row for each bookmark not already in the grid"),
-
+                   actionButton("auto_match", "Auto-match",
+                                class = "btn-outline-primary",
+                                title = "Fill blank cells with the best bookmark/table match"),
                    fileInput("import_excel", NULL, accept = ".xlsx",
                              placeholder = "Import Excel...",
                              buttonLabel = "Import Excel",
@@ -211,6 +213,31 @@ houdini_app <- function() {
     }
 
 
+    # Fill blank Bookmark/Table cells with their best fuzzy match against the
+    # loaded bookmark names / RTF table names. Never overwrites a non-empty cell.
+    # score_floor guards against filling unrelated sheets with noise (bulk button);
+    # pass 0 to always take the best guess (live per-row suggestion).
+    fill_suggestions <- function(df, score_floor = 0) {
+      bm_names <- names(available_bookmarks())
+      tbls     <- available_tables()
+      if (length(bm_names) == 0L && length(tbls) == 0L) return(df)
+
+      for (i in seq_len(nrow(df))) {
+        b <- trimws(df$Bookmark[i])
+        t <- trimws(df$Table[i])
+
+        if (nzchar(b) && !nzchar(t) && length(tbls) > 0L) {
+          m <- best_match(b, tbls)
+          if (!is.na(m$match) && m$score >= score_floor) df$Table[i] <- m$match
+        } else if (nzchar(t) && !nzchar(b) && length(bm_names) > 0L) {
+          m <- best_match(t, bm_names)
+          if (!is.na(m$match) && m$score >= score_floor) df$Bookmark[i] <- m$match
+        }
+      }
+      df
+    }
+
+
 
     register_config_grid <- function(){
       output$config_table <- renderRHandsontable({
@@ -242,12 +269,38 @@ houdini_app <- function() {
         hot
       })
 
+      observeEvent(input$config_table, {
+        if (is.null(input$config_table)) return()
+        df <- hot_to_r(input$config_table)
+        # Live per-row suggestion: fill a blank partner cell for any row where the
+        # other cell was just set. Blank-only + change-detection keeps this stable
+        # (the re-render feeds back through this observer but produces no new change).
+        suggested <- fill_suggestions(df, score_floor = 0)
+        if (!identical(suggested, df)) df <- suggested
+        config_data(df)
+      })
 
-
-
+      observeEvent(input$auto_match, {
+        df <- config_data()
+        if (length(available_bookmarks()) == 0L && length(available_tables()) == 0L) {
+          showNotification("Load a Word document and RTF folder first", type = "warning")
+          return()
+        }
+        filled <- fill_suggestions(df, score_floor = 0.12)
+        n_new  <- sum(nzchar(trimws(unlist(filled[c("Bookmark", "Table")]))) &
+                        !nzchar(trimws(unlist(df[c("Bookmark", "Table")]))))
+        config_data(filled)
+        showNotification(
+          if (n_new > 0L) sprintf("Auto-match filled %d cell%s", n_new,
+                                  if (n_new == 1L) "" else "s")
+          else "No confident matches to fill",
+          type = if (n_new > 0L) "message" else "default"
+        )
+      })
 
       observeEvent(input$fill_bookmarks, {
-        bm_names <- names(available_bookmarks())
+        print(names(available_bookmarks()))
+        bm_names <- names(available_bookmarks())[grepl("(^[Tt]able)|(^[Ff]igure)",names(available_bookmarks()))]
         if (length(bm_names) == 0L) {
           showNotification("Load a Word document with bookmarks first", type = "warning")
           return()
@@ -319,79 +372,131 @@ houdini_app <- function() {
         req(input$import_excel)
         path <- input$import_excel$datapath
 
-        xl <- tryCatch(
-          readxl::read_excel(path, col_types = "text"),
-          error = function(e) {
-            showNotification(paste("Could not read Excel file:", conditionMessage(e)), type = "error")
-            NULL
-          }
-        )
-        if (is.null(xl)) return()
+        imported <- read_xlsx(path)
 
-        # Must have Bookmark and Table columns (case-insensitive)
-        col_lower <- tolower(names(xl))
-        bm_col  <- which(col_lower == "bookmark")[1L]
-        tbl_col <- which(col_lower == "dataset")[1L]
-
-        if (is.na(bm_col) || is.na(tbl_col)) {
-          showNotification(
-            "Excel file must contain 'Bookmark' and 'Dataset' columns", type = "error"
-          )
-          return()
-        }
-
-        # Build config_data frame - strip any .rtf extension from Tables
-
-        new_config <- data.frame(
-          Bookmark  = as.character(xl[[bm_col]]),
-          Table = tools::file_path_sans_ext(as.character(xl[[tbl_col]])),
-          stringsAsFactors = FALSE
-        )
-        # Replace NA with empty string
-        new_config$Bookmark[is.na(new_config$Bookmark)]   <- ""
-        new_config$Table[is.na(new_config$Table)] <- ""
-
+        new_config <- imported$config
         config_data(new_config)
 
-        # Parse optional filter columns into table_selections
-        # Recognised column names (case-insensitive): parameters, timelines
-        param_col  <- which(col_lower == "parameters")[1L]
-        tline_col  <- which(col_lower == "timepoints")[1L]
 
-        split_semi <- function(x) {
-          if (is.na(x) || !nzchar(trimws(x))) return(character())
-          trimws(strsplit(x, ";", fixed = TRUE)[[1L]])
-        }
-
-        # Fresh selections keyed by row index - discard any previous state
-        sels <- list()
-
-        for (i in seq_len(nrow(new_config))) {
-          tname <- new_config$Table[i]
-          if (!nzchar(tname)) next
-
-          params <- if (!is.na(param_col)) split_semi(xl[[param_col]][i]) else character()
-          tlines <- if (!is.na(tline_col)) split_semi(xl[[tline_col]][i]) else character()
-
-          sels[[as.character(i)]] <- list(
-            excluded_cols        = NULL,
-            excluded_rows        = NULL,
-            excluded_header_rows = NULL,
-            parameters           = if (length(params) > 0L) params else NULL,
-            timelines            = if (length(tlines) > 0L) tlines else NULL
-          )
-        }
-
-        table_selections(sels)
+        table_selections(imported$selections)
         showNotification(
           paste("Imported", nrow(new_config), "rows from Excel"), type = "message"
         )
       })
     }
 
+
+
+
+
+    register_downloads <- function(){
+      # LOG DOWNLOAD
+
+      output$download_log <- downloadHandler(
+        filename = function() {
+          paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
+        },
+        content = function(file) {
+          df    <- config_data()
+          sels  <- table_selections()
+          paths <- rtf_paths()
+          status <- last_gen_status()
+
+          lines <- write_log(input$word_file$name, "Imported File", df, sels, status, rtf_folder_path())
+          writeLines(lines, file)
+        }
+      )
+
+      # EXCEL EXPORT
+
+      output$export_excel <- downloadHandler(
+        filename = function() {
+          paste0("houdini_config_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+        },
+        content = function(file) {
+          df   <- config_data()
+          sels <- table_selections()
+
+          semi_join <- function(x) if (length(x) == 0L || is.null(x)) "" else paste(x, collapse = "; ")
+
+          out <- data.frame(
+            Bookmark   = df$Bookmark,
+            Table      = ifelse(nzchar(df$Table), paste0(df$Table, ".rtf"), df$Table),
+            Parameters = vapply(seq_len(nrow(df)), function(i) {
+              semi_join(sels[[as.character(i)]]$parameters)
+            }, character(1)),
+            Timelines  = vapply(seq_len(nrow(df)), function(i) {
+              semi_join(sels[[as.character(i)]]$timelines)
+            }, character(1)),
+            stringsAsFactors = FALSE
+          )
+
+          writexl::write_xlsx(out, file)
+        }
+      )
+
+      # DOCUMENT GENERATION
+
+      output$download_result <- downloadHandler(
+        filename = function() {
+          if (!is.null(input$word_file)) paste0(input$word_file$name, " Houdini_Output.docx")
+          else "output.docx"
+        },
+        content = function(file) {
+          req(input$word_file)
+
+          config <- config_data()
+          keep   <- which(nzchar(trimws(config$Bookmark)) & nzchar(trimws(config$Table)))
+          config <- config[keep, , drop = FALSE]
+
+          if (nrow(config) == 0L) {
+            showNotification("No table mappings defined", type = "error"); return()
+          }
+
+          # Selections are keyed by original grid row index; re-key them to match
+          # the filtered config so blank rows above don't shift them onto the
+          # wrong tables.
+          all_sels <- table_selections()
+          selections <- setNames(
+            lapply(keep, function(i) all_sels[[as.character(i)]]),
+            as.character(seq_along(keep))
+          )
+
+          n_rows <- nrow(config)
+          status <- tryCatch(
+            withProgress(
+              message = "Generating document\u2026",
+              value   = 0,
+              {
+                process_document(
+                  word_path   = input$word_file$datapath,
+                  config      = config,
+                  rtf_paths   = rtf_paths(),
+                  selections  = selections,
+                  output_path = file,
+                  progress_cb = function(i, n, msg) {
+                    incProgress(1 / n, detail = msg)
+                  }
+                )
+              }
+            ),
+            error = function(e) {
+              showNotification(paste("Error generating document:", conditionMessage(e)), type = "error")
+              NULL
+            }
+          )
+          # process_document keys status by filtered row position; map back to
+          # original grid rows so the log pairs errors with the right rows
+          if (!is.null(status)) names(status) <- as.character(keep)
+          last_gen_status(status)
+        }
+      )
+    }
+
     register_word_file()
     register_rtf_folder()
     register_config_grid()
+    register_downloads()
 
   }
 
