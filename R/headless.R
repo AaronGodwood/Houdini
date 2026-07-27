@@ -112,7 +112,10 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
 
   status <- process_document(input_doc, cfg, rtf_paths, sels, output_path,
                              progress_cb = cb)
-  write_log(input_doc, input_sheet, cfg ,sels, status, file_location)
+
+  path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
+  lines <- write_log(input_doc, input_sheet, cfg ,sels, status, file_location)
+  writeLines(lines, path)
 
 }
 
@@ -184,6 +187,6 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
       }
     }
   }
-  path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
-  writeLines(lines, path)
+
+  lines
 }
