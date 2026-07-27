@@ -68,7 +68,8 @@ xml_header_row <- function(b, r, is_last_header) {
   for (ci in seq_len(k)) {
     if (!b$present[r, ci]) next
     span <- b$colspan[r, ci]
-    if (span == 0L) next                        # continuation, omit
+    if (span == 0L) next # merge continuation, omit
+
 
     grid_span <- if (span > 1L) {
       sprintf("<w:gridSpan w:val=\"%d\"/>", span)
@@ -82,7 +83,7 @@ xml_header_row <- function(b, r, is_last_header) {
     align <- cell_align_or_default(b$align[r, ci], ci)
     cells[ci] <- xml_cell(b$text[r, ci], align, grid_span, borders, run_pr, header = TRUE)
   }
-
+  if(all(vapply(cells, function(c) c == "", logical(1)))) cells <- rep("<w:tc><w:p/></w:tc>",k)
   tr_pr <- "<w:trPr><w:tblHeader/></w:trPr>"
   sprintf("<w:tr>%s%s</w:tr>", tr_pr, paste(cells, collapse = ""))
 }
@@ -97,7 +98,8 @@ xml_data_row <- function(b, r, is_last_data) {
   for (ci in seq_len(k)) {
     if (!b$present[r, ci]) next
     span <- b$colspan[r, ci]
-    if (span == 0L) next                        # merge continuation, omit
+    if (span == 0L) next # merge continuation, omit
+
 
     grid_span <- if (span > 1L) {
       sprintf("<w:gridSpan w:val=\"%d\"/>", span)
@@ -106,6 +108,7 @@ xml_data_row <- function(b, r, is_last_data) {
     align <- cell_align_or_default(b$align[r, ci], ci)
     cells[ci] <- xml_cell(b$text[r, ci], align, grid_span, borders, run_pr)
   }
+  if(all(vapply(cells, function(c) c == "", logical(1)))) cells <- rep("<w:tc><w:p/></w:tc>",k)
   tr_pr <- "<w:trPr><w:cantSplit/></w:trPr>"
   sprintf("<w:tr>%s%s</w:tr>",tr_pr, paste(cells, collapse = ""))
 }
@@ -164,9 +167,7 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
 
   # tblPr - explicit fixed width matching the text area
   tbl_pr <- sprintf(
-    "<w:tblPr><w:tblLayout w:type=\"fixed\"/><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblBorders><w:top w:val=\"single\" w:sz=\"12\" w:space=\"0\" w:color=\"000000\"/></w:tblBorders></w:tblPr>",
-    total_width
-  )
+    "<w:tblPr><w:tblLayout w:type=\"fixed\"/><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblBorders><w:top w:val=\"single\" w:sz=\"12\" w:space=\"0\" w:color=\"000000\"/></w:tblBorders></w:tblPr>")
 
   # Header rows
   n_hdr <- block_nrow(header)
@@ -184,6 +185,7 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
   ftr_xml <- paste(vapply(seq_len(n_ftr), function(i) {
     xml_data_row(footer, i, is_last_data = FALSE)
   }, character(1)), collapse = "")
+
 
 
 
