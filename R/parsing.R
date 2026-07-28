@@ -236,6 +236,18 @@ block_nrow <- function(b) length(b$is_header)
 block_ncol <- function(b) ncol(b$text)
 
 
+block_rows_id <- function(b, idx){
+  b$text      <- b$text[b$row_id %in% idx, , drop = FALSE]
+  b$align     <- b$align[b$row_id %in% idx, , drop = FALSE]
+  b$colspan   <- b$colspan[b$row_id %in% idx, , drop = FALSE]
+  b$width     <- b$width[b$row_id %in% idx, , drop = FALSE]
+  b$present   <- b$present[b$row_id %in% idx, , drop = FALSE]
+  b$is_header <- b$is_header[b$row_id %in% idx]
+  b$row_id    <- b$row_id[b$row_id %in% idx]
+  b
+}
+
+
 # Subset a block to the given rows (logical or integer index)
 block_rows <- function(b, idx) {
   b$text      <- b$text[idx, , drop = FALSE]
@@ -275,6 +287,50 @@ block_cols <- function(b, cols) {
 }
 
 
+#shifts spanning data across appropriat;y when columns are removed then removes them
+block_cols_resolve <- function(b, cols) {
+  if (block_nrow(b) == 0L) return(b)
+  b <- block_pad(b, max(cols, 0L))
+  n_cols <- block_ncol(b)
+  n_rows <- block_nrow(b)
+  condemned_cols <- setdiff(seq_len(n_cols),cols)
+  mask <- logical(n_cols)
+  mask[condemned_cols] <- TRUE
+  for(i in seq_len(n_rows)){
+    j <- 1
+    up <- TRUE
+    while(j<= n_cols){
+      #only act if column is in mask, value > 1 and not last col
+      if(mask[j] && b$colspan[i,j] > 1 && j < n_cols){
+        b$text[i, j + 1]    <- b$text[i, j]
+        b$align[i, j + 1]   <- b$align[i, j]
+        b$colspan[i, j + 1] <- b$colspan[i, j] - 1
+        b$width[i, j + 1]   <- b$width[i, j]
+        b$present[i, j + 1] <- b$present[i, j]
+        j <- j + 1
+      } else if(mask[j] && b$colspan[i,j] == 0 && j > 1 && up == TRUE){
+        up <- FALSE
+        k <- j - 1
+      } else if( up == FALSE){
+
+        if(b$colspan[i,k] > 0){
+          b$colspan[i,k] <- b$colspan[i,k] - 1
+          up = TRUE
+          j <- j + 1
+        } else{
+          k <- k - 1
+        }
+      } else{
+        j <- j + 1
+      }
+
+
+    }
+  }
+  block_cols(b, cols)
+}
+
+
 # Stack blocks vertically, padding narrower blocks with absent cells
 block_rbind_all <- function(blocks) {
   blocks <- blocks[vapply(blocks, block_nrow, integer(1)) > 0L]
@@ -291,6 +347,23 @@ block_rbind_all <- function(blocks) {
     is_header = unlist(lapply(blocks, `[[`, "is_header"), use.names = FALSE),
     row_id    = unlist(lapply(blocks, `[[`, "row_id"),    use.names = FALSE)
   )
+}
+
+# Tables get double gaps when pages get combined this removes one of those spaces
+# Some tables (particularly AEs) have (cont.) sections where a chunk is CONTINUED over a page
+# MW are not a fan of this so this removed them and any gaps caused by this same page break
+#
+# TODO consult someone about this May cause random errors but I do feel it is unlikely
+block_categorise <- function(block){
+  n_col <- block_ncol(block)
+  spans <- block$colspan[ ,1]
+  empty <- which(vapply(spans, function(s) s == n_col, logical(1)))
+  cont <- which(vapply(block$text[ ,1], function(t) grepl("(cont.)",t), logical(1)))
+  two_empty <- empty[(empty + 1) %in% empty]
+  cont_empty <- empty[((empty + 1) %in% cont | (empty + 2) %in% cont)]
+  ids <- block$row_id
+  wanted_ids <- ids[!ids %in% two_empty & !ids %in% cont_empty & !ids %in% cont]
+  block_rows_id(block, wanted_ids)
 }
 
 # -- Table Parsing
@@ -665,9 +738,9 @@ parse_page <- function(page_text){
 extract_parameter <- function(header_tbl) {
   for (i in rev(seq_len(block_nrow(header_tbl)))) {
     for (txt in header_tbl$text[i, header_tbl$present[i, ]]) {
-      m <- regmatches(txt, regexpr("(?i)^Parameter:\\s*(.+)$", txt, perl = TRUE))
+      m <- regmatches(txt, regexpr("(?i)^[^:]+:\\s*(.+)$", txt, perl = TRUE))
       if (length(m) > 0L && nchar(m) > 0L) {
-        return(trimws(sub("(?i)^Parameter:\\s*", "", m, perl = TRUE)))
+        return(trimws(sub("(?i)^[^:]+:\\s*", "", m, perl = TRUE)))
       }
     }
   }
@@ -906,7 +979,7 @@ combine_pages <- function(pages) {
   header <- pages[[1]]$header
   footer <- pages[[1]]$footer
   data   <- block_rbind_all(lapply(pages, `[[`, "data"))
-  #data <- block_categorise(data)
+  data <- block_categorise(data)
 
   # Column widths from the first header (or data) row
   #ref <- if (block_nrow(header) > 0L) header else data

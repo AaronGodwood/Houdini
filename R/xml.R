@@ -83,7 +83,7 @@ xml_header_row <- function(b, r, is_last_header) {
     align <- cell_align_or_default(b$align[r, ci], ci)
     cells[ci] <- xml_cell(b$text[r, ci], align, grid_span, borders, run_pr, header = TRUE)
   }
-  if(all(vapply(cells, function(c) c == "", logical(1)))) cells <- rep("<w:tc><w:p/></w:tc>",k)
+  #if(all(vapply(cells, function(c) c == "", logical(1)))) cells <- rep("<w:tc><w:p/></w:tc>",k)
   tr_pr <- "<w:trPr><w:tblHeader/></w:trPr>"
   sprintf("<w:tr>%s%s</w:tr>", tr_pr, paste(cells, collapse = ""))
 }
@@ -108,7 +108,7 @@ xml_data_row <- function(b, r, is_last_data) {
     align <- cell_align_or_default(b$align[r, ci], ci)
     cells[ci] <- xml_cell(b$text[r, ci], align, grid_span, borders, run_pr)
   }
-  if(all(vapply(cells, function(c) c == "", logical(1)))) cells <- rep("<w:tc><w:p/></w:tc>",k)
+  #if(all(vapply(cells, function(c) c == "", logical(1)))) cells <- rep("<w:tc><w:p/></w:tc>",k)
   tr_pr <- "<w:trPr><w:cantSplit/></w:trPr>"
   sprintf("<w:tr>%s%s</w:tr>",tr_pr, paste(cells, collapse = ""))
 }
@@ -137,8 +137,8 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
   data <- block_rows(data, slice_range(block_nrow(data), row_start, row_end))
 
   # Filter to selected columns
-  header <- block_cols(header, cols)
-  data   <- block_cols(data, cols)
+  header <- block_cols_resolve(header, cols)
+  data   <- block_cols_resolve(data, cols)
 
   # Column widths for the selected columns
   selected_widths <- col_widths_twips[cols]
