@@ -133,7 +133,8 @@ build_html <- function(combined, cols = NULL, row_start = NULL, row_end = NULL) 
 build_html_selection <- function(combined,
                                  excluded_cols        = integer(),
                                  excluded_rows        = integer(),
-                                 excluded_header_rows = integer()) {
+                                 excluded_header_rows = integer(),
+                                 row_limit = 200L) {
   header           <- combined$header
   data             <- combined$data
   col_widths_twips <- combined$col_widths_twips
@@ -201,7 +202,6 @@ build_html_selection <- function(combined,
   # Data rows
   n_data_rows <- block_nrow(data)
   k_dat       <- block_ncol(data)
-  row_limit   <- 200L
   truncated   <- n_data_rows > row_limit
   n_display   <- if (truncated) row_limit else n_data_rows
 
@@ -290,7 +290,8 @@ get_table_html_selection <- function(path,
                                      excluded_header_rows = NULL,
                                      parameters           = NULL,
                                      timelines            = NULL,
-                                     pages                = NULL) {
+                                     pages                = NULL,
+                                     row_limit = 200L) {
   if (is.null(pages)) pages <- parse_rtf(path)
   param_filtered    <- filter_pages(pages, parameters)
   pages <- param_filtered$pages
@@ -302,7 +303,8 @@ get_table_html_selection <- function(path,
     combined,
     excluded_cols        = excluded_cols        %||% integer(),
     excluded_rows        = excluded_rows        %||% integer(),
-    excluded_header_rows = excluded_header_rows %||% integer()
+    excluded_header_rows = excluded_header_rows %||% integer(),
+    row_limit            = row_limit
   )
 }
 

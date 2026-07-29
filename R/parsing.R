@@ -95,6 +95,10 @@ rtf_unescape_r <- function(text) {
   paste(out, collapse = "")
 }
 
+rtf_unescape <- function(text) {
+  if (.c_available()) .Call(C_rtf_unescape, text) else rtf_unescape_r(text)
+}
+
 # Fast hex string to raw vector conversion.
 # Processes in chunks of 4000 bytes (8000 hex chars) to limit intermediate
 # string allocation compared to one-pair-at-a-time substring calls.
@@ -577,7 +581,7 @@ parse_rtf_table <- function(section_text) {
     }
 
     # --- clean cell text ---
-    texts <- vapply(cell_chunks, rtf_cell_to_text_r, character(1),
+    texts <- vapply(cell_chunks, rtf_cell_to_text, character(1),
                     USE.NAMES = FALSE)
 
     # Alignment from RTF control words within each cell chunk
@@ -691,9 +695,13 @@ rtf_cell_to_text_r <- function(raw) {
   text <- gsub("[{}]", "", text, fixed = FALSE)
 
   # Apply unicode/hex unescaping on what remains
-  text <- rtf_unescape_r(text)
+  text <- rtf_unescape(text)
 
   text
+}
+
+rtf_cell_to_text <- function(raw) {
+  if (.c_available()) .Call(C_rtf_cell_to_text, raw) else rtf_cell_to_text_r(raw)
 }
 
 # -- Page Parsing
@@ -729,7 +737,7 @@ parse_page <- function(page_text){
     parameter = parameter,
     header    = block_rows(body, body$is_header),
     data      = block_rows(body, !body$is_header),
-    footer    = block_new()
+    footer    = footer_tbl
   )
 
 }
@@ -1034,6 +1042,7 @@ table_info_from_pages <- function(pages) {
   list(
     n_cols     = n_cols,
     n_rows     = block_nrow(combined$data),
+    n_hdrs     = block_nrow(combined$header),
     col_names  = col_names,
     parameters = get_parameters(pages),
     timelines  = get_timelines(combined)
