@@ -10,6 +10,92 @@
 houdini_app <- function() {
 
 
+  ui_head <- function(){
+    tags$head(
+      tags$style(HTML("
+      .well { background-color: #f8f9fa; }
+      .btn-primary { margin-top: 10px; }
+      .section-header {
+        margin-top: 20px;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 2px solid #dee2e6;
+      }
+      .action-buttons { margin-top: 15px; }
+      .status-box {
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 10px;
+      }
+      .status-success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+      .status-warning { background-color: #fff3cd; border: 1px solid #ffeeba; }
+      .status-info    { background-color: #d1ecf1; border: 1px solid #bee5eb; }
+      .preview-panel {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        min-height: 400px;
+        max-height: 600px;
+        overflow-y: auto;
+        background-color: #fff;
+      }
+      .preview-placeholder {
+        color: #999;
+        text-align: center;
+        padding-top: 50px;
+      }
+      .filter-panel {
+        border: 1px solid #eee;
+        border-radius: 4px;
+        padding: 10px;
+        margin-bottom: 10px;
+        background: #fafafa;
+      }
+      .sel-pane th[data-col] { cursor: pointer; }
+      .sel-pane tr[data-row] { cursor: pointer; }
+      .preview-centred table { margin-left: auto; margin-right: auto; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #rtf_folder_manual { margin-top: 6px; font-size: 0.82em; }
+      #rtf_folder_manual .form-control { font-size: 0.82em; }
+      .btn-spinner {
+        display: inline-block;
+        width: 14px; height: 14px;
+        border: 2px solid rgba(255,255,255,0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+    ")),
+      tags$script(HTML("
+      Shiny.addCustomMessageHandler('resetSelectionPane', function(_) {
+        // Clear JS-side exclusion state so the re-rendered pane starts fresh
+        Shiny.setInputValue('preview_excluded_cols',         [], {priority:'event'});
+        Shiny.setInputValue('preview_excluded_rows',         [], {priority:'event'});
+        Shiny.setInputValue('preview_excluded_header_rows',  [], {priority:'event'});
+      });
+
+      $(function() {
+        var btn = document.getElementById('download_result');
+        if (!btn) return;
+        var origHTML = btn.innerHTML;
+        btn.addEventListener('click', function() {
+          btn.innerHTML = '<span class=\"btn-spinner\"></span>Generating...';
+          btn.style.pointerEvents = 'none';
+          btn.style.opacity = '0.75';
+        });
+        $(document).on('shiny:filedownload', function() {
+          btn.innerHTML = origHTML;
+          btn.style.pointerEvents = '';
+          btn.style.opacity = '';
+        });
+      });
+    "))
+    )
+  }
+
+
   ui_input_panel <- function() {
     # Left panel: inputs
     column(3,
@@ -27,7 +113,7 @@ houdini_app <- function() {
              uiOutput("rtf_status"),
 
              h4("3. Generate", class = "section-header"),
-             downloadButton("download_result", "Download Result",
+             downloadButton("download_result", "Download Document",
                             class = "btn-success btn-lg btn-block"),
              downloadButton("download_log", "Download Log",
                             class = "btn-outline-secondary btn-block",
@@ -58,15 +144,17 @@ houdini_app <- function() {
                                 title = "Add a row for each bookmark not already in the grid"),
                    actionButton("auto_match", "Auto-match",
                                 class = "btn-outline-primary",
-                                title = "Fill blank cells with the best bookmark/table match"),
-                   fileInput("import_excel", NULL, accept = ".xlsx",
-                             placeholder = "Import Excel...",
-                             buttonLabel = "Import Excel",
-                             width = "160px")
+                                title = "Fill blank cells with the best bookmark/table match")
+
                ),
+               div(class = "action-buttons",
+               fileInput("import_excel", NULL, accept = ".xlsx",
+                         placeholder = "Import Excel...",
+                         buttonLabel = "Import Excel",
+                         width = "160px"),
                downloadButton("export_excel", "Export Excel",
                               class = "btn-outline-secondary",
-                              style = "margin-top:15px;")
+                              style = "margin-top:5px;"))
            ),
 
            uiOutput("filter_panel"),
@@ -74,9 +162,35 @@ houdini_app <- function() {
     )
   }
 
+  ui_preview_panel <- function(){
+    # Right panel: two-pane interactive preview
+
+    column(5,
+           h5("Selection", class = "section-header",
+              style = "margin-bottom:4px;font-size:0.95em;color:#555;"),
+           p(style = "font-size:0.78em;color:#888;margin:0 0 6px;",
+             "Click column headers to exclude columns. Click rows to exclude rows."),
+           div(class = "sel-pane preview-centred",
+               style = "border:1px solid #ddd;border-radius:5px;padding:8px;
+                        max-height:320px;overflow:auto;background:#fff;",
+               uiOutput("selection_preview")
+           ),
+           h5("Output", class = "section-header",
+              style = "margin-top:14px;margin-bottom:4px;font-size:0.95em;color:#555;"),
+           div(class = "preview-centred",
+               style = "border:1px solid #ddd;border-radius:5px;padding:8px;
+                        max-height:320px;overflow:auto;background:#fff;",
+               uiOutput("output_preview")
+           )
+    )
+
+  }
+
   ui <- fluidPage(
-    titlePanel("Houdini V2"),
+    ui_head(),
+    titlePanel("Houdini"),
     ui_input_panel(),
+    ui_preview_panel(),
     ui_config_panel()
   )
 
@@ -238,6 +352,419 @@ houdini_app <- function() {
     }
 
 
+    register_preview <- function(){
+      # ROW SELECTION -> load table info
+
+      observeEvent(input$config_table_select, {
+        sel <- input$config_table_select
+        if (is.null(sel)) return()
+
+        df  <- config_data()
+        row <- sel$select$r
+
+        if (row > 0 && row <= nrow(df)) {
+          tbl_name <- df$Table[row]
+          paths    <- rtf_paths()
+
+          if (!is.null(tbl_name) && tbl_name != "" && tbl_name %in% names(paths)) {
+            current_table_name(tbl_name)
+            current_row_index(row)
+
+            # Load table info if not cached (skip for image RTFs - no table to inspect)
+            cache <- table_info_cache()
+            if (is.null(cache[[tbl_name]])) {
+              if (isTRUE(is_image_rtf(paths[[tbl_name]]))) {
+                # Sentinel so the cache entry exists and current_info() is non-NULL
+                cache[[tbl_name]] <- list(n_cols = 0L, n_rows = 0L,
+                                          col_names = character(),
+                                          parameters = character(),
+                                          timelines = character(),
+                                          is_image = TRUE)
+                table_info_cache(cache)
+              } else {
+                info <- tryCatch({
+                  table_info_from_pages(get_cached_pages(tbl_name))
+                }, error = function(e) {
+                  showNotification(paste("Error reading RTF:", conditionMessage(e)), type = "error")
+                  NULL
+                })
+                if (!is.null(info)) {
+                  cache[[tbl_name]] <- info
+                  table_info_cache(cache)
+                }
+              }
+            }
+
+          } else {
+            current_table_name(NULL)
+            current_row_index(NULL)
+          }
+        }
+      })
+
+      # Convenience reactive: current table info
+      current_info <- reactive({
+        tbl_name <- current_table_name()
+        if (is.null(tbl_name)) return(NULL)
+        table_info_cache()[[tbl_name]]
+      })
+
+      # FILTER PANEL
+
+      output$filter_panel <- renderUI({
+        info <- current_info()
+        if (is.null(info) || isTRUE(info$is_image)) return(NULL)
+        #if (length(info$parameters) == 0L && length(info$timelines) == 0L) return(NULL)
+
+        prev          <- table_selections()[[as.character(current_row_index())]]
+
+        prev_params   <- prev$parameters %||% info$parameters
+        prev_tlines   <- prev$timelines  %||% info$timelines
+        prev_exc_cols <- prev$excluded_cols %||% integer()
+        prev_exc_rows <- prev$excluded_rows
+        prev_exc_hdrs <- prev$excluded_hdrs
+
+        div(class = "filter-panel",
+            h5("Filters"),
+
+            if (length(info$parameters) > 0L) {
+              selectizeInput(
+                "sel_parameters", "Parameters:",
+                choices  = info$parameters,
+                selected = prev_params,
+                multiple = TRUE,
+                options  = list(plugins = list("remove_button"),
+                                placeholder = "All parameters")
+              )
+            },
+
+            if (length(info$timelines) > 0L) {
+              selectizeInput(
+                "sel_timelines", "Timelines:",
+                choices  = info$timelines,
+                selected = prev_tlines,
+                multiple = TRUE,
+                options  = list(plugins = list("remove_button"),
+                                placeholder = "All timelines")
+              )
+            },
+
+            if (info$n_cols > 0L) {
+              selectizeInput(
+                "sel_excluded_cols", "Excluded Columns:",
+                choices  = seq_len(info$n_cols),
+                selected = prev_exc_cols,
+                multiple = TRUE,
+                options  = list(plugins = list("remove_button"),
+                                placeholder = "No Columns Excluded")
+              )
+            }
+        )
+      })
+
+      # Reset button - shown when a row with selections is active
+      output$reset_row_btn <- renderUI({
+        row <- current_row_index()
+        if (is.null(row)) return(NULL)
+        sel <- table_selections()[[as.character(row)]]
+        has_selections <- !is.null(sel) && (
+          length(sel$excluded_cols)        > 0L ||
+            length(sel$excluded_rows)        > 0L ||
+            length(sel$excluded_header_rows) > 0L ||
+            !is.null(sel$parameters)         ||
+            !is.null(sel$timelines)
+        )
+        if (!has_selections) return(NULL)
+        div(style = "margin-top:6px;text-align:right;",
+            actionLink("reset_row", "Reset selections for this row",
+                       style = "font-size:0.8em;color:#888;"))
+      })
+
+      observeEvent(input$reset_row, {
+        row <- current_row_index()
+        if (is.null(row)) return()
+        sels <- isolate(table_selections())
+        sels[[as.character(row)]] <- list(
+          excluded_cols        = integer(),
+          excluded_rows        = integer(),
+          excluded_header_rows = integer(),
+          parameters           = NULL,
+          timelines            = NULL
+        )
+        table_selections(sels)
+        # Tell JS to clear its exclusion arrays and re-apply styles
+        session$sendCustomMessage("resetSelectionPane", list())
+      })
+
+      # SAVE SELECTIONS WHEN INPUTS CHANGE
+
+      # Save parameters/timelines when dropdowns change
+      observeEvent(
+        list(input$sel_parameters, input$sel_timelines),
+        {
+          row  <- isolate(current_row_index())
+          info <- isolate(current_info())
+          if (is.null(row) || is.null(info) || isTRUE(info$is_image)) return()
+
+          sels <- isolate(table_selections())
+          prev <- sels[[as.character(row)]] %||% list()
+          sels[[as.character(row)]] <- list(
+            excluded_cols        = prev$excluded_cols,
+            excluded_rows        = prev$excluded_rows,
+            excluded_header_rows = prev$excluded_header_rows,
+            parameters           = input$sel_parameters %||% info$parameters,
+            timelines            = input$sel_timelines  %||% info$timelines
+          )
+          table_selections(sels)
+        },
+        ignoreNULL = FALSE
+      )
+
+      # Save exclusions when JS sends updated sets from the selection pane
+      observeEvent(
+        list(input$preview_excluded_cols,
+             input$preview_excluded_rows,
+             input$preview_excluded_header_rows),
+        {
+          row <- isolate(current_row_index())
+          if (is.null(row)) return()
+
+          sels <- isolate(table_selections())
+          prev <- sels[[as.character(row)]] %||% list()
+          sels[[as.character(row)]] <- list(
+            excluded_cols        = as.integer(input$preview_excluded_cols        %||% integer()),
+            excluded_rows        = as.integer(input$preview_excluded_rows        %||% integer()),
+            excluded_header_rows = as.integer(input$preview_excluded_header_rows %||% integer()),
+            parameters           = prev$parameters,
+            timelines            = prev$timelines
+          )
+          table_selections(sels)
+        },
+        ignoreNULL = FALSE
+      )
+
+      # INTERACTIVE PREVIEW - selection pane + output pane
+
+      # JS for the selection pane (injected after each render)
+      selection_js <- '
+(function() {
+  var excCols = [], excRows = [], excHdrs = [];
+
+  function toggle(arr, val) {
+    var i = arr.indexOf(val);
+    if (i === -1) arr.push(val); else arr.splice(i, 1);
+  }
+
+  function applyStyles(tbl) {
+    tbl.querySelectorAll("tr[data-row]").forEach(function(tr) {
+      var ri   = parseInt(tr.dataset.row, 10);
+      var type = tr.dataset.rowtype;
+      var excl = type === "header" ? excHdrs.indexOf(ri) !== -1
+                                   : excRows.indexOf(ri) !== -1;
+      tr.querySelectorAll("td,th").forEach(function(cell) {
+        var raw = cell.dataset.col;
+        var cols;
+        try { cols = JSON.parse(raw); if (!Array.isArray(cols)) cols = [cols]; }
+        catch(e) { cols = [parseInt(raw, 10)]; }
+        var cExcl = cols.some(function(c) { return excCols.indexOf(c) !== -1; });
+        cell.style.opacity = (excl || cExcl) ? "0.3" : "";
+      });
+      tr.style.opacity = excl ? "0.3" : "";
+    });
+  }
+
+  var timer;
+  function sendUpdate(tbl) {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      Shiny.setInputValue("preview_excluded_cols",
+        excCols.slice().sort(function(a,b){return a-b;}), {priority:"event"});
+      Shiny.setInputValue("preview_excluded_rows",
+        excRows.slice().sort(function(a,b){return a-b;}), {priority:"event"});
+      Shiny.setInputValue("preview_excluded_header_rows",
+        excHdrs.slice().sort(function(a,b){return a-b;}), {priority:"event"});
+    }, 300);
+  }
+
+  var container = document.getElementById("sel-pane-container");
+  if (!container) return;
+  try { excCols = JSON.parse(container.dataset.excCols || "[]"); } catch(e) {}
+  try { excRows = JSON.parse(container.dataset.excRows || "[]"); } catch(e) {}
+  try { excHdrs = JSON.parse(container.dataset.excHdrs || "[]"); } catch(e) {}
+
+  var tbl = container.querySelector("table");
+  if (!tbl) return;
+  applyStyles(tbl);
+
+  tbl.addEventListener("click", function(e) {
+    var th = e.target.closest("th[data-col]");
+    var tr = e.target.closest("tr[data-row]");
+    if (th) {
+      var raw = th.dataset.col;
+      var cols;
+      try { cols = JSON.parse(raw); if (!Array.isArray(cols)) cols = [cols]; }
+      catch(err) { cols = [parseInt(raw, 10)]; }
+      cols.forEach(function(c) { toggle(excCols, c); });
+      applyStyles(tbl);
+      sendUpdate(tbl);
+      e.stopPropagation();
+    } else if (tr) {
+      var ri   = parseInt(tr.dataset.row, 10);
+      var type = tr.dataset.rowtype;
+      if (type === "header") toggle(excHdrs, ri); else toggle(excRows, ri);
+      applyStyles(tbl);
+      sendUpdate(tbl);
+    }
+  });
+})();
+'
+
+      # Reactive that captures the "identity" of the current table+filters
+      # (drives selection pane re-render - not per-click)
+      selection_pane_key <- reactive({
+        row <- current_row_index()
+        sel <- if (!is.null(row)) table_selections()[[as.character(row)]] else NULL
+        list(
+          table  = current_table_name(),
+          params = sel$parameters,
+          tlines = sel$timelines
+        )
+      })
+
+      output$selection_preview <- renderUI({
+        key      <- selection_pane_key()
+        tbl_name <- key$table
+        paths    <- rtf_paths()
+        info     <- current_info()
+
+        if (is.null(tbl_name) || !tbl_name %in% names(paths)) {
+          return(p(style = "color:#999;padding:20px;text-align:center;",
+                   "Select a row to preview"))
+        }
+
+        if (isTRUE(info$is_image)) {
+          img <- tryCatch(extract_png(paths[[tbl_name]]), error = function(e) NULL)
+          if (is.null(img))
+            return(HTML("<p style='color:red'>Could not extract image.</p>"))
+          b64 <- paste0("data:image/png;base64,",
+                        base64enc::base64encode(img$png_bytes))
+          w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
+          h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
+          img_style <- paste0(
+            "max-width:100%;height:auto;",
+            if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
+            if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
+          )
+          return(tags$div(style = "text-align:center;",
+                          tags$img(src = b64, style = img_style)))
+        }
+
+        row <- current_row_index()
+        sel <- table_selections()[[as.character(row)]] %||% list()
+        ec  <- sel$excluded_cols %||% integer()
+        er  <- sel$excluded_rows %||% integer()
+        eh  <- sel$excluded_header_rows %||% integer()
+
+
+        int_to_json <- function(x) {
+          if (length(x) == 0L) return("[]")
+          paste0("[", paste(x, collapse = ","), "]")
+        }
+
+        cached_pages <- get_cached_pages(tbl_name)
+
+        html_content <- tryCatch(
+          get_table_html_selection(
+            paths[[tbl_name]],
+            excluded_cols        = ec,
+            excluded_rows        = er,
+            excluded_header_rows = eh,
+            parameters           = sel$parameters,
+            timelines            = sel$timelines,
+            pages                = cached_pages
+          ),
+          error = function(e) sprintf(
+            "<p style='color:red'>Selection error: %s</p>",
+            htmlEscape(conditionMessage(e))
+          )
+        )
+
+        tagList(
+          div(
+            id = "sel-pane-container",
+            `data-exc-cols` = int_to_json(ec),
+            `data-exc-rows` = int_to_json(er),
+            `data-exc-hdrs` = int_to_json(eh),
+            HTML(html_content)
+          ),
+          tags$script(HTML(selection_js))
+        )
+      })
+
+      # Debounced exclusions for the output pane
+      raw_exclusions <- reactive({
+        list(
+          cols  = as.integer(input$preview_excluded_cols         %||% integer()),
+          rows  = as.integer(input$preview_excluded_rows         %||% integer()),
+          hdrs  = as.integer(input$preview_excluded_header_rows  %||% integer())
+        )
+      })
+      debounced_exclusions <- debounce(raw_exclusions, 300)
+
+      output$output_preview <- renderUI({
+        tbl_name <- current_table_name()
+        paths    <- rtf_paths()
+        info     <- current_info()
+
+        if (is.null(tbl_name) || !tbl_name %in% names(paths)) {
+          return(p(style = "color:#999;padding:20px;text-align:center;",
+                   "No table selected"))
+        }
+
+        if (isTRUE(info$is_image)) {
+          img <- tryCatch(extract_png(paths[[tbl_name]]), error = function(e) NULL)
+          if (is.null(img))
+            return(HTML("<p style='color:red'>Could not extract image.</p>"))
+          b64 <- paste0("data:image/png;base64,",
+                        base64enc::base64encode(img$png_bytes))
+          w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
+          h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
+          img_style <- paste0(
+            "max-width:100%;height:auto;",
+            if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
+            if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
+          )
+          return(tags$div(style = "text-align:center;",
+                          tags$img(src = b64, style = img_style)))
+        }
+
+        excl <- debounced_exclusions()
+        row  <- current_row_index()
+        sel  <- table_selections()[[as.character(row)]] %||% list()
+
+        cached_pages <- get_cached_pages(tbl_name)
+
+        html_content <- tryCatch(
+          get_table_html_output(
+            paths[[tbl_name]],
+            excluded_cols        = excl$cols,
+            excluded_rows        = excl$rows,
+            excluded_header_rows = excl$hdrs,
+            parameters           = sel$parameters,
+            timelines            = sel$timelines,
+            pages                = cached_pages
+          ),
+          error = function(e) sprintf(
+            "<p style='color:red'>Output error: %s</p>",
+            htmlEscape(conditionMessage(e))
+          )
+        )
+
+        HTML(html_content)
+      })
+    }
+
+
 
     register_config_grid <- function(){
       output$config_table <- renderRHandsontable({
@@ -252,7 +779,7 @@ houdini_app <- function() {
 
         hot <- rhandsontable(df, rowHeaders = TRUE, selectCallback = TRUE,
                              overflow = "visible") |>
-          hot_cols(colWidths = c(160, 160))
+          hot_cols(colWidths = c(180, 180))
 
         hot <- if (length(bm) > 0) {
           hot |> hot_col("Bookmark", type = "dropdown", source = c("", names(bm)), strict = FALSE)
@@ -421,11 +948,11 @@ houdini_app <- function() {
 
           out <- data.frame(
             Bookmark   = df$Bookmark,
-            Table      = ifelse(nzchar(df$Table), paste0(df$Table, ".rtf"), df$Table),
+            Dataset      = ifelse(nzchar(df$Table), paste0(df$Table, ".rtf"), df$Table),
             Parameters = vapply(seq_len(nrow(df)), function(i) {
               semi_join(sels[[as.character(i)]]$parameters)
             }, character(1)),
-            Timelines  = vapply(seq_len(nrow(df)), function(i) {
+            Timepoints  = vapply(seq_len(nrow(df)), function(i) {
               semi_join(sels[[as.character(i)]]$timelines)
             }, character(1)),
             stringsAsFactors = FALSE
@@ -673,6 +1200,7 @@ houdini_app <- function() {
     register_rtf_folder()
     register_config_grid()
     register_validation()
+    register_preview()
     register_downloads()
 
   }
