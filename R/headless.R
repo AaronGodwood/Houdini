@@ -91,7 +91,7 @@ read_xlsx <- function(path) {
 #' document replaces the previously injected content instead of duplicating it.
 #'
 #' @param input_doc Path to the template (or previously generated) .docx
-#' @param config Path to a config .xlsx (see [read_xlsx()]) or a
+#' @param input_sheet Path to a config .xlsx (see [read_xlsx()]) or a
 #'   data.frame with Bookmark/Table columns plus optional filter columns
 #' @param file_location Folder containing the table .rtf files named in the config
 #' @param figure_location Folder containing the figure .rtf files named in the config (defaults to table location)
@@ -245,15 +245,15 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
 houdini_watch <- function(input_doc, input_sheet, file_location,
                           interval = 5) {
   snapshot <- function() {
-    files <- list.files(rtf_dir, pattern = "\\.rtf$", ignore.case = TRUE,
+    files <- list.files(file_location, pattern = "\\.rtf$", ignore.case = TRUE,
                         full.names = TRUE)
-    if (is.character(config) && file.exists(config)) {
-      files <- c(files, config)
+    if (is.character(input_sheet) && file.exists(input_sheet)) {
+      files <- c(files, input_sheet)
     }
     paste(files, file.mtime(files), collapse = ";")
   }
 
-  message("Watching ", rtf_dir, " - press Escape or Ctrl+C to stop")
+  message("Watching ", file_location, " - press Escape or Ctrl+C to stop")
   last <- ""
   repeat {
     current <- snapshot()

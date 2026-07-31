@@ -288,38 +288,3 @@ err_format <- function(e) {
   if (!is.null(hint)) paste0(msg, "\nHint: ", hint) else msg
 }
 
-
-
-#' Format a Log Entry
-#'
-log_entry <- function(config_data = NULL, sels = NULL, status = NULL) {
-  fmt_vec <- function(x, none = "(all)") {
-    if (is.null(x) || length(x) == 0L) none else paste(x, collapse = "; ")
-  }
-  bm_val  <- trimws(config_data$Bookmark[i])
-  tbl_val <- trimws(config_data$Table[i])
-  sel     <- sels[[as.character(i)]] %||% list()
-  err     <- gen_status[[as.character(i)]]
-
-  if (!is.null(err)) {
-    err_msg  <- if (inherits(err, "houdini_error")) conditionMessage(err) else as.character(err)
-    err_hint <- if (inherits(err, "houdini_error")) err$hint else NULL
-    lines <- c(lines,
-               paste0("Row       : ", i),
-               paste0("Bookmark  : ", bm_val),
-               paste0("Table     : ", tbl_val, ".rtf"),
-               paste0("Status    : ERROR - ", err_msg),
-               if (!is.null(err_hint)) paste0("Hint      : ", err_hint) else NULL,
-               ""
-    )
-  } else {
-    lines <- c(lines,
-               paste0("Row       : ", i),
-               paste0("Bookmark  : ", bm_val),
-               paste0("Table     : ", tbl_val, ".rtf"),
-               paste0("Parameters: ", fmt_vec(sel$parameters)),
-               paste0("Timelines : ", fmt_vec(sel$timelines)),
-               ""
-    )
-  }
-}

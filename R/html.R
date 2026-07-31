@@ -130,6 +130,7 @@ build_html <- function(combined, cols = NULL, row_start = NULL, row_end = NULL) 
 # header rows are positional.
 # excluded_cols / excluded_header_rows: integer vectors (1-based positions);
 # excluded_rows: stable row IDs. Matching elements render at opacity 0.3.
+# row_limit: the number of rows shown in the preview before it is truncated
 build_html_selection <- function(combined,
                                  excluded_cols        = integer(),
                                  excluded_rows        = integer(),
@@ -283,6 +284,7 @@ build_html_selection <- function(combined,
 #' @param parameters Character vector of parameter values to keep (NULL = all)
 #' @param timelines Character vector of timeline labels to keep (NULL = all)
 #' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
+#' @param row_limit The number of rows shown in the selection before it is truncted
 #' @return HTML string
 get_table_html_selection <- function(path,
                                      excluded_cols        = NULL,
