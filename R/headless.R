@@ -11,7 +11,17 @@ split_ints <- function(x){
 }
 
 
-
+#' Parse a excel config into config + selections
+#'
+#' Shared by the app's Excel import and [apparate()]. Requires Bookmark and
+#' Table columns (case-insensitive); recognises optional Parameters,
+#' Timelines, ExcludedColumns, ExcludedRows and ExcludedHeaderRows columns,
+#' all semicolon-separated. Any .rtf extension on Table values is stripped.
+#'
+#' @param xl A data.frame (e.g. from readxl) with the columns above
+#' @return list(config = data.frame(Bookmark, Table), selections = list keyed
+#'   by row index as character, matching the app's table_selections format)
+#' @export
 parse_xl <- function(xl){
   col_lower <- tolower(names(xl))
   bm_col  <- which(col_lower == "bookmark")[1L]
@@ -63,24 +73,53 @@ parse_xl <- function(xl){
   list(config = config, selections = sels)
 }
 
-
+#' Read a houdini xlsx workbook
+#'
+#' Same format as the app's Excel export: see [parse_xl()].
+#'
+#' @param path Path to the .xlsx file
+#' @return list(config, selections); see [parse_xl()]
+#' @export
 read_xlsx <- function(path) {
   parse_xl(readxl::read_excel(path, sheet = 1))
 }
 
-
-apparate <- function(input_doc,input_sheet,file_location, figure_location = "", hide_data = FALSE, rtf = FALSE, quiet = FALSE){
+#' Run the full houdini injection pipeline
+#'
+#' Injects every configured RTF table/image into the Word document at its
+#' bookmark. Suitable for scripts and CI. Re-running on an already-generated
+#' document replaces the previously injected content instead of duplicating it.
+#'
+#' @param input_doc Path to the template (or previously generated) .docx
+#' @param config Path to a config .xlsx (see [read_xlsx()]) or a
+#'   data.frame with Bookmark/Table columns plus optional filter columns
+#' @param file_location Folder containing the table .rtf files named in the config
+#' @param figure_location Folder containing the figure .rtf files named in the config (defaults to table location)
+#' @param hide_data Option to replace all data with XX on insertion
+#' @param rtf legacy option (kept for existing programs)
+#' @param quiet Suppress progress and summary messages
+#' @return Invisibly, the per-row status list: NULL for success or a
+#'   houdini_error condition per failed row, keyed by config row
+#' @export
+apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL, hide_data = FALSE, rtf = FALSE, quiet = FALSE){
   #Check documents exist
   if(!file.exists(input_doc)){
-    stop("Word document not found:", input_doc)
+    stop("Word document not found: ", input_doc)
   }
   if(!dir.exists(file_location)){
-    stop("RTF folder not found:", file_location)
+    stop("RTF folder not found: ", file_location)
+  }
+  if(is.null(figure_location) || !dir.exists(figure_location)){
+    figure_location <- file_location
   }
 
   #read in documents and gets rtf filenames
 
-  parsed <- read_xlsx(input_sheet)
+  parsed <- if(is.character(input_sheet)){
+    read_xlsx(input_sheet)
+  } else{
+    parse_xl(input_sheet)
+  }
 
   rtf_files <- list.files(file_location, pattern = "\\.rtf$", ignore.case = TRUE)
   rtf_paths <- setNames(
@@ -119,7 +158,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = "", 
 
 }
 
-
+#ouputs the collected log data over a run
 write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, file_location){
   df    <- config_data
 
@@ -189,4 +228,44 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
   }
 
   lines
+}
+
+
+
+
+#' Watch an RTF folder and regenerate the document on every change
+#'
+#' Polls the RTF folder (and the config workbook, when given as a path) and
+#' calls [houdini_run()] whenever a file appears, disappears, or changes.
+#' Blocks until interrupted (Escape / Ctrl+C).
+#'
+#' @inheritParams apparate
+#' @param interval Seconds between polls
+#' @export
+houdini_watch <- function(input_doc, input_sheet, file_location,
+                          interval = 5) {
+  snapshot <- function() {
+    files <- list.files(rtf_dir, pattern = "\\.rtf$", ignore.case = TRUE,
+                        full.names = TRUE)
+    if (is.character(config) && file.exists(config)) {
+      files <- c(files, config)
+    }
+    paste(files, file.mtime(files), collapse = ";")
+  }
+
+  message("Watching ", rtf_dir, " - press Escape or Ctrl+C to stop")
+  last <- ""
+  repeat {
+    current <- snapshot()
+    if (!identical(current, last)) {
+      last <- current
+      message("Change detected at ", format(Sys.time(), "%H:%M:%S"),
+              " - regenerating")
+      tryCatch(
+        houdini_run(input_doc, input_sheet, file_location),
+        error = function(e) message("Generation failed: ", conditionMessage(e))
+      )
+    }
+    Sys.sleep(interval)
+  }
 }

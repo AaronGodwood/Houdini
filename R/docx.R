@@ -352,7 +352,7 @@ add_xml <- function(node, xml_block, where = "after"){
   if(where == "on"){
     next_node <- xml_find_first(node,"following-sibling::*[1]")
 
-    if(xml_name(next_node) == "tbl"){
+    if(xml_name(next_node) == "tbl" || !is.na(xml_child(next_node, ".//w:drawing"))){
       xml_replace(next_node,xml_block)
       #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "before")
       #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkEnd w:xmlns="%s" w:id="%d"/>',W_NS,next_bmk_id)), .where = "after")
