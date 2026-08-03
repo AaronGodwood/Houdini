@@ -1,3 +1,5 @@
+
+
 #' Return the Houdini Shiny application object
 #'
 #' Called internally by \code{\link{run_app}}. You can also pass the result
@@ -7,65 +9,95 @@
 #' @import shiny
 #' @import rhandsontable
 #' @export
-houdini_app <- function() {
+houdini_newapp <- function() {
 
+  # Theme: Bootstrap 5
+  houdini_theme <- bslib::bs_theme(
+    version      = 5,
+    preset       = "shiny",
+    primary      = "#2c6e9b",
+    success      = "#2a7a2a",
+    base_font    = bslib::font_google("Inter", local = FALSE),
+    heading_font = bslib::font_google("Inter", local = FALSE)
+  )
 
-  ui_head <- function(){
+  # App-specific CSS. Colours come from Bootstrap variables so both themes work.
+  ui_head <- function() {
     tags$head(
       tags$style(HTML("
-      .well { background-color: #f8f9fa; }
-      .btn-primary { margin-top: 10px; }
-      .section-header {
-        margin-top: 20px;
-        margin-bottom: 15px;
-        padding-bottom: 5px;
-        border-bottom: 2px solid #dee2e6;
-      }
-      .action-buttons { margin-top: 15px; }
-      .status-box {
-        padding: 10px;
-        border-radius: 5px;
-        margin-top: 10px;
-      }
-      .status-success { background-color: #d4edda; border: 1px solid #c3e6cb; }
-      .status-warning { background-color: #fff3cd; border: 1px solid #ffeeba; }
-      .status-info    { background-color: #d1ecf1; border: 1px solid #bee5eb; }
-      .preview-panel {
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 15px;
-        min-height: 400px;
-        max-height: 600px;
-        overflow-y: auto;
-        background-color: #fff;
-      }
-      .preview-placeholder {
-        color: #999;
-        text-align: center;
-        padding-top: 50px;
-      }
-      .filter-panel {
-        border: 1px solid #eee;
-        border-radius: 4px;
-        padding: 10px;
-        margin-bottom: 10px;
-        background: #fafafa;
-      }
+      /* Interactive preview: clickable headers/rows */
       .sel-pane th[data-col] { cursor: pointer; }
       .sel-pane tr[data-row] { cursor: pointer; }
       .preview-centred table { margin-left: auto; margin-right: auto; }
+      /* Two stacked panes share the card body, each scrolling on its own.
+         flex-basis 0 + equal grow keeps them balanced at any card height,
+         and min-height 0 lets them actually shrink inside the flex parent. */
+      .preview-scroll {
+        overflow: auto;
+        flex: 1 1 0;
+        min-height: 120px;
+        background: var(--bs-body-bg);
+      }
+      .pane-label {
+        display: flex;
+        align-items: baseline;
+        gap: 0.25rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8em;
+        font-weight: 600;
+        color: var(--bs-secondary-color);
+        background: var(--bs-tertiary-bg);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      /* Preview tables inherit theme colours so dark mode stays readable */
+      .preview-scroll table { color: var(--bs-body-color); }
+
+      /* Compact toolbar above the config grid */
+      .grid-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      .grid-toolbar .btn { --bs-btn-padding-y: 0.25rem; --bs-btn-padding-x: 0.5rem; }
+      .grid-toolbar .sep {
+        width: 1px; height: 1.4rem;
+        background: var(--bs-border-color);
+        margin: 0 0.25rem;
+      }
+      /* rhandsontable needs an explicit height to scroll internally */
+      .grid-host { flex: 1 1 auto; min-height: 220px; overflow: auto; }
+
+      /* Import Excel: hide the file-input slab, keep a normal-looking button */
+      .compact-file .form-control,
+      .compact-file .progress { display: none !important; }
+      .compact-file .input-group { margin-bottom: 0 !important; }
+      .compact-file .btn { --bs-btn-padding-y: 0.25rem; --bs-btn-padding-x: 0.5rem; }
+      .compact-file { margin-bottom: 0 !important; }
+      .compact-file .form-group { margin-bottom: 0 !important; }
+
+      .doc-map {
+        max-height: 260px; overflow-y: auto;
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--bs-border-radius);
+        padding: 6px; font-size: 0.8em; line-height: 1.5;
+        background: var(--bs-body-bg);
+      }
+      .doc-map .map-bm { cursor: pointer; border-radius: 3px; padding: 0 4px; }
+      .doc-map .map-bm:hover { background: var(--bs-tertiary-bg); }
+
+      .hint { font-size: 0.78em; color: var(--bs-secondary-color); }
+
       @keyframes spin { to { transform: rotate(360deg); } }
-      #rtf_folder_manual { margin-top: 6px; font-size: 0.82em; }
-      #rtf_folder_manual .form-control { font-size: 0.82em; }
       .btn-spinner {
-        display: inline-block;
-        width: 14px; height: 14px;
+        display: inline-block; width: 14px; height: 14px;
         border: 2px solid rgba(255,255,255,0.4);
-        border-top-color: #fff;
-        border-radius: 50%;
+        border-top-color: #fff; border-radius: 50%;
         animation: spin 0.6s linear infinite;
-        vertical-align: middle;
-        margin-right: 6px;
+        vertical-align: middle; margin-right: 6px;
       }
     ")),
       tags$script(HTML("
@@ -95,113 +127,172 @@ houdini_app <- function() {
     )
   }
 
+  # Sidebar: sources, generation, and the document map
+  ui_sidebar <- function() {
+    bslib::sidebar(
+      width = 330,
+      title = NULL,
 
-  ui_input_panel <- function() {
-    # Left panel: inputs
-    column(3,
-           wellPanel(
-             h4("1. Word Document", class = "section-header"),
-             fileInput("word_file", NULL,
-                       accept = c(".docx", ".doc"),
-                       placeholder = "Select Word file..."),
-             uiOutput("bookmark_status"),
+      bslib::accordion(
+        multiple = TRUE,
+        open     = c("Sources", "Generate","Validation"),
 
-             h4("2. RTF Source", class = "section-header"),
-             uiOutput("folder_picker_btn"),
-             textInput("rtf_folder_manual", NULL,
-                       placeholder = "Paste folder path and press Enter\u2026"),
-             uiOutput("rtf_status"),
+        bslib::accordion_panel(
+          "Sources", icon = bsicons::bs_icon("folder2-open"),
+          tags$label(class = "form-label fw-semibold small", "Word document"),
+          fileInput("word_file", NULL, accept = c(".docx", ".doc"),
+                    placeholder = "Select .docx\u2026", width = "100%"),
+          uiOutput("bookmark_status"),
 
-             h4("3. Generate", class = "section-header"),
-             downloadButton("download_result", "Download Document",
-                            class = "btn-success btn-lg btn-block"),
-             downloadButton("download_log", "Download Log",
-                            class = "btn-outline-secondary btn-block",
-                            style = "margin-top:6px;"),
+          tags$label(class = "form-label fw-semibold small mt-2", "RTF folder"),
+          uiOutput("folder_picker_btn"),
+          textInput("rtf_folder_manual", NULL, width = "100%",
+                    placeholder = "Or paste a folder path\u2026"),
+          uiOutput("rtf_status"),
 
-             uiOutput("row_warning_display")
-           )
+        ),
+
+        bslib::accordion_panel(
+          "Generate", icon = bsicons::bs_icon("file-earmark-arrow-down"),
+          downloadButton("download_result", "Download Result",
+                         class = "btn-success w-100"),
+          uiOutput("prebuild_status"),
+          downloadButton("download_log", "Download Log",
+                         class = "btn-outline-secondary btn-sm w-100 mt-2")
+        ),
+
+        # bslib::accordion_panel(
+        #   "Document map", icon = bsicons::bs_icon("list-nested"),
+        #   uiOutput("doc_map_panel")
+        # ),
+
+        bslib::accordion_panel(
+          "Validation", icon = bsicons::bs_icon("exclamation-triangle"),
+          uiOutput("row_warning_display")
+        )
+      )
     )
   }
 
-  ui_config_panel <- function() {
-    # Middle panel: config table
-    column(4,
-           h4("Table Configuration", class = "section-header"),
-           p("Map bookmarks to RTF tables. Click a row to configure filters and preview."),
+  # Configuration card: search, toolbar, grid, filters
+  ui_config_card <- function() {
+    bslib::card(
+      full_screen = TRUE,
+      bslib::card_header(
+        class = "d-flex justify-content-between align-items-center",
+        span(bsicons::bs_icon("table"), " Table configuration"),
+        uiOutput("config_summary", inline = TRUE)
+      ),
+      bslib::card_body(
+        class = "d-flex flex-column",
+        gap = "0.5rem",
+        padding = "0.75rem",
 
-           div(style = "height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;",
-               rHandsontableOutput("config_table")
-           ),
+        div(class = "d-flex gap-2 align-items-center",
+            div(class = "flex-grow-1",
+                textInput("grid_search", NULL, width = "100%",
+                          placeholder = "Filter rows by bookmark or table\u2026")),
+            actionButton("grid_search_clear", NULL,
+                         icon = icon("times"), class = "btn-sm btn-outline-secondary",
+                         title = "Clear filter")),
 
-           div(style = "display:flex;justify-content:space-between;align-items:flex-start;",
-               div(class = "action-buttons",
-                   actionButton("add_row",    "Add Row",    class = "btn-outline-secondary"),
-                   actionButton("remove_row", "Remove Row", class = "btn-outline-secondary"),
-                   actionButton("clear_all",  "Clear All",  class = "btn-outline-danger"),
-                   actionButton("fill_bookmarks", "Add All Bookmarks",
-                                class = "btn-outline-secondary",
-                                title = "Add a row for each bookmark not already in the grid"),
-                   actionButton("auto_match", "Auto-match",
-                                class = "btn-outline-primary",
-                                title = "Fill blank cells with the best bookmark/table match")
+        div(class = "grid-toolbar",
+            actionButton("add_row", NULL, icon = icon("plus"),
+                         class = "btn-outline-secondary", title = "Add a row"),
+            actionButton("remove_row", NULL, icon = icon("minus"),
+                         class = "btn-outline-secondary",
+                         title = "Remove the selected row"),
+            div(class = "sep"),
+            actionButton("fill_bookmarks", "All bookmarks",
+                         class = "btn-outline-secondary",
+                         title = "Add a row for each bookmark not already in the grid"),
+            actionButton("auto_match", "Auto-match",
+                         class = "btn-outline-primary",
+                         title = "Fill blank cells with the best bookmark/table match"),
+            div(class = "sep"),
+            div(class = "compact-file d-inline-block",
+                fileInput("import_excel", NULL, accept = ".xlsx",
+                          buttonLabel = "Import", width = "auto")),
+            downloadButton("export_excel", "Export",
+                           class = "btn-outline-secondary btn-sm"),
+            div(class = "ms-auto"),
+            actionButton("clear_all", NULL, icon = icon("trash"),
+                         class = "btn-outline-danger btn-sm",
+                         title = "Clear the whole grid")
+        ),
 
-               ),
-               div(class = "action-buttons",
-               fileInput("import_excel", NULL, accept = ".xlsx",
-                         placeholder = "Import Excel...",
-                         buttonLabel = "Import Excel",
-                         width = "160px"),
-               downloadButton("export_excel", "Export Excel",
-                              class = "btn-outline-secondary",
-                              style = "margin-top:5px;"))
-           ),
+        div(class = "grid-host border rounded",
+            rhandsontable::rHandsontableOutput("config_table")),
 
-           uiOutput("filter_panel"),
-           uiOutput("reset_row_btn")
+        uiOutput("filter_panel"),
+        uiOutput("reset_row_btn")
+      )
     )
   }
 
-  ui_preview_panel <- function(){
-    # Right panel: two-pane interactive preview
+  # Preview card: Selection above Output, both live. Editing exclusions in the
+  # Selection pane updates Output in place, so the two stay side-by-side in
+  # time even though they are stacked in space.
+  ui_preview_card <- function() {
+    bslib::card(
+      full_screen = TRUE,
+      bslib::card_header(
+        class = "d-flex justify-content-between align-items-center flex-wrap gap-2",
+        uiOutput("preview_title", inline = TRUE),
+        bslib::popover(
+          actionLink("preview_opts", bsicons::bs_icon("gear")),
+          title = "Preview options",
+          checkboxInput("sel_show_all",
+                        "Show all rows (large tables may be slow)",
+                        value = FALSE)
+        )
+      ),
+      bslib::card_body(
+        padding = 0,
+        gap = 0,
+        class = "d-flex flex-column",
 
-    column(5,
-           h5("Selection", class = "section-header",
-              style = "margin-bottom:4px;font-size:0.95em;color:#555;"),
-           p(style = "font-size:0.78em;color:#888;margin:0 0 6px;",
-             "Click column headers to exclude columns. Click rows to exclude rows."),
-           div(class = "sel-pane preview-centred",
-               style = "border:1px solid #ddd;border-radius:5px;padding:8px;
-                        max-height:320px;overflow:auto;background:#fff;",
-               uiOutput("selection_preview")
-           ),
-           h5("Output", class = "section-header",
-              style = "margin-top:14px;margin-bottom:4px;font-size:0.95em;color:#555;"),
-           div(class = "preview-centred",
-               style = "border:1px solid #ddd;border-radius:5px;padding:8px;
-                        max-height:320px;overflow:auto;background:#fff;",
-               uiOutput("output_preview")
-           )
+        div(class = "pane-label",
+            span(bsicons::bs_icon("hand-index"), " Selection"),
+            span(class = "hint ms-2",
+                 "click headers to exclude columns, rows to exclude rows")),
+        div(class = "sel-pane preview-centred preview-scroll px-2 pb-2",
+            uiOutput("selection_preview")),
+
+        div(class = "pane-label border-top",
+            span(bsicons::bs_icon("file-earmark-check"), " Output"),
+            span(class = "hint ms-2", "exactly what will be injected")),
+        div(class = "preview-centred preview-scroll px-2 pb-2",
+            uiOutput("output_preview"))
+      )
     )
-
   }
 
-  ui <- fluidPage(
+  ui <- bslib::page_sidebar(
+    title = tagList(bsicons::bs_icon("magic"), "Houdini"),
+    theme = houdini_theme,
+    fillable = TRUE,
     ui_head(),
-    titlePanel("Houdini"),
-    ui_input_panel(),
-    ui_preview_panel(),
-    ui_config_panel()
+    sidebar = ui_sidebar(),
+    bslib::layout_columns(
+      col_widths = c(6, 6),
+
+      ui_preview_card(),
+      ui_config_card()
+    )
   )
 
   server <- function(input, output, session) {
 
-    # REACTIVE VALUES
+    # SHARED STATE - reactiveVals and helpers used across the register_* sections.
+    # Each register_*() below is a local closure over this state; server() ends by
+    # calling them all to wire up the app.
 
     available_bookmarks <- reactiveVal(character())
     available_tables    <- reactiveVal(character())
     rtf_paths           <- reactiveVal(list())
     rtf_folder_path     <- reactiveVal(NULL)
+
 
     config_data <- reactiveVal(
       data.frame(
@@ -232,12 +323,68 @@ houdini_app <- function() {
       pages
     }
 
+
+
     # selections keyed by row index (character):
     #   list(excluded_cols, excluded_rows, excluded_header_rows, parameters, timelines)
     table_selections    <- reactiveVal(list())
     last_gen_status     <- reactiveVal(NULL)
 
-    register_word_file <- function(){
+
+    # Per-row validation results; assigned in register_validation(), read by the
+    # config grid renderer for the status column
+    row_warnings <- NULL
+
+    # Activate a config row: set the current table/row and warm the info cache.
+    # Shared by the grid's select callback and the validation-panel jump links.
+    activate_config_row <- function(row) {
+      df <- config_data()
+      if (is.null(row) || is.na(row) || row < 1 || row > nrow(df)) return()
+
+      tbl_name <- df$Table[row]
+      paths    <- rtf_paths()
+
+      if (!is.null(tbl_name) && tbl_name != "" && tbl_name %in% names(paths)) {
+        current_table_name(tbl_name)
+        current_row_index(row)
+
+        # Load table info if not cached (skip for image RTFs - no table to inspect)
+        cache <- table_info_cache()
+        if (is.null(cache[[tbl_name]])) {
+          if (isTRUE(is_image_rtf(paths[[tbl_name]]))) {
+            # Sentinel so the cache entry exists and current_info() is non-NULL
+            cache[[tbl_name]] <- list(n_cols = 0L, n_rows = 0L,
+                                      col_names = character(),
+                                      parameters = character(),
+                                      timelines = character(),
+                                      is_image = TRUE)
+            table_info_cache(cache)
+          } else {
+            info <- tryCatch({
+              table_info_from_pages(get_cached_pages(tbl_name))
+            }, error = function(e) {
+              showNotification(paste("Error reading RTF:", conditionMessage(e)),
+                               type = "error")
+              NULL
+            })
+            if (!is.null(info)) {
+              cache[[tbl_name]] <- info
+              table_info_cache(cache)
+            }
+          }
+        }
+      } else {
+        current_table_name(NULL)
+        current_row_index(NULL)
+      }
+    }
+
+
+
+    #
+    # WORD FILE
+
+    register_word_file <- function() {
       observeEvent(input$word_file, {
         req(input$word_file)
         bookmarks <- tryCatch(
@@ -255,11 +402,12 @@ houdini_app <- function() {
       output$bookmark_status <- renderUI({
         bm <- available_bookmarks()
         if (length(bm) > 0) {
-          div(class = "status-box status-success",
-              icon("check-circle"), paste(length(bm), "bookmarks found"))
+          div(class = "alert alert-success py-1 px-2 mb-0 small",
+              bsicons::bs_icon("check-circle-fill"),
+              sprintf(" %d bookmarks found", length(bm)))
         } else if (!is.null(input$word_file)) {
-          div(class = "status-box status-warning",
-              icon("exclamation-triangle"), "No bookmarks found")
+          div(class = "alert alert-warning py-1 px-2 mb-0 small",
+              bsicons::bs_icon("exclamation-triangle-fill"), " No bookmarks found")
         }
       })
     }
@@ -289,7 +437,7 @@ houdini_app <- function() {
       showNotification(paste("Found", length(rtf_files), "RTF files."), type = "message")
     }
 
-    register_rtf_folder <- function(){
+    register_rtf_folder <- function() {
       # Show native folder picker button only when inside RStudio Desktop
       # (rstudioapi is in Suggests, so check it is installed before calling it)
       output$folder_picker_btn <- renderUI({
@@ -320,86 +468,32 @@ houdini_app <- function() {
       output$rtf_status <- renderUI({
         tbls <- available_tables()
         if (length(tbls) > 0) {
-          div(class = "status-box status-success",
-              icon("check-circle"), paste(length(tbls), "RTF files found"))
+          div(class = "alert alert-success py-1 px-2 mb-0 small",
+              bsicons::bs_icon("check-circle-fill"),
+              sprintf(" %d RTF files found", length(tbls)))
         }
       })
+
+
     }
 
+    # PREVIEW - row selection, filter panel, selection/output panes and the
+    # observers that persist filters and exclusions per row.
 
-    # Fill blank Bookmark/Table cells with their best fuzzy match against the
-    # loaded bookmark names / RTF table names. Never overwrites a non-empty cell.
-    # score_floor guards against filling unrelated sheets with noise (bulk button);
-    # pass 0 to always take the best guess (live per-row suggestion).
-    fill_suggestions <- function(df, score_floor = 0) {
-      bm_names <- names(available_bookmarks())
-      tbls     <- available_tables()
-      if (length(bm_names) == 0L && length(tbls) == 0L) return(df)
-
-      for (i in seq_len(nrow(df))) {
-        b <- trimws(df$Bookmark[i])
-        t <- trimws(df$Table[i])
-
-        if (nzchar(b) && !nzchar(t) && length(tbls) > 0L) {
-          m <- best_match(b, tbls)
-          if (!is.na(m$match) && m$score >= score_floor) df$Table[i] <- m$match
-        } else if (nzchar(t) && !nzchar(b) && length(bm_names) > 0L) {
-          m <- best_match(t, bm_names)
-          if (!is.na(m$match) && m$score >= score_floor) df$Bookmark[i] <- m$match
-        }
-      }
-      df
-    }
-
-
-    register_preview <- function(){
-      # ROW SELECTION -> load table info
-
+    register_preview <- function() {
       observeEvent(input$config_table_select, {
         sel <- input$config_table_select
         if (is.null(sel)) return()
 
-        df  <- config_data()
-        row <- sel$select$r
-
-        if (row > 0 && row <= nrow(df)) {
-          tbl_name <- df$Table[row]
-          paths    <- rtf_paths()
-
-          if (!is.null(tbl_name) && tbl_name != "" && tbl_name %in% names(paths)) {
-            current_table_name(tbl_name)
-            current_row_index(row)
-
-            # Load table info if not cached (skip for image RTFs - no table to inspect)
-            cache <- table_info_cache()
-            if (is.null(cache[[tbl_name]])) {
-              if (isTRUE(is_image_rtf(paths[[tbl_name]]))) {
-                # Sentinel so the cache entry exists and current_info() is non-NULL
-                cache[[tbl_name]] <- list(n_cols = 0L, n_rows = 0L,
-                                          col_names = character(),
-                                          parameters = character(),
-                                          timelines = character(),
-                                          is_image = TRUE)
-                table_info_cache(cache)
-              } else {
-                info <- tryCatch({
-                  table_info_from_pages(get_cached_pages(tbl_name))
-                }, error = function(e) {
-                  showNotification(paste("Error reading RTF:", conditionMessage(e)), type = "error")
-                  NULL
-                })
-                if (!is.null(info)) {
-                  cache[[tbl_name]] <- info
-                  table_info_cache(cache)
-                }
-              }
-            }
-
-          } else {
-            current_table_name(NULL)
-            current_row_index(NULL)
-          }
+        # Grid rows are positions in the (possibly filtered) view - translate back
+        # to the real config row index
+        keep <- visible_rows()
+        row  <- sel$select$r
+        if (is.null(row) || is.na(row)) return()
+        if (length(keep) < nrow(config_data()) && row >= 1L && row <= length(keep)) {
+          row <- keep[row]
         }
+        activate_config_row(row)
       })
 
       # Convenience reactive: current table info
@@ -414,18 +508,20 @@ houdini_app <- function() {
       output$filter_panel <- renderUI({
         info <- current_info()
         if (is.null(info) || isTRUE(info$is_image)) return(NULL)
-        #if (length(info$parameters) == 0L && length(info$timelines) == 0L) return(NULL)
-
-        prev          <- table_selections()[[as.character(current_row_index())]]
-
-        prev_params   <- prev$parameters %||% info$parameters
-        prev_tlines   <- prev$timelines  %||% info$timelines
-        prev_exc_cols <- prev$excluded_cols %||% integer()
+        # NULL means "no filter" and must stay NULL: defaulting to the full set
+        # here (and saving it back) would freeze the selection, silently dropping
+        # any parameter/timeline added when the RTF is later regenerated.
+        # An empty selectize renders its placeholder ("All parameters").
+        prev        <- table_selections()[[as.character(current_row_index())]]
+        prev_params   <- prev$parameters
+        prev_tlines   <- prev$timelines
+        prev_exc_cols <- prev$excluded_cols
         prev_exc_rows <- prev$excluded_rows
         prev_exc_hdrs <- prev$excluded_hdrs
 
-        div(class = "filter-panel",
-            h5("Filters"),
+        div(class = "border rounded p-2 mt-1",
+            div(class = "fw-semibold small mb-1",
+                bsicons::bs_icon("funnel"), " Filters"),
 
             if (length(info$parameters) > 0L) {
               selectizeInput(
@@ -440,25 +536,49 @@ houdini_app <- function() {
 
             if (length(info$timelines) > 0L) {
               selectizeInput(
-                "sel_timelines", "Timelines:",
+                "sel_timelines", "Timepoints:",
                 choices  = info$timelines,
                 selected = prev_tlines,
                 multiple = TRUE,
                 options  = list(plugins = list("remove_button"),
-                                placeholder = "All timelines")
+                                placeholder = "All timepoints")
               )
             },
 
             if (info$n_cols > 0L) {
               selectizeInput(
-                "sel_excluded_cols", "Excluded Columns:",
+                "preview_excluded_cols", "Excluded Columns:",
                 choices  = seq_len(info$n_cols),
                 selected = prev_exc_cols,
                 multiple = TRUE,
                 options  = list(plugins = list("remove_button"),
                                 placeholder = "No Columns Excluded")
               )
-            }
+            },
+
+            if (info$n_rows > 0L) {
+              selectizeInput(
+                "preview_excluded_rows", "Excluded Rows:",
+                choices  = seq_len(info$n_rows),
+                selected = prev_exc_rows,
+                multiple = TRUE,
+                options  = list(plugins = list("remove_button"),
+                                placeholder = "No Rows Excluded")
+              )
+            },
+
+            # if (info$n_hdrs > 0L) {
+            #   selectizeInput(
+            #     "preview_excluded_header_rows", "Excluded Headers:",
+            #     choices  = seq_len(info$n_hdrs),
+            #     selected = prev_exc_hdrs,
+            #     multiple = TRUE,
+            #     options  = list(plugins = list("remove_button"),
+            #                     placeholder = "No Headers Excluded")
+            #   )
+            # }
+
+
         )
       })
 
@@ -512,8 +632,8 @@ houdini_app <- function() {
             excluded_cols        = prev$excluded_cols,
             excluded_rows        = prev$excluded_rows,
             excluded_header_rows = prev$excluded_header_rows,
-            parameters           = input$sel_parameters %||% info$parameters,
-            timelines            = input$sel_timelines  %||% info$timelines
+            parameters           = input$sel_parameters,
+            timelines            = input$sel_timelines
           )
           table_selections(sels)
         },
@@ -631,6 +751,66 @@ houdini_app <- function() {
         )
       })
 
+      # Render an image RTF as a centred, scaled <img>
+      image_preview_ui <- function(path) {
+        img <- tryCatch(extract_png(path), error = function(e) NULL)
+        if (is.null(img)) {
+          return(div(class = "text-danger p-3", "Could not extract image."))
+        }
+        b64  <- paste0("data:image/png;base64,",
+                       base64enc::base64encode(img$png_bytes))
+        w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
+        h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
+        tags$div(
+          style = "text-align:center;",
+          tags$img(src = b64, style = paste0(
+            "max-width:100%;height:auto;",
+            if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
+            if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
+          ))
+        )
+      }
+
+      # Header line: which table, its shape, and any active filtering
+      output$preview_title <- renderUI({
+        tbl_name <- current_table_name()
+        if (is.null(tbl_name)) {
+          return(span(class = "text-secondary",
+                      bsicons::bs_icon("eye"), " Preview"))
+        }
+        info <- current_info()
+        row  <- current_row_index()
+        sel  <- table_selections()[[as.character(row)]] %||% list()
+
+        bits <- character()
+        if (!is.null(info) && !isTRUE(info$is_image)) {
+          bits <- c(bits, sprintf("%d cols \u00d7 %d rows", info$n_cols, info$n_rows))
+        }
+        n_excl <- length(sel$excluded_cols) + length(sel$excluded_rows) +
+          length(sel$excluded_header_rows)
+        if (n_excl > 0L) bits <- c(bits, sprintf("%d excluded", n_excl))
+        if (!is.null(sel$parameters)) {
+          bits <- c(bits, sprintf("%d param%s", length(sel$parameters),
+                                  if (length(sel$parameters) == 1L) "" else "s"))
+        }
+        if (!is.null(sel$timelines)) {
+          bits <- c(bits, sprintf("%d timeline%s", length(sel$timelines),
+                                  if (length(sel$timelines) == 1L) "" else "s"))
+        }
+
+        tagList(
+          span(class = "fw-semibold",
+               if (isTRUE(info$is_image)) bsicons::bs_icon("image")
+               else bsicons::bs_icon("table"),
+               " ", tbl_name),
+          if (length(bits) > 0L)
+            span(class = "hint ms-2", paste(bits, collapse = " \u00b7 "))
+        )
+      })
+
+      # Interactive pane: click headers/rows to exclude; excluded content is greyed
+      # rather than removed. Re-renders only when the table or its filters change,
+      # not on every click (the JS applies click feedback locally).
       output$selection_preview <- renderUI({
         key      <- selection_pane_key()
         tbl_name <- key$table
@@ -638,40 +818,23 @@ houdini_app <- function() {
         info     <- current_info()
 
         if (is.null(tbl_name) || !tbl_name %in% names(paths)) {
-          return(p(style = "color:#999;padding:20px;text-align:center;",
-                   "Select a row to preview"))
+          return(div(class = "text-secondary text-center p-4",
+                     bsicons::bs_icon("hand-index"),
+                     div(class = "mt-2", "Select a row to preview its table")))
         }
 
-        if (isTRUE(info$is_image)) {
-          img <- tryCatch(extract_png(paths[[tbl_name]]), error = function(e) NULL)
-          if (is.null(img))
-            return(HTML("<p style='color:red'>Could not extract image.</p>"))
-          b64 <- paste0("data:image/png;base64,",
-                        base64enc::base64encode(img$png_bytes))
-          w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
-          h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
-          img_style <- paste0(
-            "max-width:100%;height:auto;",
-            if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
-            if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
-          )
-          return(tags$div(style = "text-align:center;",
-                          tags$img(src = b64, style = img_style)))
-        }
+        if (isTRUE(info$is_image)) return(image_preview_ui(paths[[tbl_name]]))
 
         row <- current_row_index()
         sel <- table_selections()[[as.character(row)]] %||% list()
-        ec  <- sel$excluded_cols %||% integer()
-        er  <- sel$excluded_rows %||% integer()
-        eh  <- sel$excluded_header_rows %||% integer()
-
+        ec  <- as.integer(sel$excluded_cols        %||% integer())
+        er  <- as.integer(sel$excluded_rows        %||% integer())
+        eh  <- as.integer(sel$excluded_header_rows %||% integer())
 
         int_to_json <- function(x) {
           if (length(x) == 0L) return("[]")
           paste0("[", paste(x, collapse = ","), "]")
         }
-
-        cached_pages <- get_cached_pages(tbl_name)
 
         html_content <- tryCatch(
           get_table_html_selection(
@@ -681,10 +844,11 @@ houdini_app <- function() {
             excluded_header_rows = eh,
             parameters           = sel$parameters,
             timelines            = sel$timelines,
-            pages                = cached_pages
+            pages                = get_cached_pages(tbl_name),
+            row_limit            = if (isTRUE(input$sel_show_all)) Inf else 200L
           ),
           error = function(e) sprintf(
-            "<p style='color:red'>Selection error: %s</p>",
+            "<p class='text-danger'>Selection error: %s</p>",
             htmlEscape(conditionMessage(e))
           )
         )
@@ -701,61 +865,35 @@ houdini_app <- function() {
         )
       })
 
-      # Debounced exclusions for the output pane
-      raw_exclusions <- reactive({
-        list(
-          cols  = as.integer(input$preview_excluded_cols         %||% integer()),
-          rows  = as.integer(input$preview_excluded_rows         %||% integer()),
-          hdrs  = as.integer(input$preview_excluded_header_rows  %||% integer())
-        )
-      })
-      debounced_exclusions <- debounce(raw_exclusions, 300)
-
+      # Result pane: exactly what will be injected. Driven by the debounced live
+      # exclusions so it tracks clicks in the Selection pane without re-rendering
+      # on every one; falls back to stored selections when the row changes.
       output$output_preview <- renderUI({
         tbl_name <- current_table_name()
         paths    <- rtf_paths()
         info     <- current_info()
 
         if (is.null(tbl_name) || !tbl_name %in% names(paths)) {
-          return(p(style = "color:#999;padding:20px;text-align:center;",
-                   "No table selected"))
+          return(div(class = "text-secondary text-center p-4", "No table selected"))
         }
 
-        if (isTRUE(info$is_image)) {
-          img <- tryCatch(extract_png(paths[[tbl_name]]), error = function(e) NULL)
-          if (is.null(img))
-            return(HTML("<p style='color:red'>Could not extract image.</p>"))
-          b64 <- paste0("data:image/png;base64,",
-                        base64enc::base64encode(img$png_bytes))
-          w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
-          h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
-          img_style <- paste0(
-            "max-width:100%;height:auto;",
-            if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
-            if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
-          )
-          return(tags$div(style = "text-align:center;",
-                          tags$img(src = b64, style = img_style)))
-        }
+        if (isTRUE(info$is_image)) return(image_preview_ui(paths[[tbl_name]]))
 
-        excl <- debounced_exclusions()
-        row  <- current_row_index()
-        sel  <- table_selections()[[as.character(row)]] %||% list()
-
-        cached_pages <- get_cached_pages(tbl_name)
+        row <- current_row_index()
+        sel <- table_selections()[[as.character(row)]] %||% list()
 
         html_content <- tryCatch(
           get_table_html_output(
             paths[[tbl_name]],
-            excluded_cols        = excl$cols,
-            excluded_rows        = excl$rows,
-            excluded_header_rows = excl$hdrs,
+            excluded_cols        = as.integer(sel$excluded_cols        %||% integer()),
+            excluded_rows        = as.integer(sel$excluded_rows        %||% integer()),
+            excluded_header_rows = as.integer(sel$excluded_header_rows %||% integer()),
             parameters           = sel$parameters,
             timelines            = sel$timelines,
-            pages                = cached_pages
+            pages                = get_cached_pages(tbl_name)
           ),
           error = function(e) sprintf(
-            "<p style='color:red'>Output error: %s</p>",
+            "<p class='text-danger'>Output error: %s</p>",
             htmlEscape(conditionMessage(e))
           )
         )
@@ -765,21 +903,143 @@ houdini_app <- function() {
     }
 
 
+    # CONFIG TABLE
 
-    register_config_grid <- function(){
-      output$config_table <- renderRHandsontable({
+    # Fill blank Bookmark/Table cells with their best fuzzy match against the
+    # loaded bookmark names / RTF table names. Never overwrites a non-empty cell.
+    # score_floor guards against filling unrelated sheets with noise (bulk button);
+    # pass 0 to always take the best guess (live per-row suggestion).
+    fill_suggestions <- function(df, score_floor = 0) {
+      bm_names <- names(available_bookmarks())
+      tbls     <- available_tables()
+      if (length(bm_names) == 0L && length(tbls) == 0L) return(df)
+
+      for (i in seq_len(nrow(df))) {
+        b <- trimws(df$Bookmark[i])
+        t <- trimws(df$Table[i])
+
+        if (nzchar(b) && !nzchar(t) && length(tbls) > 0L) {
+          m <- best_match(b, tbls)
+          if (!is.na(m$match) && m$score >= score_floor) df$Table[i] <- m$match
+        } else if (nzchar(t) && !nzchar(b) && length(bm_names) > 0L) {
+          m <- best_match(t, bm_names)
+          if (!is.na(m$match) && m$score >= score_floor) df$Bookmark[i] <- m$match
+        }
+      }
+      df
+    }
+
+    # Per-row status for the grid's icon column, encoded "icon|tooltip".
+    # Generation outcome (from the last Download Result) wins for rows it
+    # covers; otherwise live validation supplies an error/warning icon.
+    row_status_values <- function(n) {
+      warns <- row_warnings()
+      gen   <- last_gen_status()
+      vapply(seq_len(n), function(i) {
+        key <- as.character(i)
+        if (!is.null(gen) && key %in% names(gen)) {
+          g <- gen[[key]]$err
+          if (is.null(g)) return("\u2714|Injected successfully on last generation")
+          msg <- if (inherits(g, "condition")) conditionMessage(g) else as.character(g)
+          return(paste0("\u2716|", msg))
+        }
+        w <- if (i <= length(warns)) warns[[i]] else NULL
+        if (!is.null(w) && nzchar(w$type)) {
+          icon <- if (w$type == "error") "\u2716" else "\u26A0"
+          return(paste0(icon, "|", w$msg))
+        }
+        "|"
+      }, character(1))
+    }
+
+    status_renderer <- "
+    function(instance, td, row, col, prop, value, cellProperties) {
+      var parts = String(value == null ? '' : value).split('|');
+      td.innerHTML = '';
+      td.textContent = parts[0];
+      td.title = parts.slice(1).join('|');
+      td.className = 'htCenter htMiddle';
+      td.style.cursor = parts[1] ? 'help' : '';
+      td.style.fontWeight = '700';
+      if (parts[0] === '\\u2716')      td.style.color = '#c00000';
+      else if (parts[0] === '\\u26a0') td.style.color = '#b8860b';
+      else if (parts[0] === '\\u2714') td.style.color = '#2a7a2a';
+      else                             td.style.color = '';
+      return td;
+    }"
+
+    # rhandsontable 0.3.8's hot_col(renderer=) applies the renderer to EVERY
+    # column, and all columns share one config object, so setting it on a single
+    # index leaks too. Rebuild the list with per-column copies and attach the
+    # renderer to just the target column.
+    hot_renderer_one <- function(hot, col_index, renderer) {
+      cols <- hot$x$columns
+      cols <- lapply(seq_along(cols), function(i) {
+        cc <- cols[[i]]
+        cc[names(cc)] <- cc[names(cc)]     # force an independent copy
+        if (i != col_index) cc$renderer <- NULL
+        cc
+      })
+      cols[[col_index]]$renderer <- htmlwidgets::JS(renderer)
+      hot$x$columns <- cols
+      hot
+    }
+
+    # Rows currently visible in the grid, honouring the search box. Returns the
+    # ORIGINAL row indices so selection, validation and selections stay keyed to
+    # the real config rows rather than filtered positions.
+    visible_rows <- reactive({
+      df <- config_data()
+      q  <- trimws(input$grid_search %||% "")
+      if (nrow(df) == 0L || !nzchar(q)) return(seq_len(nrow(df)))
+      hit <- grepl(q, df$Bookmark, ignore.case = TRUE, fixed = FALSE) |
+        grepl(q, df$Table,    ignore.case = TRUE, fixed = FALSE)
+      hit[is.na(hit)] <- FALSE
+      which(hit)
+    })
+
+    register_config_grid <- function() {
+      observeEvent(input$grid_search_clear, {
+        updateTextInput(session, "grid_search", value = "")
+      })
+
+      output$config_summary <- renderUI({
+        df <- config_data()
+        n  <- nrow(df)
+        complete <- sum(nzchar(trimws(df$Bookmark)) & nzchar(trimws(df$Table)))
+        vis <- length(visible_rows())
+        span(class = "hint",
+             if (vis < n) sprintf("%d shown \u00b7 %d of %d mapped", vis, complete, n)
+             else sprintf("%d of %d mapped", complete, n))
+      })
+
+      output$config_table <- rhandsontable::renderRHandsontable({
         df <- config_data()
         if (nrow(df) == 0) {
           df <- data.frame(Bookmark = rep("", 5), Table = rep("", 5),
                            stringsAsFactors = FALSE)
         }
 
+        status <- row_status_values(nrow(df))
+        keep   <- visible_rows()
+        if (length(keep) == 0L) keep <- integer()
+
+        df <- cbind(
+          data.frame(` ` = status, check.names = FALSE, stringsAsFactors = FALSE),
+          df
+        )
+        # Filtered view: show only matching rows, labelled with their real numbers
+        if (length(keep) < nrow(df)) {
+          df <- df[keep, , drop = FALSE]
+          rownames(df) <- as.character(keep)
+        }
+
         bm  <- available_bookmarks()
         tbl <- available_tables()
 
-        hot <- rhandsontable(df, rowHeaders = TRUE, selectCallback = TRUE,
-                             overflow = "visible") |>
-          hot_cols(colWidths = c(180, 180))
+        hot <- rhandsontable::rhandsontable(df, rowHeaders = TRUE, selectCallback = TRUE,
+                             overflow = "visible", height = 420) |>
+          hot_cols(colWidths = c(30, 170, 170))
 
         hot <- if (length(bm) > 0) {
           hot |> hot_col("Bookmark", type = "dropdown", source = c("", names(bm)), strict = FALSE)
@@ -793,12 +1053,28 @@ houdini_app <- function() {
           hot |> hot_col("Table", type = "text")
         }
 
-        hot
+        # Status column last: read-only plus the isolated icon renderer
+        hot <- hot |> hot_col(1, readOnly = TRUE)
+        hot_renderer_one(hot, 1L, status_renderer)
       })
 
       observeEvent(input$config_table, {
         if (is.null(input$config_table)) return()
-        df <- hot_to_r(input$config_table)
+        edited <- hot_to_r(input$config_table)
+        edited[[" "]] <- NULL          # status column is display-only
+        edited$Status <- NULL          # tolerate either name
+
+        # The grid may be showing a filtered subset; merge edits back into the
+        # full config at their original row positions so hidden rows survive.
+        full <- config_data()
+        keep <- isolate(visible_rows())
+        if (nrow(full) > 0L && length(keep) == nrow(edited) && length(keep) < nrow(full)) {
+          full[keep, c("Bookmark", "Table")] <- edited[, c("Bookmark", "Table")]
+          df <- full
+        } else {
+          df <- edited
+        }
+
         # Live per-row suggestion: fill a blank partner cell for any row where the
         # other cell was just set. Blank-only + change-detection keeps this stable
         # (the re-render feeds back through this observer but produces no new change).
@@ -826,8 +1102,7 @@ houdini_app <- function() {
       })
 
       observeEvent(input$fill_bookmarks, {
-
-        bm_names <- names(available_bookmarks())[grepl("(^[Tt]able)|(^[Ff]igure)",names(available_bookmarks()))]
+        bm_names <- names(available_bookmarks())
         if (length(bm_names) == 0L) {
           showNotification("Load a Word document with bookmarks first", type = "warning")
           return()
@@ -871,18 +1146,25 @@ houdini_app <- function() {
       observeEvent(input$remove_row, {
         df <- config_data()
         if (nrow(df) > 1) {
-          removed <- nrow(df)
+          # Remove the selected row if there is one, otherwise the last row
+          removed <- current_row_index() %||% nrow(df)
+          if (removed > nrow(df)) removed <- nrow(df)
           config_data(df[-removed, , drop = FALSE])
-          # Drop the removed row's selections so a later Add Row doesn't inherit them
-          sels <- table_selections()
-          if (!is.null(sels[[as.character(removed)]])) {
-            sels[[as.character(removed)]] <- NULL
-            table_selections(sels)
+          # Selections are keyed by row index: drop the removed row's entry and
+          # shift every later row's entry up one so they stay with their rows
+          sels     <- table_selections()
+          new_sels <- list()
+          for (key in names(sels)) {
+            k <- as.integer(key)
+            if (k < removed) {
+              new_sels[[key]] <- sels[[key]]
+            } else if (k > removed) {
+              new_sels[[as.character(k - 1L)]] <- sels[[key]]
+            }
           }
-          if (identical(current_row_index(), removed)) {
-            current_row_index(NULL)
-            current_table_name(NULL)
-          }
+          table_selections(new_sels)
+          current_row_index(NULL)
+          current_table_name(NULL)
         }
       })
 
@@ -890,6 +1172,10 @@ houdini_app <- function() {
         config_data(data.frame(Bookmark = rep("", 5), Table = rep("", 5),
                                stringsAsFactors = FALSE))
         table_selections(list())
+        # Clear the active row too, or the preview panes keep showing a table
+        # from a row that no longer exists
+        current_row_index(NULL)
+        current_table_name(NULL)
       })
 
 
@@ -899,134 +1185,30 @@ houdini_app <- function() {
         req(input$import_excel)
         path <- input$import_excel$datapath
 
-        imported <- read_xlsx(path)
+        xl <- tryCatch(
+          read_xlsx(path),
+          error = function(e) {
+            showNotification(paste("Could not read Excel file:", conditionMessage(e)), type = "error")
+            NULL
+          }
+        )
+        if (is.null(xl)) return()
 
-        new_config <- imported$config
-        config_data(new_config)
-
-
-        table_selections(imported$selections)
+        # Fresh config and selections - discard any previous state
+        config_data(xl$config)
+        table_selections(xl$selections)
         showNotification(
-          paste("Imported", nrow(new_config), "rows from Excel"), type = "message"
+          paste("Imported", nrow(xl$config), "rows from Excel"), type = "message"
         )
       })
     }
 
+    # PER-ROW VALIDATION
 
-
-
-
-    register_downloads <- function(){
-      # LOG DOWNLOAD
-
-      output$download_log <- downloadHandler(
-        filename = function() {
-          paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
-        },
-        content = function(file) {
-          df    <- config_data()
-          sels  <- table_selections()
-          paths <- rtf_paths()
-          status <- last_gen_status()
-
-          lines <- write_log(input$word_file$name, "Imported File", df, sels, status, rtf_folder_path())
-          writeLines(lines, file)
-        }
-      )
-
-      # EXCEL EXPORT
-
-      output$export_excel <- downloadHandler(
-        filename = function() {
-          paste0("houdini_config_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
-        },
-        content = function(file) {
-          df   <- config_data()
-          sels <- table_selections()
-
-          semi_join <- function(x) if (length(x) == 0L || is.null(x)) "" else paste(x, collapse = "; ")
-
-          out <- data.frame(
-            Bookmark   = df$Bookmark,
-            Dataset      = ifelse(nzchar(df$Table), paste0(df$Table, ".rtf"), df$Table),
-            Parameters = vapply(seq_len(nrow(df)), function(i) {
-              semi_join(sels[[as.character(i)]]$parameters)
-            }, character(1)),
-            Timepoints  = vapply(seq_len(nrow(df)), function(i) {
-              semi_join(sels[[as.character(i)]]$timelines)
-            }, character(1)),
-            stringsAsFactors = FALSE
-          )
-
-          writexl::write_xlsx(out, file)
-        }
-      )
-
-      # DOCUMENT GENERATION
-
-      output$download_result <- downloadHandler(
-        filename = function() {
-          if (!is.null(input$word_file)) paste0("Houdini_Output_",input$word_file$name)
-          else "output.docx"
-        },
-        content = function(file) {
-          req(input$word_file)
-
-          config <- config_data()
-          keep   <- which(nzchar(trimws(config$Bookmark)) & nzchar(trimws(config$Table)))
-          config <- config[keep, , drop = FALSE]
-
-          if (nrow(config) == 0L) {
-            showNotification("No table mappings defined", type = "error"); return()
-          }
-
-          # Selections are keyed by original grid row index; re-key them to match
-          # the filtered config so blank rows above don't shift them onto the
-          # wrong tables.
-          all_sels <- table_selections()
-          selections <- setNames(
-            lapply(keep, function(i) all_sels[[as.character(i)]]),
-            as.character(seq_along(keep))
-          )
-
-          n_rows <- nrow(config)
-          status <- tryCatch(
-            withProgress(
-              message = "Generating document\u2026",
-              value   = 0,
-              {
-                process_document(
-                  word_path   = input$word_file$datapath,
-                  config      = config,
-                  rtf_paths   = rtf_paths(),
-                  selections  = selections,
-                  output_path = file,
-                  progress_cb = function(i, n, msg) {
-                    incProgress(1 / n, detail = msg)
-                  }
-                )
-              }
-            ),
-            error = function(e) {
-              showNotification(paste("Error generating document:", conditionMessage(e)), type = "error")
-              NULL
-            }
-          )
-          # process_document keys status by filtered row position; map back to
-          # original grid rows so the log pairs errors with the right rows
-          if (!is.null(status)) names(status) <- as.character(keep)
-          last_gen_status(status)
-        }
-      )
-    }
-
-
-    register_validation <- function(){
-      # PER-ROW VALIDATION
-
-      # Returns a list of length nrow(config_data()).
-      # Each element: list(type = "error"|"warning"|"", msg = "plain text message")
-      row_warnings <- reactive({
+    # Returns a list of length nrow(config_data()).
+    # Each element: list(type = "error"|"warning"|"", msg = "plain text message")
+    register_validation <- function() {
+      row_warnings <<- reactive({
         df    <- config_data()
         bm    <- available_bookmarks()
         bmctx <- bookmarks_contexts(bm)
@@ -1070,9 +1252,10 @@ houdini_app <- function() {
             hints  <- c(hints,  e$hint)
           }
 
-          #Bookmark exists but sits in a table cell
-          if(nzchar(bm_val) && bm_val %in% names(bm) && !identical(bmctx[[bm_val]], "body") && !is.null(bmctx[[bm_val]])){
-            e <- err_bookmark_bad_context(bm_val,bmctx[[bm_val]])
+          # Bookmark exists but sits in a table cell or text box
+          if (nzchar(bm_val) && bm_val %in% names(bm) &&
+              !identical(bmctx[[bm_val]], "body") && !is.null(bmctx[[bm_val]])) {
+            e <- err_bookmark_bad_context(bm_val, bmctx[[bm_val]])
             errors <- c(errors, conditionMessage(e))
             hints  <- c(hints,  e$hint)
           }
@@ -1092,7 +1275,7 @@ houdini_app <- function() {
             hints  <- c(hints,  e$hint)
           }
 
-          # Same RTF mapped to multiple bookmarks (warning only - may be intentional)
+          # Same RTF mapped to multiple bookmarks (warning only — may be intentional)
           if (nzchar(tbl_val) && tbl_val %in% dup_tables) {
             dup_rows <- which(all_tbl_vals == tbl_val)
             warnings <- c(warnings, sprintf(
@@ -1164,10 +1347,8 @@ houdini_app <- function() {
           if (!nzchar(w$type)) return(NULL)
 
           is_error <- w$type == "error"
-          bg  <- if (is_error) "#f8d7da" else "#fff3cd"
-          bdr <- if (is_error) "#f5c2c7" else "#ffecb5"
-          ico <- if (is_error) "\u26a0" else "\u26a0"
-          lbl <- if (is_error) "Error" else "Warning"
+          cls <- if (is_error) "alert-danger" else "alert-warning"
+          ico <- if (is_error) "x-octagon-fill" else "exclamation-triangle-fill"
 
           bm_val  <- trimws(df$Bookmark[i])
           tbl_val <- trimws(df$Table[i])
@@ -1175,25 +1356,148 @@ houdini_app <- function() {
                             if (nzchar(bm_val))  paste0(" \u2013 ", bm_val)  else "",
                             if (nzchar(tbl_val)) paste0(" / ", tbl_val) else "")
 
-          div(style = sprintf(
-            "padding:5px 8px;margin-bottom:4px;border-radius:4px;
-             background:%s;border:1px solid %s;font-size:0.82em;", bg, bdr),
-            strong(paste0(ico, " ", lbl, ": ")), row_lbl,
-            tags$br(),
-            span(style = "color:#555;", w$msg),
-            if (!is.null(w$hint)) tagList(tags$br(),
-                                          span(style = "color:#777;font-style:italic;", paste0("Hint: ", w$hint))
-            )
+          # Clicking a warning jumps to the offending row
+          div(class = paste("alert py-1 px-2 mb-1 small", cls),
+              style = "cursor:pointer;",
+              onclick = sprintf(
+                "Shiny.setInputValue('warning_row_click', %d, {priority:'event'})", i),
+              div(class = "fw-semibold",
+                  bsicons::bs_icon(ico), " ", row_lbl),
+              div(w$msg),
+              if (!is.null(w$hint))
+                div(class = "fst-italic opacity-75", paste0("Hint: ", w$hint))
           )
         })
 
         items <- Filter(Negate(is.null), items)
-        if (length(items) == 0L) return(NULL)
+        if (length(items) == 0L) {
+          return(div(class = "hint",
+                     bsicons::bs_icon("check-circle"), " No validation issues"))
+        }
 
-        div(style = "margin-top:12px;max-height:350px;overflow-y:auto;",
-            h5(style = "margin:0 0 6px;font-size:0.9em;color:#666;", "Validation warnings"),
-            items)
+        div(style = "max-height:320px;overflow-y:auto;", items)
       })
+
+      # Jump to the row a validation message refers to
+      observeEvent(input$warning_row_click, {
+        activate_config_row(input$warning_row_click)
+      })
+    }
+
+
+
+
+
+
+
+    # DOWNLOADS - log, Excel export, and document generation handlers.
+
+    register_downloads <- function() {
+      output$download_log <- downloadHandler(
+        filename = function() {
+          paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
+        },
+        content = function(file) {
+          df    <- config_data()
+          sels  <- table_selections()
+          paths <- rtf_paths()
+          status <- last_gen_status()
+
+          lines <- write_log(input$word_file$name, "Imported File", df, sels, status, rtf_folder_path())
+          writeLines(lines, file)
+        }
+      )
+
+      # EXCEL EXPORT
+
+      output$export_excel <- downloadHandler(
+
+        filename = function() {
+          paste0("houdini_config_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+        },
+        content = function(file) {
+          df   <- config_data()
+          sels <- table_selections()
+
+          semi_join <- function(x) if (length(x) == 0L || is.null(x)) "" else paste(x, collapse = "; ")
+
+          sel_col <- function(field) {
+            vapply(seq_len(nrow(df)), function(i) {
+              semi_join(sels[[as.character(i)]][[field]])
+            }, character(1))
+          }
+
+          out <- data.frame(
+            Bookmark           = df$Bookmark,
+            Dataset            = ifelse(nzchar(df$Table), paste0(df$Table, ".rtf"), df$Table),
+            Parameters         = sel_col("parameters"),
+            Timepoints          = sel_col("timelines"),
+            ExcludedColumns    = sel_col("excluded_cols"),
+            ExcludedRows       = sel_col("excluded_rows"),
+            ExcludedHeaderRows = sel_col("excluded_header_rows"),
+            stringsAsFactors   = FALSE
+          )
+
+          writexl::write_xlsx(out, file)
+        }
+      )
+
+      # DOCUMENT GENERATION
+
+      output$download_result <- downloadHandler(
+        filename = function() {
+          if (!is.null(input$word_file)) paste0("Houdini_Output_",input$word_file$name)
+          else "output.docx"
+        },
+        content = function(file) {
+          req(input$word_file)
+
+          config <- config_data()
+          keep   <- which(nzchar(trimws(config$Bookmark)) & nzchar(trimws(config$Table)))
+          config <- config[keep, , drop = FALSE]
+
+          if (nrow(config) == 0L) {
+            showNotification("No table mappings defined", type = "error"); return()
+          }
+
+          # Selections are keyed by original grid row index; re-key them to match
+          # the filtered config so blank rows above don't shift them onto the
+          # wrong tables.
+          all_sels <- table_selections()
+          selections <- setNames(
+            lapply(keep, function(i) all_sels[[as.character(i)]]),
+            as.character(seq_along(keep))
+          )
+
+          n_rows <- nrow(config)
+          status <- tryCatch(
+            withProgress(
+              message = "Generating document\u2026",
+              value   = 0,
+              {
+                process_document(
+                  word_path   = input$word_file$datapath,
+                  config      = config,
+                  rtf_paths   = rtf_paths(),
+                  selections  = selections,
+                  output_path = file,
+                  progress_cb = function(i, n, msg) {
+                    incProgress(1 / n, detail = msg)
+                  }
+                )
+              }
+            ),
+            error = function(e) {
+              showNotification(paste("Error generating document:", conditionMessage(e)), type = "error")
+              NULL
+            }
+          )
+          # process_document keys status by filtered row position; map back to
+          # original grid rows so the log pairs errors with the right rows
+          if (!is.null(status)) names(status) <- as.character(keep)
+          last_gen_status(status)
+        }
+      )
     }
 
     register_word_file()
@@ -1202,7 +1506,6 @@ houdini_app <- function() {
     register_validation()
     register_preview()
     register_downloads()
-
   }
 
   shiny::shinyApp(ui, server)
