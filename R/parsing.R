@@ -859,7 +859,7 @@ resolve_cols <- function(cols, n_cols_total, header) {
   cols_int <- suppressWarnings(as.integer(cols))
   if (anyNA(cols_int)) {
     ref_names <- if (block_nrow(header) > 0L) {
-      header$text[1L, header$present[1L, ]]
+      header$text[block_nrow(header), ]
     } else character()
     cols_int <- match(as.character(cols), ref_names)
     cols_int <- cols_int[!is.na(cols_int)]
