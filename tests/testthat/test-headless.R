@@ -48,8 +48,8 @@ test_that("apparate injects from a config workbook end to end", {
 
   status <- apparate(docx, cfg_xl, rtf_dir, quiet = TRUE)
 
-  expect_true(all(vapply(status, is.null, logical(1))))
-  expect_true(file.exists(out))
+  expect_true(all(vapply(status, function(s) is.null(s$err), logical(1))))
+  expect_true(file.exists(paste0(docx,"_Houdini_Output.docx", collapse="")))
 
   doc <- read_docx_document(paste0(docx,"_Houdini_Output.docx", collapse=""))
   expect_match(doc, "<w:tbl[ >]")
@@ -73,7 +73,7 @@ test_that("apparate accepts a data.frame config and reports row errors", {
     Dataset    = c("tbl", "tbl"),
     stringsAsFactors = FALSE
   )
-  status <- apparate(docx, config, rtf_dir,quiet = TRUE)
+  status <- apparate(docx, config, rtf_dir, quiet = TRUE)
 
   expect_null(status[["1"]]$err)
   expect_s3_class(status[["2"]]$err, "houdini_error")

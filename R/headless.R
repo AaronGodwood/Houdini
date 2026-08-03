@@ -147,15 +147,23 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
 
   #runs main process and logs results
 
-  output_path <-  paste0(getwd(),"/",input_doc,"_Houdini_Output.docx", collapse = "")
+  output_path <-  if(grepl("^//", input_doc)){
+    paste0(getwd(),"/",input_doc,"_Houdini_Output.docx", collapse = "")
+  } else{
+    paste0(input_doc, "_Houdini_Output.docx", collapse = "")
+  }
 
   status <- process_document(input_doc, cfg, rtf_paths, sels, output_path,
                              progress_cb = cb)
 
   path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
-  lines <- write_log(input_doc, input_sheet, cfg ,sels, status, file_location)
-  writeLines(lines, path)
+  if(!quiet){
+    lines <- write_log(input_doc, input_sheet, cfg ,sels, status, file_location)
+    writeLines(lines, path)
+  }
 
+
+  invisible(status)
 }
 
 #ouputs the collected log data over a run
@@ -262,7 +270,7 @@ houdini_watch <- function(input_doc, input_sheet, file_location,
       message("Change detected at ", format(Sys.time(), "%H:%M:%S"),
               " - regenerating")
       tryCatch(
-        houdini_run(input_doc, input_sheet, file_location),
+        apparate(input_doc, input_sheet, file_location),
         error = function(e) message("Generation failed: ", conditionMessage(e))
       )
     }
