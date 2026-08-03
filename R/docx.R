@@ -158,7 +158,11 @@ open_docx <- function(docx_path) {
   # Detect next available image index from existing media files
   media_dir   <- file.path(tmp, "word", "media")
   existing    <- if (dir.exists(media_dir)) list.files(media_dir, pattern = "\\.png$") else character()
-  next_img_id <- length(existing) + 1L
+  existing_ids <- suppressWarnings(as.integer(
+    sub("^image([0-9]+)\\..*$", "\\1", existing[grepl("^image[0-9]+\\.", existing)])
+  ))
+  existing_ids <- existing_ids[!is.na(existing_ids)]
+  next_img_id  <- if (length(existing_ids) > 0L) max(existing_ids) + 1L else 1L
 
   # Text width in EMU (read once, used by every inject_image call)
   text_width_emu <- docx_text_width_emu(doc)
@@ -217,7 +221,7 @@ inject_table <- function(session, bookmark_name, xml_string) {
     stop(err_bookmark_bad_context(bookmark_name, entry$context))
   }
 
-  add_xml(entry$para, read_xml(xml_string), where = "on") ##For table replacement use add_xml() as a guide (currently has lots of cursor tracking stuff in it thats not needed)
+  insert_or_replace(session, entry$para, read_xml(xml_string), where = "on")
   invisible(TRUE)
 }
 
@@ -297,6 +301,8 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
     target_h_emu <- target_w_emu
   }
 
+
+
   # Capture id before add_image_relationship increments the counter
   img_id <- session$next_img_id
   rel_id <- add_image_relationship(session, png_bytes)
@@ -339,11 +345,11 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
     target_w_emu, target_h_emu   # a:ext
   )
 
-  xml_add_sibling(para_node, read_xml(drawing_xml), .where = "after") ## similarly to above use add_xml as a guide for replacement
+  insert_or_replace(session, para_node, read_xml(drawing_xml), where = "on") ## similarly to above use add_xml as a guide for replacement
   invisible(TRUE)
 }
 
-add_xml <- function(node, xml_block, where = "after"){
+insert_or_replace <- function(session, node, xml_block, where = "after"){
 
   #next_bmk_id <- session$next_bmk_id
   #session$next_bmk_id <- session$next_bmk_id + 1L
@@ -353,6 +359,7 @@ add_xml <- function(node, xml_block, where = "after"){
     next_node <- xml_find_first(node,"following-sibling::*[1]")
 
     if(xml_name(next_node) == "tbl" || !is.na(xml_child(next_node, ".//w:drawing"))){
+      cleanup_image_rels(session, next_node)
       xml_replace(next_node,xml_block)
       #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "before")
       #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkEnd w:xmlns="%s" w:id="%d"/>',W_NS,next_bmk_id)), .where = "after")
@@ -371,7 +378,30 @@ add_xml <- function(node, xml_block, where = "after"){
 }
 
 
+# Remove image relationships (and their media files) referenced by nodes
+# that are about to be deleted, so replaced images don't accumulate.
+cleanup_image_rels <- function(session, node) {
+  A_NS <- "http://schemas.openxmlformats.org/drawingml/2006/main"
 
+  blips <- xml_find_all(node, ".//a:blip", ns = c(a = A_NS))
+  for (blip in blips) {
+    rid <- xml_attr(blip, "embed")
+    if (is.na(rid)) next
+    rel <- xml_find_first(
+      session$rels_doc,
+      sprintf(".//r:Relationship[@Id='%s']", rid),
+      ns = c(r = REL_NS)
+    )
+    if (inherits(rel, "xml_missing")) next
+    target <- xml_attr(rel, "Target")
+    if (!is.na(target)) {
+      media_file <- file.path(session$tmp_dir, "word", target)
+      if (file.exists(media_file)) unlink(media_file)
+    }
+    xml_remove(rel)
+  }
+
+}
 
 
 
