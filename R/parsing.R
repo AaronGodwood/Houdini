@@ -206,7 +206,7 @@ remove_group <- function(text, tag) {
     if (is.na(end_pos)) break
 
     text <- paste0(substr(text, 1L, brace_pos - 1L),
-                   substr(text, end_pos + 1L, nchar(text)))
+                   substr(text, end_pos, nchar(text)))
   }
   text
 }
@@ -709,7 +709,7 @@ rtf_cell_to_text <- function(raw) {
 parse_page <- function(page_text){
   # Extract header and footer groups, remaining is body
   header_text <- extract_group(page_text, "\\header")
-  footer_text <- extract_group(page_text, "\\footer") # TODO make use of footer -- worked in old tokeniser
+  footer_text <- extract_group(page_text, "\\footer")
 
   body_text <- remove_groups(page_text, c(
     "\\header", "\\footer", "\\fonttbl", "\\colortbl","\\stylesheet","\\info"))

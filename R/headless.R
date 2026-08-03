@@ -147,7 +147,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
 
   #runs main process and logs results
 
-  output_path <-  if(grepl("^//", input_doc)){
+  output_path <-  if(!grepl("^/", input_doc)){
     paste0(getwd(),"/",input_doc,"_Houdini_Output.docx", collapse = "")
   } else{
     paste0(input_doc, "_Houdini_Output.docx", collapse = "")
@@ -218,7 +218,10 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
                    paste0("Bookmark  : ", bm_val),
                    paste0("Table     : ", tbl_val, ".rtf"),
                    paste0("Parameters: ", fmt_vec(sel$parameters)),
-                   paste0("Timepoints: ", fmt_vec(sel$timelines))
+                   paste0("Timepoints: ", fmt_vec(sel$timelines)),
+                   paste0("Excluded Columns: ", fmt_vec(sel$excluded_cols, none = "(none)")),
+                   paste0("Excluded Rows: ", fmt_vec(sel$excluded_rows, none = "(none)"))
+
         )
 
         if(!is.null(warn) && length(warn) > 0){
