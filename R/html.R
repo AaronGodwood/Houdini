@@ -33,7 +33,7 @@ html_header_row <- function(b, r, is_last_header) {
     has_text <- nzchar(trimws(b$text[r, ci]))
     border   <- if (is_last_header || has_text) "border-bottom:2px solid black;" else ""
     align    <- paste0("vertical-align: bottom; text-align:", cell_align_or_default(b$align[r, ci], ci))
-    style    <- sprintf(" style=\"%spadding:0;%s\"", border, align)
+    style    <- sprintf(" style=\"%spadding:0;white-space:pre;%s\"", border, align)
     cells[ci] <- sprintf("<th%s%s><b>%s</b></th>",
                          span_attr, style, htmlEscape(b$text[r, ci]))
   }
@@ -52,7 +52,7 @@ html_data_row <- function(b, r, is_last_data) {
     if (span == 0L) next                        # merge continuation, skip
     span_attr <- if (span > 1L) sprintf(" colspan=\"%d\"", span) else ""
     align <- paste0("text-align:", cell_align_or_default(b$align[r, ci], ci))
-    style <- trimws(paste0(border_style, "padding:0;", align), which = "left")
+    style <- trimws(paste0(border_style, "padding:0;white-space:pre;", align), which = "left")
     cells[ci] <- sprintf("<td%s style=\"%s\">%s</td>",
                          span_attr, style, htmlEscape(b$text[r, ci]))
   }
@@ -64,7 +64,7 @@ html_data_row <- function(b, r, is_last_data) {
 # Build HTML from a combined table object (output of combine_pages())
 # cols: integer vector of column indices to include (NULL = all)
 # row_start / row_end: 1-based data row range (NULL = all)
-build_html <- function(combined, cols = NULL, row_start = NULL, row_end = NULL) {
+build_html <- function(combined, cols = NULL, row_start = NULL, row_end = NULL, hide_data = FALSE) {
   header           <- combined$header
   data             <- combined$data
   col_widths_twips <- combined$col_widths_twips
@@ -183,7 +183,7 @@ build_html_selection <- function(combined,
       raw_align <- cell_align_or_default(header$align[ri, ci], ci)
       opacity   <- if (col_excl || row_excl) "opacity:0.3;" else ""
       style     <- sprintf(
-        " style=\"%s%spadding:0;vertical-align: bottom;text-align:%s;cursor:pointer\"",
+        " style=\"%s%spadding:0;white-space:pre;vertical-align: bottom;text-align:%s;cursor:pointer\"",
         border, opacity, raw_align
       )
       cells[ci] <- sprintf(
@@ -236,9 +236,10 @@ build_html_selection <- function(combined,
       opacity   <- if (col_excl || row_excl) "opacity:0.3;" else ""
       raw_align <- cell_align_or_default(data$align[ri, ci], ci)
       style <- sprintf(
-        " style=\"%s%spadding:0;text-align:%s\"",
+        " style=\"%s%spadding:0;white-space:pre;;text-align:%s\"",
         border_style, opacity, raw_align
       )
+
       cells[ci] <- sprintf(
         "<td%s%s data-col='%s'>%s</td>",
         span_attr, style, dc, htmlEscape(data$text[ri, ci])
