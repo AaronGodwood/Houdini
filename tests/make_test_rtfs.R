@@ -261,6 +261,46 @@ make_rtf_combined_filters <- function(path) {
 }
 
 
+# =========================================================
+# FIXTURE 5: Multi indent level RTF
+# =========================================================
+
+make_rtf_levels <- function(path){
+
+  wl <- 2160L; wd <- 1440L
+
+  hdr <- rtf_row(list(
+    cell("Trick Class{\\line}\n    Trick name/names", wl, bold = TRUE, align = "l"),
+    cell("Baseline",                          wd, bold = TRUE),
+    cell("2 min Escape",                      wd, bold = TRUE),
+    cell("10 min Escape",                     wd, bold = TRUE)
+  ), trhdr = TRUE)
+
+  data_rows <- function() {
+    paste0(
+      rtf_row(list(cell("Illusions", wl, align = "l"), cell("52", wd), cell(12.2, wd), cell("24.1", wd))),
+      rtf_row(list(cell("    Appirition", wl, align = "l"), cell("49", wd), cell(14.7, wd), cell("22.7", wd))),
+      rtf_row(list(cell("    Dissapearance", wl, align = "l"), cell("34", wd), cell(15.2, wd), cell("18.1", wd))),
+      rtf_row(list(cell("", wl+3*wd))),
+      rtf_row(list(cell("Escapism", wl, align = "l"), cell("52", wd), cell(12.2, wd), cell("24.1", wd))),
+      rtf_row(list(cell("    Straight Jacket", wl, align = "l"), cell("49", wd), cell(14.7, wd), cell("22.7", wd))),
+      rtf_row(list(cell("    Handcuffs", wl, align = "l"), cell("34", wd), cell(15.2, wd), cell("18.1", wd)))
+    , collapse = "")
+  }
+
+  page <- paste(
+    rtf_sectd(),
+    rtf_header_section(parameter = "Audience Noise (DB)"),
+    rtf_footer_section("Page 1"),
+    hdr, data_rows(),
+    sep = "\r\n"
+  )
+
+  writeLines(rtf_document(list(page)), path, useBytes = FALSE)
+  invisible(path)
+}
+
+
 
 # ============================================================
 # FIXTURE 6: Image RTF (PNG embedded via \pngblip)
@@ -401,6 +441,7 @@ make_test_rtfs <- function(output_dir = "tests/testthat/fixtures") {
     "multi_timeline.rtf"    = make_rtf_multi_timeline,
     "combined_filters.rtf"  = make_rtf_combined_filters,
     "merged_headers.rtf"    = make_rtf_span_by_width,
+    "multi_levels.rtf"      = make_rtf_levels,
     "image.rtf"             = make_rtf_image,
     "escapes.rtf"           = make_rtf_escapes
   )

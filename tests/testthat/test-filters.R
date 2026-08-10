@@ -20,15 +20,33 @@ test_that("filter_timelines keeps only the selected blocks", {
   pages <- parse_rtf(test_path("fixtures", "multi_timeline.rtf"))
   combined <- combine_pages(pages)
 
-  kept <- filter_timelines(combined, "Week 4")
+  kept <- filter_timelines(combined, "Week 4")$combined
   # Page 1 holds Week 1 and Week 4; only the Week 4 block (label + 2 rows) stays
-  expect_identical(block_nrow(kept[[1]]$data), 3L)
-  expect_identical(kept[[1]]$data$text[1L, 1L], "Week 4")
-  # Page 2 (Week 8 / Week 12) loses everything
-  expect_identical(block_nrow(kept[[2]]$data), 0L)
+  expect_identical(block_nrow(kept$data), 3L)
+  expect_identical(kept$data$text[1L, 1L], "Week 4")
+
 
   # No filter -> unchanged
   expect_identical(filter_timelines(combined, NULL)$combined, combined)
+})
+
+test_that("filter_levels keeps only selected indents", {
+  pages <- parse_rtf(test_path("fixtures", "multi_levels.rtf"))
+  combined <- combine_pages(pages)
+
+  kept_level1 <- filter_levels(combined, "Trick Class")$combined
+  # Expect to keep 2 level 1 rows and 1 blank row
+  expect_identical(block_nrow(kept_level1$data), 3L)
+  expect_identical(kept_level1$data$text[1L, 1L], "Illusions")
+
+  kept_level2 <- filter_levels(combined, "Trick name/names")$combined
+  # Expect to keep 4 level 2 rows and 1 blank row
+  expect_identical(block_nrow(kept_level2$data), 5L)
+  expect_identical(kept_level2$data$text[1L, 1L], "    Appirition")
+
+
+  # No filter -> unchanged
+  expect_identical(filter_levels(combined, NULL)$combined, combined)
 })
 
 
