@@ -252,8 +252,8 @@ make_rtf_combined_filters <- function(path) {
   }
 
   pages <- list(
-    make_param_page("Cholesterol",   1L),
-    make_param_page("Triglycerides", 2L)
+    make_param_page("Audience Noise (DB)",   1L),
+    make_param_page("Clap Density", 2L)
   )
 
   writeLines(rtf_document(pages), path, useBytes = FALSE)
