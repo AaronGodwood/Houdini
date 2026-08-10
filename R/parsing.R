@@ -383,7 +383,6 @@ fint <- if (getRversion() >= "4.3.0") {
   findInterval
 }
 
-
 # Start positions of all matches of `pattern`, ascending; numeric(0) if none.
 # Doubles, not integers, so fint() avoids a per-call as.double copy.
 token_positions <- function(text, pattern) {
@@ -460,7 +459,7 @@ grid_align_row <- function(texts, aligns, flag_first, flag_cont, ge, grid_widths
 # Each token type is located with a single regex scan over the whole section;
 # per-row and per-cell tests then become sorted-position lookups instead of
 # fresh regex passes over row substrings.
-parse_rtf_table <- function(section_text) {
+parse_rtf_table <- function(section_text, hide_data = FALSE) {
   trowd_pos <- token_positions(section_text, "\\\\trowd(?![a-zA-Z])")
   if (length(trowd_pos) == 0L) return(block_new())
 
@@ -581,7 +580,7 @@ parse_rtf_table <- function(section_text) {
     }
 
     # --- clean cell text ---
-    texts <- vapply(cell_chunks, rtf_cell_to_text, character(1),
+    texts <- vapply(cell_chunks, function(c) rtf_cell_to_text(c, hide_data), character(1),
                     USE.NAMES = FALSE)
 
     # Alignment from RTF control words within each cell chunk
@@ -661,7 +660,7 @@ parse_rtf_table <- function(section_text) {
 }
 
 # Strip RTF markup from a cell's raw text, returning clean plain text
-rtf_cell_to_text_r <- function(raw) {
+rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
   # Remove nested groups (e.g. field instructions, pictures)
   text <- raw
 
@@ -696,17 +695,19 @@ rtf_cell_to_text_r <- function(raw) {
 
   # Apply unicode/hex unescaping on what remains
   text <- rtf_unescape(text)
-
+  if(hide_data && grepl("^[0-9]", text)){
+    return("XX")
+  }
   text
 }
 
-rtf_cell_to_text <- function(raw) {
-  if (.c_available()) .Call(C_rtf_cell_to_text, raw) else rtf_cell_to_text_r(raw)
+rtf_cell_to_text <- function(raw, hide_data = FALSE) {
+  if (.c_available()) .Call(C_rtf_cell_to_text, raw, hide_data) else rtf_cell_to_text_r(raw, hide_data)
 }
 
 # -- Page Parsing
 
-parse_page <- function(page_text){
+parse_page <- function(page_text, hide_data = FALSE){
   # Extract header and footer groups, remaining is body
   header_text <- extract_group(page_text, "\\header")
   footer_text <- extract_group(page_text, "\\footer")
@@ -731,7 +732,7 @@ parse_page <- function(page_text){
 
 
   # Parse the body table and split into header rows and data rows
-  body <- parse_rtf_table(body_text)
+  body <- parse_rtf_table(body_text, hide_data = hide_data)
   footer_tbl$colspan <- matrix(block_ncol(body))
   list(
     parameter = parameter,
@@ -770,14 +771,15 @@ extract_footnotes <- function(footer_tbl){
 #' Parse an RTF file into a list of page objects
 #'
 #' @param path Path to the .rtf file
+#' @param hide_data toggle to replace all data in tables with XX
 #' @return List of page objects, each with:
 #'   \item{parameter}{character or NA}
 #'   \item{header}{block of header rows (see section 4)}
 #'   \item{data}{block of data rows, with stable \code{row_id}s}
-parse_rtf <- function(path) {
+parse_rtf <- function(path, hide_data = FALSE) {
   text  <- rtf_read_raw(path)
   pages <- rtf_split_pages(text)
-  pages <- lapply(pages, parse_page)
+  pages <- lapply(pages, function(p) parse_page(p, hide_data))
 
   # Stable row identity: number data rows sequentially across all pages in
   # document order. Row exclusions are stored against these IDs rather than
@@ -807,20 +809,27 @@ parse_rtf <- function(path) {
 #' @param excluded_header_rows Integer vector of header row indices to exclude
 #' @param parameters Parameter filter
 #' @param timelines Timeline filter
+#' @param levels Indent level filter
+#' @param hide_data toggle to replace all data in tables with XX
 #' @return list(combined, included_cols) where combined has rows filtered
 prepare_table <- function(pages = NULL, path = NULL,
                           excluded_cols = NULL, excluded_rows = NULL,
                           excluded_header_rows = NULL,
-                          parameters = NULL, timelines = NULL) {
-  if (is.null(pages)) pages <- parse_rtf(path)
+                          parameters = NULL, timelines = NULL, levels = NULL,
+                          hide_data = FALSE) {
+  if (is.null(pages)) pages <- parse_rtf(path, hide_data)
 
   param_filtered    <- filter_pages(pages, parameters)
   pages <- param_filtered$pages
   warnings <- param_filtered$warnings
 
   tl_filtered <- filter_timelines(combine_pages(pages),timelines)
-  combined <- tl_filtered$combined
   warnings <- c(warnings,tl_filtered$warnings)
+
+  lvl_filtered <- filter_levels(tl_filtered$combined, levels)
+  warnings <- c(warnings, lvl_filtered$warnings)
+
+  combined <- lvl_filtered$combined
 
   n_cols <- length(combined$col_widths_twips)
   n_data <- block_nrow(combined$data)
@@ -840,11 +849,6 @@ prepare_table <- function(pages = NULL, path = NULL,
 
   list(combined = combined, included_cols = inc_cols, warns = warnings)
 }
-
-
-
-
-
 
 
 
@@ -924,7 +928,8 @@ table_info_from_pages <- function(pages) {
     n_hdrs     = block_nrow(combined$header),
     col_names  = col_names,
     parameters = get_parameters(pages),
-    timelines  = get_timelines(combined)
+    timelines  = get_timelines(combined),
+    levels     = names(get_levels(combined))
   )
 }
 

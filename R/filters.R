@@ -109,6 +109,7 @@ filter_levels <- function(combined, levels){
 
   combined_levels <- get_levels(combined)
   present_levels <- levels[levels %in% names(combined_levels)]
+  present_indents <- combined_levels[names(combined_levels) %in% present_levels]
 
   not_present <- levels[!levels %in% names(combined_levels)]
   warnings <- lapply(not_present, function(p) warn_filter_not_found(p,"Level"))
@@ -123,7 +124,7 @@ filter_levels <- function(combined, levels){
     attr(match, "match.length")
   }, numeric(1))
 
-  keep <- indents %in% combined_levels[[levels]] | is.na(indents)
+  keep <- indents %in% present_indents | is.na(indents)
   rows <- which(keep)
   combined$data <- block_rows(combined$data,rows)
   list(combined = combined, warnings = warnings)
@@ -157,7 +158,8 @@ get_timelines <- function(combined) {
 #' @return Named list of indent count named by corresponding level
 get_levels <- function(combined){
   hdr1 <- block_cols(combined$header, 1)$text[block_nrow(combined$header)]
-  lines <- strsplit (hdr1, "\n")[[1]]
+  lines <- strsplit(hdr1, "\n")[[1]]
+  if(length(lines) < 2) return(NULL)
   hdr_indents <- vapply(lines, function(t){
     match <- regexpr("^\\s+",t)
     if(match[1] == -1) return(0)

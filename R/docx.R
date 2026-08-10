@@ -422,8 +422,9 @@ cleanup_image_rels <- function(session, node) {
 #' @param output_path Path to write the final .docx
 #' @param progress_cb Optional callback \code{function(i, n, msg)} invoked once
 #'   per config row for progress reporting; \code{NULL} disables reporting.
+#' @param hide_data toggle to replace all data in tables with XX
 process_document <- function(word_path, config, rtf_paths, selections, output_path,
-                             progress_cb = NULL) {
+                             progress_cb = NULL, hide_data = FALSE) {
   session <- open_docx(word_path)
   on.exit(unlink(session$tmp_dir, recursive = TRUE), add = TRUE)
 
@@ -473,7 +474,9 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
           excluded_header_rows = sel$excluded_header_rows,
           parameters           = sel$parameters,
           timelines            = sel$timelines,
-          text_width_twips     = tw_twips
+          levels               = sel$levels,
+          text_width_twips     = tw_twips,
+          hide_data            = hide_data
         )
         xml_str <- output$xml
         status[[i]]$warn <- output$warns

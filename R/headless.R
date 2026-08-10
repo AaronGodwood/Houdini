@@ -40,9 +40,10 @@ parse_xl <- function(xl){
   config$Table[is.na(config$Table)] <- ""
 
   # Parse optional filter columns into table_selections
-  # Recognised column names (case-insensitive): parameters, timepoints
+  # Recognised column names (case-insensitive): parameters, timepoints, levels
   param_col  <- which(col_lower == "parameters")[1L]
   tline_col  <- which(col_lower == "timepoints")[1L]
+  lvl_col    <- which(col_lower == "levels")[1L]
 
   #experimental at this point
 
@@ -59,13 +60,15 @@ parse_xl <- function(xl){
 
     params <- split_semi(col_val(param_col, i))
     tlines <- split_semi(col_val(tline_col, i))
+    lvls   <- split_semi(col_val(lvl_col, i))
 
     sels[[as.character(i)]] <- list(
       excluded_cols        = split_ints(col_val(ecol_col,i)),
       excluded_rows        = split_ints(col_val(erow_col,i)),
       excluded_header_rows = split_ints(col_val(ehdr_col,i)),
       parameters           = if (length(params) > 0L) params else NULL,
-      timelines            = if (length(tlines) > 0L) tlines else NULL
+      timelines            = if (length(tlines) > 0L) tlines else NULL,
+      levels               = if (length(lvls)   > 0L) lvls   else NULL
     )
 
   }
@@ -154,7 +157,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
   }
 
   status <- process_document(input_doc, cfg, rtf_paths, sels, output_path,
-                             progress_cb = cb)
+                             progress_cb = cb, hide_data)
 
   path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
   if(!quiet){

@@ -135,7 +135,8 @@ build_html_selection <- function(combined,
                                  excluded_cols        = integer(),
                                  excluded_rows        = integer(),
                                  excluded_header_rows = integer(),
-                                 row_limit = 200L) {
+                                 row_limit = 200L,
+                                 hide_data = FALSE) {
   header           <- combined$header
   data             <- combined$data
   col_widths_twips <- combined$col_widths_twips
@@ -284,6 +285,7 @@ build_html_selection <- function(combined,
 #' @param excluded_header_rows Integer vector of 1-based header row indices
 #' @param parameters Character vector of parameter values to keep (NULL = all)
 #' @param timelines Character vector of timeline labels to keep (NULL = all)
+#' @param levels Character vector of indent level titles to keep (NULL = all)
 #' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
 #' @param row_limit The number of rows shown in the selection before it is truncted
 #' @return HTML string
@@ -293,15 +295,20 @@ get_table_html_selection <- function(path,
                                      excluded_header_rows = NULL,
                                      parameters           = NULL,
                                      timelines            = NULL,
+                                     levels               = NULL,
                                      pages                = NULL,
-                                     row_limit = 200L) {
-  if (is.null(pages)) pages <- parse_rtf(path)
+                                     row_limit            = 200L,
+                                     hide_data            = FALSE) {
+  if (is.null(pages)) pages <- parse_rtf(path, hide_data)
   param_filtered    <- filter_pages(pages, parameters)
   pages <- param_filtered$pages
-  warnings <- param_filtered$warnings
+
 
   tl_filtered <- filter_timelines(combine_pages(pages),timelines)
-  combined <- tl_filtered$combined
+  lvl_filtered <- filter_levels(tl_filtered$combined, levels)
+
+  combined <- lvl_filtered$combined
+
   build_html_selection(
     combined,
     excluded_cols        = excluded_cols        %||% integer(),
@@ -319,6 +326,7 @@ get_table_html_selection <- function(path,
 #' @param excluded_header_rows Integer vector of 1-based header row indices
 #' @param parameters Character vector of parameter values to keep (NULL = all)
 #' @param timelines Character vector of timeline labels to keep (NULL = all)
+#' @param levels Character vector of indent level titles to keep (NULL = all)
 #' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
 #' @return HTML string
 get_table_html_output <- function(path,
@@ -327,12 +335,15 @@ get_table_html_output <- function(path,
                                   excluded_header_rows = NULL,
                                   parameters           = NULL,
                                   timelines            = NULL,
-                                  pages                = NULL) {
+                                  levels               = NULL,
+                                  pages                = NULL,
+                                  hide_data            = FALSE) {
   prep <- prepare_table(
     pages = pages, path = path,
     excluded_cols = excluded_cols, excluded_rows = excluded_rows,
     excluded_header_rows = excluded_header_rows,
-    parameters = parameters, timelines = timelines
+    parameters = parameters, timelines = timelines, levels = levels,
+    hide_data = hide_data
   )
   build_html(prep$combined, cols = prep$included_cols)
 }

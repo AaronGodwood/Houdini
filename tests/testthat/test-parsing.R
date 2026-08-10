@@ -32,6 +32,18 @@ test_that("timeline labels are detected across pages", {
                    c("Week 1", "Week 4", "Week 8", "Week 12"))
 })
 
+test_that("multi-level tables are detected by header", {
+  pages <- parse_rtf(test_path("fixtures", "multi_levels.rtf"))
+  combined <- combine_pages(pages)
+  expect_identical(names(get_levels(combined)),
+                   c("Trick Class", "Trick name/names"))
+
+  #test to make sure no levels detected if not present
+  pages <- parse_rtf(test_path("fixtures", "multi_timeline.rtf"))
+  combined <- combine_pages(pages)
+  expect_identical(get_levels(combined), NULL)
+})
+
 
 
 test_that("escape fixture decodes CP1252 and unicode in cells", {

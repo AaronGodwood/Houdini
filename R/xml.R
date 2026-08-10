@@ -210,8 +210,10 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
 #' @param excluded_header_rows Integer vector of 1-based header row indices to exclude
 #' @param parameters Character vector of parameter values to keep (NULL = all)
 #' @param timelines Character vector of timeline labels to keep (NULL = all)
+#' @param levels Character vector of indent level titles to keep (NULL = all)
 #' @param text_width_twips Target table width in twips (NULL = use RTF widths)
 #' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
+#' @param hide_data toggle to replace all data in tables with XX
 #' @return Character string containing a <w:tbl> XML fragment
 get_table_xml <- function(path,
                           excluded_cols        = NULL,
@@ -219,13 +221,16 @@ get_table_xml <- function(path,
                           excluded_header_rows = NULL,
                           parameters           = NULL,
                           timelines            = NULL,
+                          levels               = NULL,
                           text_width_twips     = NULL,
-                          pages                = NULL) {
+                          pages                = NULL,
+                          hide_data            = FALSE) {
   prep <- prepare_table(
     pages = pages, path = path,
     excluded_cols = excluded_cols, excluded_rows = excluded_rows,
     excluded_header_rows = excluded_header_rows,
-    parameters = parameters, timelines = timelines
+    parameters = parameters, timelines = timelines, levels = levels,
+    hide_data = hide_data
   )
   list(xml = build_xml(prep$combined, cols = prep$included_cols,
             text_width_twips = text_width_twips), warns = prep$warns)

@@ -215,7 +215,7 @@ SEXP C_rtf_unescape(SEXP text) {
  *   5. Unescape \ucN / \uN / \'xx sequences
  *   6. Trim whitespace
  */
-SEXP C_rtf_cell_to_text(SEXP raw_text) {
+SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
   const char *input = CHAR(STRING_ELT(raw_text, 0));
   int n = (int)strlen(input);
 
@@ -367,5 +367,17 @@ SEXP C_rtf_cell_to_text(SEXP raw_text) {
   }
 
 
+
+
+  if (LOGICAL(hide_data)[0]) {
+    unsigned char first = (unsigned char)buf[0];
+
+    if (first != '\0' && isdigit(first)) {
+      return ScalarString(mkCharCE("XX", CE_UTF8));
+    }
+  }
+
   return ScalarString(mkCharCE(buf, CE_UTF8));
+
+
 }

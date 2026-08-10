@@ -244,6 +244,9 @@ houdini_newapp <- function() {
           title = "Preview options",
           checkboxInput("sel_show_all",
                         "Show all rows (large tables may be slow)",
+                        value = FALSE),
+          checkboxInput("sel_hide_data",
+                        "Hide data values",
                         value = FALSE)
         )
       ),
@@ -314,9 +317,12 @@ houdini_newapp <- function() {
     # Get cached parsed pages for a table, parsing on first access
     get_cached_pages <- function(tbl_name) {
       cache <- parse_cache()
+      print("Step 1")
       if (!is.null(cache[[tbl_name]])) return(cache[[tbl_name]])
       paths <- rtf_paths()
+      print("Step 12")
       if (!tbl_name %in% names(paths)) return(NULL)
+      print("Step 165")
       pages <- parse_rtf(paths[[tbl_name]])
       cache[[tbl_name]] <- pages
       parse_cache(cache)
@@ -354,9 +360,10 @@ houdini_newapp <- function() {
           if (isTRUE(is_image_rtf(paths[[tbl_name]]))) {
             # Sentinel so the cache entry exists and current_info() is non-NULL
             cache[[tbl_name]] <- list(n_cols = 0L, n_rows = 0L,
-                                      col_names = character(),
+                                      col_names  = character(),
                                       parameters = character(),
-                                      timelines = character(),
+                                      timelines  = character(),
+                                      levels     = character(),
                                       is_image = TRUE)
             table_info_cache(cache)
           } else {
@@ -481,6 +488,7 @@ houdini_newapp <- function() {
     # observers that persist filters and exclusions per row.
 
     register_preview <- function() {
+
       observeEvent(input$config_table_select, {
         sel <- input$config_table_select
         if (is.null(sel)) return()
@@ -515,6 +523,7 @@ houdini_newapp <- function() {
         prev        <- table_selections()[[as.character(current_row_index())]]
         prev_params   <- prev$parameters
         prev_tlines   <- prev$timelines
+        prev_lvls     <- prev$levels
         prev_exc_cols <- prev$excluded_cols
         prev_exc_rows <- prev$excluded_rows
         prev_exc_hdrs <- prev$excluded_hdrs
@@ -542,6 +551,17 @@ houdini_newapp <- function() {
                 multiple = TRUE,
                 options  = list(plugins = list("remove_button"),
                                 placeholder = "All timepoints")
+              )
+            },
+
+            if (length(info$levels) > 0L) {
+              selectizeInput(
+                "sel_levels", "Levels:",
+                choices  = info$levels,
+                selected = prev_lvls,
+                multiple = TRUE,
+                options  = list(plugins = list("remove_button"),
+                                placeholder = "All levels")
               )
             },
 
@@ -592,7 +612,8 @@ houdini_newapp <- function() {
             length(sel$excluded_rows)        > 0L ||
             length(sel$excluded_header_rows) > 0L ||
             !is.null(sel$parameters)         ||
-            !is.null(sel$timelines)
+            !is.null(sel$timelines)          ||
+            !is.null(sel$levels)
         )
         if (!has_selections) return(NULL)
         div(style = "margin-top:6px;text-align:right;",
@@ -609,7 +630,8 @@ houdini_newapp <- function() {
           excluded_rows        = integer(),
           excluded_header_rows = integer(),
           parameters           = NULL,
-          timelines            = NULL
+          timelines            = NULL,
+          levels               = NULL
         )
         table_selections(sels)
         # Tell JS to clear its exclusion arrays and re-apply styles
@@ -620,8 +642,9 @@ houdini_newapp <- function() {
 
       # Save parameters/timelines when dropdowns change
       observeEvent(
-        list(input$sel_parameters, input$sel_timelines),
+        list(input$sel_parameters, input$sel_timelines, input$sel_levels),
         {
+
           row  <- isolate(current_row_index())
           info <- isolate(current_info())
           if (is.null(row) || is.null(info) || isTRUE(info$is_image)) return()
@@ -633,7 +656,8 @@ houdini_newapp <- function() {
             excluded_rows        = prev$excluded_rows,
             excluded_header_rows = prev$excluded_header_rows,
             parameters           = input$sel_parameters,
-            timelines            = input$sel_timelines
+            timelines            = input$sel_timelines,
+            levels               = input$sel_levels
           )
           table_selections(sels)
         },
@@ -656,7 +680,8 @@ houdini_newapp <- function() {
             excluded_rows        = as.integer(input$preview_excluded_rows        %||% integer()),
             excluded_header_rows = as.integer(input$preview_excluded_header_rows %||% integer()),
             parameters           = prev$parameters,
-            timelines            = prev$timelines
+            timelines            = prev$timelines,
+            levels               = prev$levels
           )
           table_selections(sels)
         },
@@ -747,7 +772,8 @@ houdini_newapp <- function() {
         list(
           table  = current_table_name(),
           params = sel$parameters,
-          tlines = sel$timelines
+          tlines = sel$timelines,
+          lvls   = sel$levels
         )
       })
 
@@ -797,6 +823,10 @@ houdini_newapp <- function() {
           bits <- c(bits, sprintf("%d timeline%s", length(sel$timelines),
                                   if (length(sel$timelines) == 1L) "" else "s"))
         }
+        if (!is.null(sel$levels)) {
+          bits <- c(bits, sprintf("%d level%s", length(sel$levels),
+                                  if (length(sel$levels) == 1L) "" else "s"))
+        }
 
         tagList(
           span(class = "fw-semibold",
@@ -812,10 +842,18 @@ houdini_newapp <- function() {
       # rather than removed. Re-renders only when the table or its filters change,
       # not on every click (the JS applies click feedback locally).
       output$selection_preview <- renderUI({
+
+        cat(
+          "renderUI:",
+          "show_all=", input$sel_show_all,
+          "hide_data=", input$sel_hide_data,
+          "\n"
+        )
         key      <- selection_pane_key()
         tbl_name <- key$table
         paths    <- rtf_paths()
         info     <- current_info()
+
 
         if (is.null(tbl_name) || !tbl_name %in% names(paths)) {
           return(div(class = "text-secondary text-center p-4",
@@ -844,8 +882,10 @@ houdini_newapp <- function() {
             excluded_header_rows = eh,
             parameters           = sel$parameters,
             timelines            = sel$timelines,
+            levels               = sel$levels,
             pages                = get_cached_pages(tbl_name),
-            row_limit            = if (isTRUE(input$sel_show_all)) Inf else 200L
+            row_limit            = if (isTRUE(input$sel_show_all)) Inf else 200L,
+            hide_data            = if (isTRUE(input$sel_hide_data)) TRUE else FALSE
           ),
           error = function(e) sprintf(
             "<p class='text-danger'>Selection error: %s</p>",
@@ -890,7 +930,9 @@ houdini_newapp <- function() {
             excluded_header_rows = as.integer(sel$excluded_header_rows %||% integer()),
             parameters           = sel$parameters,
             timelines            = sel$timelines,
-            pages                = get_cached_pages(tbl_name)
+            levels               = sel$levels,
+            pages                = get_cached_pages(tbl_name),
+            hide_data            = if (isTRUE(input$sel_hide_data)) TRUE else FALSE
           ),
           error = function(e) sprintf(
             "<p class='text-danger'>Output error: %s</p>",
@@ -901,6 +943,8 @@ houdini_newapp <- function() {
         HTML(html_content)
       })
     }
+
+
 
 
     # CONFIG TABLE
@@ -1431,7 +1475,8 @@ houdini_newapp <- function() {
             Bookmark           = df$Bookmark,
             Dataset            = ifelse(nzchar(df$Table), paste0(df$Table, ".rtf"), df$Table),
             Parameters         = sel_col("parameters"),
-            Timepoints          = sel_col("timelines"),
+            Timepoints         = sel_col("timelines"),
+            Levels             = sel_col("levels"),
             ExcludedColumns    = sel_col("excluded_cols"),
             ExcludedRows       = sel_col("excluded_rows"),
             ExcludedHeaderRows = sel_col("excluded_header_rows"),
