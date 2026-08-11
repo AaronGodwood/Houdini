@@ -1,5 +1,4 @@
 
-
 #' Return the Houdini Shiny application object
 #'
 #' Called internally by \code{\link{run_app}}. You can also pass the result
@@ -9,7 +8,7 @@
 #' @import shiny
 #' @import rhandsontable
 #' @export
-houdini_newapp <- function() {
+houdini_app <- function() {
 
   # Theme: Bootstrap 5
   houdini_theme <- bslib::bs_theme(
@@ -146,8 +145,10 @@ houdini_newapp <- function() {
 
           tags$label(class = "form-label fw-semibold small mt-2", "RTF folder"),
           uiOutput("folder_picker_btn"),
-          textInput("rtf_folder_manual", NULL, width = "100%",
-                    placeholder = "Or paste a folder path\u2026"),
+          uiOutput("pin_selector"),
+          uiOutput("rtf_folder_input"),
+          # textInput("rtf_folder_manual", NULL, width = "100%",
+          #           placeholder = "Or paste a folder path\u2026"),
           uiOutput("rtf_status"),
 
         ),
@@ -314,6 +315,11 @@ houdini_newapp <- function() {
     # parse_rtf cache: table_name -> parse_rtf() result (list of pages)
     parse_cache <- reactiveVal(list())
 
+    #check if we are on posit connect or local
+    is_connect <- function() {
+      nzchar(Sys.getenv("CONNECT_CONTENT_GUID", ""))
+    }
+
     # Get cached parsed pages for a table, parsing on first access
     get_cached_pages <- function(tbl_name) {
       cache <- parse_cache()
@@ -419,6 +425,51 @@ houdini_newapp <- function() {
       })
     }
 
+    # RTF pin code for connect
+
+    load_rtf_pin <- function(pin_name) {
+
+      board <- pins::board_connect()
+
+      rtf_files <- tryCatch(
+        pins::pin_download(board, pin_name),
+        error = function(e) {
+          showNotification(
+            paste("Failed to load pin:", e$message),
+            type = "error"
+          )
+          return(NULL)
+        }
+      )
+
+      rtf_folder_path(pin_name)
+
+
+      if (length(rtf_files) == 0L || is.null(rtf_files)) {
+        available_tables(character())
+        showNotification(
+          "No RTF files found in the selected pin.",
+          type = "warning"
+        )
+        return()
+      }
+
+      tbl_names <- tools::file_path_sans_ext(basename(rtf_files))
+      full_paths <- file.path(rtf_files)
+
+      available_tables(tbl_names)
+      rtf_paths(setNames(as.list(full_paths), tbl_names))
+
+      table_info_cache(list())
+      parse_cache(list())
+
+      showNotification(
+        paste("Found", length(rtf_files), "RTF files."),
+        type = "message"
+      )
+    }
+
+
     # RTF FOLDER
 
     # Shared helper: load RTF files from a validated folder path
@@ -444,43 +495,91 @@ houdini_newapp <- function() {
       showNotification(paste("Found", length(rtf_files), "RTF files."), type = "message")
     }
 
-    register_rtf_folder <- function() {
-      # Show native folder picker button only when inside RStudio Desktop
-      # (rstudioapi is in Suggests, so check it is installed before calling it)
-      output$folder_picker_btn <- renderUI({
-        if (!requireNamespace("rstudioapi", quietly = TRUE)) return(NULL)
-        if (!isTRUE(tryCatch(rstudioapi::isAvailable(), error = function(e) FALSE))) return(NULL)
-        actionButton("pick_folder_rstudio", "Choose RTF Folder\u2026",
-                     class = "btn-primary",
-                     style = "width:100%;")
+    register_rtf_source <- function() {
+
+      output$rtf_folder_input <- renderUI({
+        if(is_connect()) return(NULL)
+        textInput("rtf_folder_manual", NULL, width = "100%",
+                  placeholder = "Or paste a folder path\u2026")
       })
 
-      observeEvent(input$pick_folder_rstudio, {
-        folder <- tryCatch(
-          rstudioapi::selectDirectory(caption = "Select RTF folder"),
-          error = function(e) NULL
-        )
-        if (is.null(folder) || !nzchar(folder)) return()
-        load_rtf_folder(folder)
-        updateTextInput(session, "rtf_folder_manual", value = folder)
-      })
+      if(is_connect()){
+        board <- pins::board_connect()
 
-      # Handle manual path entry — fires on Enter (input value change)
-      observeEvent(input$rtf_folder_manual, {
-        path <- trimws(input$rtf_folder_manual)
-        if (!nzchar(path)) return()
-        load_rtf_folder(path)
-      }, ignoreInit = TRUE)
+        output$pin_selector <- renderUI({
 
-      output$rtf_status <- renderUI({
-        tbls <- available_tables()
-        if (length(tbls) > 0) {
-          div(class = "alert alert-success py-1 px-2 mb-0 small",
+          pins_available <- tryCatch(
+            pins::pin_list(board),
+            error = function(e) character()
+          )
+
+          selectInput(
+            "rtf_pin",
+            "Choose RTF Pin",
+            choices = pins_available,
+            width = "100%"
+          )
+        })
+
+        observeEvent(input$rtf_pin, {
+
+          req(input$rtf_pin)
+
+          load_rtf_pin(input$rtf_pin)
+
+        }, ignoreInit = FALSE)
+
+        output$rtf_status <- renderUI({
+
+          tbls <- available_tables()
+
+          if (length(tbls) > 0) {
+            div(
+              class = "alert alert-success py-1 px-2 mb-0 small",
               bsicons::bs_icon("check-circle-fill"),
-              sprintf(" %d RTF files found", length(tbls)))
-        }
-      })
+              sprintf(" %d RTF files found", length(tbls))
+            )
+          }
 
+        })
+
+      }else{
+        # Show native folder picker button only when inside RStudio Desktop
+        # (rstudioapi is in Suggests, so check it is installed before calling it)
+        output$folder_picker_btn <- renderUI({
+          if (!requireNamespace("rstudioapi", quietly = TRUE)) return(NULL)
+          if (!isTRUE(tryCatch(rstudioapi::isAvailable(), error = function(e) FALSE))) return(NULL)
+          actionButton("pick_folder_rstudio", "Choose RTF Folder\u2026",
+                       class = "btn-primary",
+                       style = "width:100%;")
+        })
+
+        observeEvent(input$pick_folder_rstudio, {
+          folder <- tryCatch(
+            rstudioapi::selectDirectory(caption = "Select RTF folder"),
+            error = function(e) NULL
+          )
+          if (is.null(folder) || !nzchar(folder)) return()
+          load_rtf_folder(folder)
+          updateTextInput(session, "rtf_folder_manual", value = folder)
+        })
+
+        # Handle manual path entry — fires on Enter (input value change)
+        observeEvent(input$rtf_folder_manual, {
+          path <- trimws(input$rtf_folder_manual)
+          if (!nzchar(path)) return()
+          load_rtf_folder(path)
+        }, ignoreInit = TRUE)
+
+        output$rtf_status <- renderUI({
+          tbls <- available_tables()
+          if (length(tbls) > 0) {
+            div(class = "alert alert-success py-1 px-2 mb-0 small",
+                bsicons::bs_icon("check-circle-fill"),
+                sprintf(" %d RTF files found", length(tbls)))
+          }
+        })
+      }
 
     }
 
@@ -1546,7 +1645,7 @@ houdini_newapp <- function() {
     }
 
     register_word_file()
-    register_rtf_folder()
+    register_rtf_source()
     register_config_grid()
     register_validation()
     register_preview()
@@ -1556,3 +1655,5 @@ houdini_newapp <- function() {
   shiny::shinyApp(ui, server)
 
 }
+
+houdini_app()
