@@ -362,11 +362,11 @@ block_categorise <- function(block){
   n_col <- block_ncol(block)
   spans <- block$colspan[ ,1]
   empty <- which(vapply(spans, function(s) s == n_col, logical(1)))
-  cont <- which(vapply(block$text[ ,1], function(t) grepl("(cont.)",t), logical(1)))
+  #cont <- which(vapply(block$text[ ,1], function(t) grepl("(cont.)",t), logical(1)))
   two_empty <- empty[(empty + 1) %in% empty]
-  cont_empty <- empty[((empty + 1) %in% cont | (empty + 2) %in% cont)]
+  #cont_empty <- empty[((empty + 1) %in% cont | (empty + 2) %in% cont)]
   ids <- block$row_id
-  wanted_ids <- ids[!ids %in% two_empty & !ids %in% cont_empty & !ids %in% cont]
+  wanted_ids <- ids[!ids %in% two_empty]# & !ids %in% cont_empty & !ids %in% cont]
   block_rows_id(block, wanted_ids)
 }
 
@@ -580,7 +580,7 @@ parse_rtf_table <- function(section_text, hide_data = FALSE) {
     }
 
     # --- clean cell text ---
-    texts <- vapply(cell_chunks, function(c) rtf_cell_to_text(c, hide_data), character(1),
+    texts <- vapply(cell_chunks, function(c) rtf_cell_to_text_r(c, hide_data), character(1),
                     USE.NAMES = FALSE)
 
     # Alignment from RTF control words within each cell chunk
@@ -666,6 +666,15 @@ rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
 
   # Remove {\*...} destination groups entirely
   text <- gsub("\\{\\\\\\*[^}]*\\}", "", text, perl = TRUE)
+  indents <- gregexpr("\\\\li([0-9]+)", text, perl = TRUE)
+  indent_vals <- as.integer(gsub("\\\\li", "",
+                                regmatches(text, indents)[[1]]))
+  if(length(indent_vals) == 0){
+    indent_vals <- 0L
+  }else{
+    indent_vals <- round(indent_vals/97)
+  }
+
 
   # Iteratively strip innermost {...} groups: remove control words inside, keep plain text.
   # Two-pass per iteration: first strip control words inside the group, then remove braces.
@@ -694,7 +703,8 @@ rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
   text <- gsub("[{}]", "", text, fixed = FALSE)
 
   # Apply unicode/hex unescaping on what remains
-  text <- rtf_unescape(text)
+  indent <- strrep(" ", times = indent_vals)
+  text <- paste0(indent,rtf_unescape(text), collapse = "")
   if(hide_data && grepl("^[0-9]", text)){
     return("XX")
   }
@@ -829,7 +839,7 @@ prepare_table <- function(pages = NULL, path = NULL,
   lvl_filtered <- filter_levels(tl_filtered$combined, levels)
   warnings <- c(warnings, lvl_filtered$warnings)
 
-  combined <- lvl_filtered$combined
+  combined <- remove_continuations(lvl_filtered$combined)
 
   n_cols <- length(combined$col_widths_twips)
   n_data <- block_nrow(combined$data)

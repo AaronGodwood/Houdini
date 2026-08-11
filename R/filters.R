@@ -124,7 +124,11 @@ filter_levels <- function(combined, levels){
     attr(match, "match.length")
   }, numeric(1))
 
-  keep <- indents %in% present_indents | is.na(indents)
+  non_na <- indents[!is.na(indents)]
+  idx <- cumsum(!is.na(indents))
+  filled <- c(NA_character_,non_na)[idx+1]
+
+  keep <- filled %in% present_indents | is.na(filled)
   rows <- which(keep)
   combined$data <- block_rows(combined$data,rows)
   list(combined = combined, warnings = warnings)
@@ -166,5 +170,27 @@ get_levels <- function(combined){
     attr(match, "match.length")
   }, numeric(1))
   return(setNames(hdr_indents, trimws(lines)))
+}
+
+
+remove_continuations <- function(combined){
+  block <- combined$data
+  n_col <- block_ncol(block)
+  spans <- block$colspan[ ,1]
+  ids <- block$row_id
+  empty <- vapply(seq_along(spans), function(s){
+    if(spans[s] == n_col) return(ids[s])
+    NA_integer_
+  }, integer(1))
+  empty <- empty[!is.na(empty)]
+  cont <- vapply(seq_along(block$text[ ,1]), function(t){
+    if(grepl("(cont.)",block$text[t ,1])) return(ids[t])
+    NA_integer_
+    }, integer(1))
+  cont <- cont[!is.na(cont)]
+  cont_empty <- empty[((empty + 1) %in% cont | (empty + 2) %in% cont)]
+  wanted_ids <- ids[!ids %in% cont_empty & !ids %in% cont]
+  combined$data <- block_rows_id(block, wanted_ids)
+  combined
 }
 
