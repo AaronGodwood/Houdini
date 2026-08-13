@@ -315,9 +315,10 @@ houdini_app <- function() {
     # parse_rtf cache: table_name -> parse_rtf() result (list of pages)
     parse_cache <- reactiveVal(list())
 
-    #check if we are on posit connect or local
+    #check if we are on posit connect or local as pins are only used on posit connect and not local devices
     is_connect <- function() {
-      nzchar(Sys.getenv("CONNECT_CONTENT_GUID", ""))
+      nzchar(Sys.getenv("CONNECT_CONTENT_GUID", "")) &&
+        requireNamespace("pins", quietly = TRUE)
     }
 
     # Get cached parsed pages for a table, parsing on first access
@@ -942,12 +943,6 @@ houdini_app <- function() {
       # not on every click (the JS applies click feedback locally).
       output$selection_preview <- renderUI({
 
-        cat(
-          "renderUI:",
-          "show_all=", input$sel_show_all,
-          "hide_data=", input$sel_hide_data,
-          "\n"
-        )
         key      <- selection_pane_key()
         tbl_name <- key$table
         paths    <- rtf_paths()
@@ -1538,7 +1533,8 @@ houdini_app <- function() {
     register_downloads <- function() {
       output$download_log <- downloadHandler(
         filename = function() {
-          paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
+          # Colons are not accepted filenames on windows - (was failing to _)
+          paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H-%M-%S"), "].log")
         },
         content = function(file) {
           df    <- config_data()
@@ -1656,4 +1652,3 @@ houdini_app <- function() {
 
 }
 
-houdini_app()

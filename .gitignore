@@ -5,3 +5,7 @@
 Houdini.Rproj
 _*.R
 debug.R
+*.o
+*.so
+*.dll
+*.dylib

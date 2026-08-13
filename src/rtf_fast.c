@@ -92,6 +92,30 @@ static int is_ctrl_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
+/* Indent handling, should be kept equal to values in R/parsing.R to maintain consisteny between
+ * both paths */
+#define TWIPS_PER_INDENT_LEVEL 194
+#define SPACES_PER_INDENT_LEVEL 2
+
+static long min_left_indent(const char *s, int len){
+  long best = -1;
+  for(int i = 0; i + 3 < len; i++){
+    if(s[i] != '\\' || s[i+1] != 'l' || s[i + 2] != 'i') continue;
+    int j = i + 3;
+    int neg = 0;
+    if(j < len && s[j] == '-') { neg = 1; j++;}
+    if(j >= len || !isdigit((unsigned char)s[j])) continue; /* e.g. \line */
+    long val = 0;
+    while (j < len && isdigit((unsigned char)s[j])){
+      val = val * 10 + (s[j] - '0');
+      j++;
+    }
+    if(neg || val <= 0) continue;
+    if(best < 0 || val < best) best = val;
+  }
+  return best;
+}
+
 /* Is s[i] the start of a \uN or \ucN sequence (which the unescape pass
  * decodes, so the control-word stripping passes must leave them alone)? */
 static int is_unicode_escape(const char *s, int i, int end) {
@@ -249,6 +273,15 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
     memcpy(buf, tmp, wi + 1);
   }
 
+  int indent_spaces = 0;
+  {
+    long twips = min_left_indent(buf, (int)strlen(buf));
+    if(twips > 0){
+      long level = (twips + TWIPS_PER_INDENT_LEVEL / 2) / TWIPS_PER_INDENT_LEVEL;
+      indent_spaces = (int)(level * SPACES_PER_INDENT_LEVEL);
+    }
+  }
+
   /* Pass 2: Iteratively flatten innermost brace groups.
    * For each innermost {...}, strip control words but keep plain text
    * and escape sequences (decoded in pass 5). */
@@ -316,7 +349,7 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
                (ri + 5 == len || !isalpha((unsigned char)buf[ri+5]))){
         ri +=5;
         if (ri< len && buf[ri] == ' ') ri++;
-        tmp[wi++] = '\n';
+        tmp[wi++] = '\1';
       }else if (buf[ri] == '\\' && ri + 1 < len &&
         is_ctrl_char(buf[ri + 1])) {
         ri++;
@@ -349,7 +382,9 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
     int ri = 0, wi = 0;
     int len = (int)strlen(buf);
     while (ri < len) {
-      if (buf[ri] != '{' && buf[ri] != '}') {
+      if( buf[ri] == '\1'){
+        tmp[wi++] = '\n';
+      }else if (buf[ri] != '{' && buf[ri] != '}') {
         tmp[wi++] = buf[ri];
       }
       ri++;
@@ -366,7 +401,15 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
     buf = out;
   }
 
+  /* Pass 6: Prepend the indent prefix */
 
+  if(indent_spaces > 0){
+    int len = (int)strlen(buf);
+    char *out = R_alloc((size_t)indent_spaces + len + 1, 1);
+    memset(out, ' ', (size_t)indent_spaces);
+    memcpy(out + indent_spaces, buf, (size_t)len + 1);
+    buf = out;
+  }
 
 
   if (LOGICAL(hide_data)[0]) {
@@ -378,6 +421,5 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
   }
 
   return ScalarString(mkCharCE(buf, CE_UTF8));
-
 
 }

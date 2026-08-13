@@ -64,7 +64,7 @@ html_data_row <- function(b, r, is_last_data) {
 # Build HTML from a combined table object (output of combine_pages())
 # cols: integer vector of column indices to include (NULL = all)
 # row_start / row_end: 1-based data row range (NULL = all)
-build_html <- function(combined, cols = NULL, row_start = NULL, row_end = NULL, hide_data = FALSE) {
+build_html <- function(combined, cols = NULL, row_start = NULL, row_end = NULL) {
   header           <- combined$header
   data             <- combined$data
   col_widths_twips <- combined$col_widths_twips
@@ -135,8 +135,7 @@ build_html_selection <- function(combined,
                                  excluded_cols        = integer(),
                                  excluded_rows        = integer(),
                                  excluded_header_rows = integer(),
-                                 row_limit = 200L,
-                                 hide_data = FALSE) {
+                                 row_limit = 200L) {
   header           <- combined$header
   data             <- combined$data
   col_widths_twips <- combined$col_widths_twips
@@ -237,7 +236,7 @@ build_html_selection <- function(combined,
       opacity   <- if (col_excl || row_excl) "opacity:0.3;" else ""
       raw_align <- cell_align_or_default(data$align[ri, ci], ci)
       style <- sprintf(
-        " style=\"%s%spadding:0;white-space:pre;;text-align:%s\"",
+        " style=\"%s%spadding:0;white-space:pre;overflow-wrap:break-word;text-align:%s\"",
         border_style, opacity, raw_align
       )
 
@@ -269,7 +268,7 @@ build_html_selection <- function(combined,
 
   sprintf(
     paste0("<table style=\"font-family:'Times New Roman',Times,serif;",
-           "font-size:10pt;border-top:2px solid black;border-collapse:collapse;user-select:none\">",
+           "font-size:10pt;width:100%%;table-layout:fixed;border-top:2px solid black;border-collapse:collapse;user-select:none\">",
            "%s%s%s</table>"),
     colgroup, thead, tbody
   )
@@ -288,6 +287,7 @@ build_html_selection <- function(combined,
 #' @param levels Character vector of indent level titles to keep (NULL = all)
 #' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
 #' @param row_limit The number of rows shown in the selection before it is truncted
+#' @param hide_data toggle to replace all data in tables with XX
 #' @return HTML string
 get_table_html_selection <- function(path,
                                      excluded_cols        = NULL,
@@ -299,7 +299,7 @@ get_table_html_selection <- function(path,
                                      pages                = NULL,
                                      row_limit            = 200L,
                                      hide_data            = FALSE) {
-  if (is.null(pages)) pages <- parse_rtf(path, hide_data)
+  if (is.null(pages)|| hide_data) pages <- parse_rtf(path, hide_data)
   param_filtered    <- filter_pages(pages, parameters)
   pages <- param_filtered$pages
 
@@ -328,6 +328,7 @@ get_table_html_selection <- function(path,
 #' @param timelines Character vector of timeline labels to keep (NULL = all)
 #' @param levels Character vector of indent level titles to keep (NULL = all)
 #' @param pages Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL
+#' @param hide_data toggle to replace all data in tables with XX
 #' @return HTML string
 get_table_html_output <- function(path,
                                   excluded_cols        = NULL,

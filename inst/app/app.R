@@ -1,1 +1,1 @@
-Houdini::houdini_newapp()
+Houdini::houdini_app()

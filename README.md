@@ -41,7 +41,7 @@ devtools::install_local("path/to/Houdini")
 
 ## Quick start
 
-# Using the GUI
+### Using the GUI
 
 ```r
 library(Houdini)
@@ -59,7 +59,7 @@ This opens the Shiny app in your browser. Then:
 4. **Generate** - download the finished Word document. A generation log is
    available alongside it.
    
-# Using the command line interface
+### Using the command line interface
 
 ```r
 library(Houdini)
@@ -67,6 +67,8 @@ apparate( input_doc = "path/to/word/document.docx",
           input_sheet = "path/to/excel/document.xlsx",
           file_location = "path/to/rtf/folder/")
 ```
+
+This will run the Houdini process in the current working directory and output both the modified word document and a log file detailing all successes, warning and errors that occur through insertion and filtering.
 
 ## Configuration via Excel
 
@@ -80,7 +82,8 @@ For large/reproducible jobs or when using the command line interface  you can de
 | `Parameters`  | no       | Semicolon-separated parameter values to keep, e.g. `Cholesterol; Triglycerides`. |
 | `Timepoints`  | no       | Semicolon-separated timepoint labels to keep, e.g. `Week 1; Week 4`.             |
 | `Levels`      | no       | Semicolon-separated indent level labels to keep e.g. `System Organ Class; Prefered Term`|
-| `ExcludedCols`| no       | Semicolon-separated column numbers or headers to exclude e.g. `1; 4` or `Placebo; Treatment`|
+| `ExcludedColumns`| no       | Semicolon-separated column numbers or headers to exclude e.g. `1; 4` or `Placebo; Treatment`|
+| `ExcludedRows`| no       | Semicolon-separated row numbers to exclude e.g. `1; 4` |
 
 Use **Export Excel** to save the current configuration back out in this same
 format (a convenient way to produce a template to edit).
@@ -96,7 +99,6 @@ libraries:
 3. **Render** to minimal OOXML (`R/xml.R`) or HTML preview (`R/html.R`).
 4. **Inject** the OOXML into the unzipped `.docx`, then rezip (`R/docx.R`).
 
-See the *Getting started with Houdini* vignette for a worked end-to-end example.
 
 ## License
 

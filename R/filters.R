@@ -103,7 +103,7 @@ filter_timelines <- function(combined, timelines) {
 #'
 #' Rows with no content are always kept.
 #' @param combined Output of combine_pages()
-#' @param timelines Character vector of timeline values to include
+#' @param levels Character vector of level indent titles to include
 filter_levels <- function(combined, levels){
   if (is.null(levels) || length(levels) == 0L) return(list(combined = combined, warnings = list()))
 
@@ -116,7 +116,14 @@ filter_levels <- function(combined, levels){
 
   if (is.null(present_levels) || length(present_levels) == 0L) return(list(combined = combined, warnings = warnings))
 
-  col1 <- block_cols(combined$data, 1)$text
+  block <- combined$data
+  col1 <- block_cols(block, 1)$text
+
+  blank_row <- if(block_ncol(block) > 0L){
+    !apply(nzchar(trimws(block$text)) & block$present, 1L, any)
+  } else {
+    rep(TRUE, block_nrow(block))
+  }
   indents <- vapply(col1, function(t){
     if(t == "") return(NA_integer_)
     match <- regexpr("^\\s+",t)
@@ -126,11 +133,11 @@ filter_levels <- function(combined, levels){
 
   non_na <- indents[!is.na(indents)]
   idx <- cumsum(!is.na(indents))
-  filled <- c(NA_character_,non_na)[idx+1]
+  filled <- c(NA_integer_,non_na)[idx + 1]
 
-  keep <- filled %in% present_indents | is.na(filled)
+  keep <- filled %in% present_indents | is.na(filled) | blank_row
   rows <- which(keep)
-  combined$data <- block_rows(combined$data,rows)
+  combined$data <- block_rows(block,rows)
   list(combined = combined, warnings = warnings)
 }
 

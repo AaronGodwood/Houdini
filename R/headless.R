@@ -4,6 +4,12 @@ split_semi <- function(x) {
   trimws(strsplit(x, ";", fixed = TRUE)[[1L]])
 }
 
+# Resolve a path against the working directory unless its already absolute
+absolute_path <- function(path){
+  is_abs <- grepl("^(/|\\\\\\\\|[A-Za-z]:[/\\\\])", path)
+  if(is_abs) path else file.path(getwd(), path)
+}
+
 split_ints <- function(x){
   v <- as.integer(split_semi(as.character(x)))
   v <- v[!is.na(v)]
@@ -150,16 +156,13 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
 
   #runs main process and logs results
 
-  output_path <-  if(!grepl("^/", input_doc)){
-    paste0(getwd(),"/",input_doc,"_Houdini_Output.docx", collapse = "")
-  } else{
-    paste0(input_doc, "_Houdini_Output.docx", collapse = "")
-  }
+  output_path <- paste0(absolute_path(input_doc), "_Houdini_Output.docx", collapse = "")
 
   status <- process_document(input_doc, cfg, rtf_paths, sels, output_path,
                              progress_cb = cb, hide_data)
 
-  path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "].log")
+  #Colons are illegal filenames on widows
+  path <- paste0("houdini_log[", format(Sys.time(), "%Y-%m-%d %H-%M-%S"), "].log")
   if(!quiet){
     lines <- write_log(input_doc, input_sheet, cfg ,sels, status, file_location)
     writeLines(lines, path)

@@ -580,7 +580,7 @@ parse_rtf_table <- function(section_text, hide_data = FALSE) {
     }
 
     # --- clean cell text ---
-    texts <- vapply(cell_chunks, function(c) rtf_cell_to_text_r(c, hide_data), character(1),
+    texts <- vapply(cell_chunks, function(c) rtf_cell_to_text(c, hide_data), character(1),
                     USE.NAMES = FALSE)
 
     # Alignment from RTF control words within each cell chunk
@@ -659,6 +659,24 @@ parse_rtf_table <- function(section_text, hide_data = FALSE) {
   )
 }
 
+
+# Conversions from \\li in RTF so that correct indenting in maintained
+# Important for level filtering
+TWIPS_PER_INDENT_LEVEL <- 194L
+
+SPACES_PER_INDENT_LEVEL <- 2L
+
+#Catches \\li indents and converts them to a number of spaces via conversions above
+rtf_indent_prefix <- function(text){
+  m <- regmatches(text, gregexpr("\\\\li(-?[0-9]+)(?![0-9])", text, perl = TRUE))[[1L]]
+  if(length(m) == 0L) return("")
+  twips <- as.integer(sub("\\\\li","",m))
+  twips <- twips[!is.na(twips) & twips > 0L]
+  if(length(twips) == 0L) return("")
+  level <- round(min(twips) / TWIPS_PER_INDENT_LEVEL)
+  strrep(" ", level * SPACES_PER_INDENT_LEVEL)
+}
+
 # Strip RTF markup from a cell's raw text, returning clean plain text
 rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
   # Remove nested groups (e.g. field instructions, pictures)
@@ -666,14 +684,7 @@ rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
 
   # Remove {\*...} destination groups entirely
   text <- gsub("\\{\\\\\\*[^}]*\\}", "", text, perl = TRUE)
-  indents <- gregexpr("\\\\li([0-9]+)", text, perl = TRUE)
-  indent_vals <- as.integer(gsub("\\\\li", "",
-                                regmatches(text, indents)[[1]]))
-  if(length(indent_vals) == 0){
-    indent_vals <- 0L
-  }else{
-    indent_vals <- round(indent_vals/97)
-  }
+  indent <- rtf_indent_prefix(text)
 
 
   # Iteratively strip innermost {...} groups: remove control words inside, keep plain text.
@@ -689,22 +700,22 @@ rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
   #   text <- new_text
   # }
 
+  #remove rtf generated \n s and then replace rtf \\line control words with \n
+  text <- gsub("[\r\n]", "", text, perl = TRUE)
+  text <- gsub("\\\\line(?![a-zA-A])\\s?", "\n", text, perl = TRUE)
+
   # Remove remaining RTF control words (\word or \word123), but preserve
   # \uN and \ucN - they are decoded (not stripped) by rtf_unescape below
-  text <- gsub("\\\\(?!u-?[0-9]|uc[0-9]|line)[a-zA-Z]+[-]?[0-9]*\\s?", "", text, perl = TRUE)
+  text <- gsub("\\\\(?!u-?[0-9]|uc[0-9])[a-zA-Z]+[-]?[0-9]*[ ]?", "", text, perl = TRUE)
   # Replace \\~ with spaces (appears in some tables as a space escape character)
   text <- gsub("\\\\~"," ", text, perl = TRUE)
   # Remove remaining control symbols (\<symbol>), preserving \'xx hex escapes
   text <- gsub("\\\\(?!')[^a-zA-Z]", "", text, perl = TRUE)
-  #remove rtf generated \n s and then replace rtf \\line control words with \n
-  text <- gsub("\\n","", text, perl = TRUE)
-  text <- gsub("\\\\line", "\n", text, perl = TRUE)
   # Remove stray brace,s
   text <- gsub("[{}]", "", text, fixed = FALSE)
 
   # Apply unicode/hex unescaping on what remains
-  indent <- strrep(" ", times = indent_vals)
-  text <- paste0(indent,rtf_unescape(text), collapse = "")
+  text <- paste0(indent, rtf_unescape(text))
   if(hide_data && grepl("^[0-9]", text)){
     return("XX")
   }
@@ -827,7 +838,7 @@ prepare_table <- function(pages = NULL, path = NULL,
                           excluded_header_rows = NULL,
                           parameters = NULL, timelines = NULL, levels = NULL,
                           hide_data = FALSE) {
-  if (is.null(pages)) pages <- parse_rtf(path, hide_data)
+  if (is.null(pages) || hide_data) pages <- parse_rtf(path, hide_data)
 
   param_filtered    <- filter_pages(pages, parameters)
   pages <- param_filtered$pages
