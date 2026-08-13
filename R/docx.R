@@ -132,16 +132,46 @@ docx_text_width_emu <- function(doc) {
 #' @param docx_path Path to the source .docx file
 #' @return A docx session environment
 open_docx <- function(docx_path) {
+  if(!file.exists(docx_path)){
+    stop(err_docx_unreadable(docx_path, "file does not exist"))
+  }
+
   tmp <- tempfile()
   dir.create(tmp)
+
+  ok <- withCallingHandlers(
+    tryCatch({unzip(docx_path, exdir = tmp); TRUE},
+             error = function(e) FALSE),
+    warning = function(w) invokeRestart("muffleWarning")
+  )
   unzip(docx_path, exdir = tmp)
 
   xml_path   <- file.path(tmp, "word", "document.xml")
   rels_path  <- file.path(tmp, "word", "_rels", "document.xml.rels")
   ct_path    <- file.path(tmp, "[Content_Types].xml")
-  doc        <- read_xml(xml_path)
-  rels_doc   <- read_xml(rels_path)
-  ct_doc     <- read_xml(ct_path)
+
+  if(!ok || !file.exists(xml_path)) {
+    unlink(tmp, recursive = TRUE)
+    stop(err_docx_unreadable(
+      docx_path,
+      "the file is not a readable .docx (no word/document.xml inside)"
+    ))
+  }
+
+  parsed <- tryCatch(
+    list(doc  = read_xml(xml_path),
+         rels = read_xml(rels_path),
+         ct   = read_xml(ct_path)),
+    error = function(e){
+      unlink(tmp, recursive = TRUE)
+      stop(err_docx_unreadable(docx_path, e))
+    }
+  )
+
+
+  doc        <- parsed$doc
+  rels_doc   <- parsed$rels
+  ct_doc     <- parsed$ct
 
   # Build bookmark jump table once: name -> <w:p> node reference
   bm_nodes   <- xml_find_all(doc, ".//w:bookmarkStart", ns = c(w = W_NS))
@@ -448,7 +478,17 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
 
     rtf_path <- rtf_paths[[tbl_name]]
 
-    if (is_image_rtf(rtf_path)) {
+    is_img <- tryCatch(
+      is_image_rtf(rtf_path),
+      error = function(e){
+        status[[i]]$err <<- err_rtf_unreadable(rtf_path, e)
+        NULL
+      }
+    )
+
+    if(is.null(is_img)) next
+
+    if (is_img) {
       img <- tryCatch(
         extract_png(rtf_path),
         error = function(e) {
@@ -459,8 +499,10 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
       if (is.null(img)) next
       tryCatch({
         inject_image(session, bm_name, img$png_bytes, img$width_twips, img$height_twips)
-        #logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
-      }, error = function(e) status[[i]]$err <<- e #err_image_inject_failed(bm_name, e)
+
+      }, error = function(e) {
+        status[[i]]$err <<- as_houdini_error(e, err_image_inject_failed, bm_name)
+      }
       )
 
     } else {
@@ -481,8 +523,10 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
         xml_str <- output$xml
         status[[i]]$warn <- output$warns
         inject_table(session, bm_name, xml_str)
-        #logger::log_info(sprintf("%s Succesfully Inserted at Bookmark: %s",tbl_name,bm_name))
-      }, error = function(e) status[[i]]$err <<- e )#err_xml_inject_failed(bm_name, e))
+
+      }, error = function(e) {
+        status[[i]]$err <<- as_houdini_error(e, xml_inject_failed, bm_name)
+      })
     }
   }
 

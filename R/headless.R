@@ -90,7 +90,14 @@ parse_xl <- function(xl){
 #' @return list(config, selections); see [parse_xl()]
 #' @export
 read_xlsx <- function(path) {
-  parse_xl(readxl::read_excel(path, sheet = 1))
+  if(!file.exists(path)){
+    stop(err_excel_unreadable(path, "file does not exist"))
+  }
+  xl <- tryCatch(
+    readxl::read_excel(path, sheet = 1),
+    error = function(e) stop(err_excel_unreadable(path,e))
+  )
+  parse_xl(xl)
 }
 
 #' Run the full houdini injection pipeline
@@ -113,10 +120,19 @@ read_xlsx <- function(path) {
 apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL, hide_data = FALSE, rtf = FALSE, quiet = FALSE){
   #Check documents exist
   if(!file.exists(input_doc)){
-    stop("Word document not found: ", input_doc)
+    stop(houdini_error(
+      "docx_unreadable",
+      paste0("Word document not found: ", input_doc),
+      "Check the path to the .docx file",
+      list(path = input_doc)
+    ))
   }
   if(!dir.exists(file_location)){
-    stop("RTF folder not found: ", file_location)
+    stop(houdini_error(
+      "rtf_folder_missing",
+      paste0("RTF folder not found: ", file_location),
+      "Check the path to the folder holding the rtf files"
+      ))
   }
   if(is.null(figure_location) || !dir.exists(figure_location)){
     figure_location <- file_location
@@ -127,7 +143,12 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
   parsed <- if(is.character(input_sheet)){
     read_xlsx(input_sheet)
   } else{
-    parse_xl(input_sheet)
+    tryCatch(
+      parse_xl(input_sheet),
+      houdini_error = function(e) stop(e),
+      error = function(e) stop(err_excel_unreadable("(config data.frame", e))
+    )
+
   }
 
   rtf_files <- list.files(file_location, pattern = "\\.rtf$", ignore.case = TRUE)
@@ -172,6 +193,10 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
   invisible(status)
 }
 
+with_rtf_ext <- function(name){
+  ifelse(grepl("\\.rtf$", name, ignore.case = TRUE), name, paste0(name, ".rtf"))
+}
+
 #ouputs the collected log data over a run
 write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, file_location){
   df    <- config_data
@@ -184,7 +209,9 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
              paste0("Generated : ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
              paste0("User      : ", Sys.info()[["user"]]),
              paste0("Word file : ", if (!is.null(input_doc)) input_doc else "(not set)"),
-             paste0("Excel File :", if(!is.null(input_sheet)) input_sheet else "(not set)"),
+             paste0("Excel File :", if(is.character(input_sheet)) input_sheet
+                                    else if (is.data.frame(input_sheet)) "(config data.frame)"
+                                    else "(not set)"),
              paste0("RTF folder: ", file_location %||% "(not set)"),
              ""
   )
@@ -213,7 +240,7 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
         lines <- c(lines,
                    paste0("Row       : ", i),
                    paste0("Bookmark  : ", bm_val),
-                   paste0("Table     : ", tbl_val, ".rtf"),
+                   paste0("Table     : ", with_rtf_ext(tbl_val)),
                    paste0("Status    : ERROR - ", err_msg),
                    if (!is.null(err_hint)) paste0("Hint      : ", err_hint) else NULL,
                    ""
@@ -222,7 +249,7 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
         lines <- c(lines,
                    paste0("Row       : ", i),
                    paste0("Bookmark  : ", bm_val),
-                   paste0("Table     : ", tbl_val, ".rtf"),
+                   paste0("Table     : ", with_rtf_ext(tbl_val)),
                    paste0("Parameters: ", fmt_vec(sel$parameters)),
                    paste0("Timepoints: ", fmt_vec(sel$timelines)),
                    paste0("Excluded Columns: ", fmt_vec(sel$excluded_cols, none = "(none)")),

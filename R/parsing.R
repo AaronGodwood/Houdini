@@ -798,9 +798,34 @@ extract_footnotes <- function(footer_tbl){
 #'   \item{header}{block of header rows (see section 4)}
 #'   \item{data}{block of data rows, with stable \code{row_id}s}
 parse_rtf <- function(path, hide_data = FALSE) {
-  text  <- rtf_read_raw(path)
-  pages <- rtf_split_pages(text)
-  pages <- lapply(pages, function(p) parse_page(p, hide_data))
+  if(!file.exists(path)){
+    stop(err_rtf_unreadable(path, "file does not exist"))
+  }
+  if(dir.exists(path)){
+    stop(err_rtf_unreadable(path, "path is a directory, not a file"))
+  }
+
+
+  text  <- tryCatch(
+    rtf_read_raw(path),
+    error = function(e) stop(err_rtf_unreadable(path,e))
+  )
+
+  pages <- tryCatch(
+    rtf_split_pages(text),
+    error = function(e) stop(err_rtf_parse_failed(path, "split_pages", e))
+  )
+
+  if(length(pages) == 0L){
+    stop(err_rtf_parse_failed(
+      path, "split_pages",
+      "no table sections (\\sectd) were found in the file"
+    ))
+  }
+  pages <- tryCatch(
+    lapply(pages, function(p) parse_page(p, hide_data)),
+    error = function(e) stop(err_rtf_parse_failed(path, "parse_page", e))
+  )
 
   # Stable row identity: number data rows sequentially across all pages in
   # document order. Row exclusions are stored against these IDs rather than

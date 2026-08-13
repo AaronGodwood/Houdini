@@ -240,7 +240,7 @@ err_excel_unreadable <- function(path, cause = NULL){
   msg <- sprintf("Cannot read Excel Document '%s'.", basename(path))
   if (nzchar(cause_msg)) msg <- paste0(msg, " ", cause_msg)
   houdini_error(
-    "docx_unreadable",
+    "excel_unreadable",
     msg,
     "Check that the file exists, is not open in another application or has permissions restrictions.",
     list(path = path)
@@ -263,8 +263,26 @@ warn_filter_not_found <- function(filter_name, filter_type = NULL) {
     "filter_not_found",
     msg,
     sprintf("Check that the %s exists and is spelt correctly.",tolower(filter_text)),
-    #list(filter_name = filter_name)
+    list(filter_name = filter_name, filter_type = filter_type)
   )
+}
+
+#
+# Utility: normalise any condition into a houdini_error
+
+#' Return \code{e} unchanged if it is already a houdini_error, otherwise wrap it
+#'
+#' Errors raised deep in the pipeline (or by base R) carry no hint and are
+#' often meaningless to the user e.g. "subscript out of bounds" tells them nothing
+#' about which file or bookmark is at fault. Wrapping preserves the orginal error
+#' whilst adding an actionable message and a hint. existing houdini_errors are just
+#' passed as they are.
+#'
+#' @param e A condition object
+#' @param constructor A houdini_error construcor taking (context, cause)
+#' @param context First argument for the constructor (e.g. a bookmark name)
+as_houdini_error <- function(e, constuctor, context){
+  if(inherits(e, "houdini_error")) e else constuctor(context, e)
 }
 
 
