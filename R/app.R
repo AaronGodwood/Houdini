@@ -324,12 +324,9 @@ houdini_app <- function() {
     # Get cached parsed pages for a table, parsing on first access
     get_cached_pages <- function(tbl_name) {
       cache <- parse_cache()
-      print("Step 1")
       if (!is.null(cache[[tbl_name]])) return(cache[[tbl_name]])
       paths <- rtf_paths()
-      print("Step 12")
       if (!tbl_name %in% names(paths)) return(NULL)
-      print("Step 165")
       pages <- parse_rtf(paths[[tbl_name]])
       cache[[tbl_name]] <- pages
       parse_cache(cache)

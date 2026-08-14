@@ -144,7 +144,6 @@ open_docx <- function(docx_path) {
              error = function(e) FALSE),
     warning = function(w) invokeRestart("muffleWarning")
   )
-  unzip(docx_path, exdir = tmp)
 
   xml_path   <- file.path(tmp, "word", "document.xml")
   rels_path  <- file.path(tmp, "word", "_rels", "document.xml.rels")
