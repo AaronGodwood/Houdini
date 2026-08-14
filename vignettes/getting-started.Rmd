@@ -1,0 +1,348 @@
+---
+title: "Getting started with Houdini"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with Houdini}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+Houdini inserts tables and figures into a Word document. You give it three
+things - a Word template with named bookmarks, a folder of RTF files, and a
+mapping between them (usually from an excel document) - and it writes a finished document with Word tables at each bookmark.
+
+This vignette builds a small report from scratch: two tables, one figure, and
+a filter.
+
+```{r setup, echo = FALSE, message = FALSE}
+library(Houdini)
+
+# ---------------------------------------------------------------------------
+# Everything in this chunk stands in for files you would already have: a Word
+# template exported from your report shell, and a folder of RTF output from
+# SAS. It is hidden because none of it is about using Houdini.
+# ---------------------------------------------------------------------------
+
+W <- "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+# A minimal but valid .docx containing the given bookmarks, one per paragraph.
+make_template <- function(path, bookmarks) {
+  paras <- vapply(seq_along(bookmarks), function(i) {
+    sprintf(paste0('<w:p><w:bookmarkStart w:id="%d" w:name="%s"/>',
+                   '<w:r><w:t>%s</w:t></w:r>',
+                   '<w:bookmarkEnd w:id="%d"/></w:p>'),
+            i, bookmarks[i], bookmarks[i], i)
+  }, character(1))
+
+  doc <- sprintf(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+     <w:document xmlns:w="%s"><w:body>%s
+       <w:sectPr><w:pgSz w:w="11906" w:h="16838"/>
+       <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+       </w:sectPr></w:body></w:document>',
+    W, paste(paras, collapse = ""))
+
+  tmp <- tempfile(); dir.create(tmp)
+  dir.create(file.path(tmp, "word", "_rels"), recursive = TRUE)
+  writeLines(doc, file.path(tmp, "word", "document.xml"))
+  writeLines(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+     <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+    file.path(tmp, "word", "_rels", "document.xml.rels"))
+  writeLines(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+     <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+     <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+     <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+     </Types>', file.path(tmp, "[Content_Types].xml"))
+
+  zip::zip(path, list.files(tmp, recursive = TRUE, all.files = TRUE),
+           root = tmp, mode = "mirror", include_directories = FALSE)
+  unlink(tmp, recursive = TRUE)
+  path
+}
+
+# One RTF table page. `parameter` populates the page header, which is what
+# Houdini reads when you filter by parameter.
+rtf_page <- function(header, rows, parameter = NULL, widths) {
+  bounds <- cumsum(widths)
+  defs <- paste(sprintf("\\cellx%d", bounds), collapse = "")
+
+  row_xml <- function(cells, hdr = FALSE) {
+    tag <- if (hdr) "\\trhdr" else ""
+    body <- paste(vapply(seq_along(cells), function(i) {
+      align <- if (i == 1L) "l" else "c"
+      bold <- if (hdr) "\\b" else ""
+      sprintf("{\\q%s%s %s\\cell}", align, bold, cells[i])
+    }, character(1)), collapse = "")
+    sprintf("\\trowd%s%s%s\\row", tag, defs, body)
+  }
+
+  head_sec <- if (is.null(parameter)) "" else sprintf(
+    "{\\header\\trowd\\cellx8640{\\ql Parameter: %s\\cell}\\row}", parameter)
+
+  paste0("\\sectd\n", head_sec, "\n", row_xml(header, hdr = TRUE), "\n",
+         paste(vapply(rows, row_xml, character(1)), collapse = "\n"), "\n\\sect")
+}
+
+write_rtf <- function(path, pages) {
+  writeLines(paste0("{\\rtf1\\ansi\n", paste(pages, collapse = "\n"), "\n}"),
+             path)
+  path
+}
+
+# A 1x1 PNG is enough to show how figures are handled
+png_bytes <- as.raw(c(
+  0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x00,0x00,0x0d,0x49,0x48,0x44,
+  0x52,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x01,0x08,0x02,0x00,0x00,0x00,0x90,
+  0x77,0x53,0xde,0x00,0x00,0x00,0x0c,0x49,0x44,0x41,0x54,0x08,0xd7,0x63,0xf8,
+  0xcf,0xc0,0x00,0x00,0x03,0x01,0x01,0x00,0x18,0xdd,0x8d,0xb0,0x00,0x00,0x00,
+  0x00,0x49,0x45,0x4e,0x44,0xae,0x42,0x60,0x82))
+
+write_image_rtf <- function(path) {
+  hex <- paste(sprintf("%02x", as.integer(png_bytes)), collapse = "")
+  writeLines(sprintf(
+    "{\\rtf1\\ansi\n\\sectd\n{\\pict\\pngblip\\picwgoal5760\\pichgoal3240\n%s}\n\\sect}",
+    hex), path)
+  path
+}
+
+# Pull word/document.xml out of a .docx so the results below can be checked
+read_docx_xml <- function(path) {
+  tmp <- tempfile(); dir.create(tmp)
+  on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
+  utils::unzip(path, exdir = tmp)
+  paste(readLines(file.path(tmp, "word", "document.xml"), warn = FALSE),
+        collapse = "\n")
+}
+
+# --- the "study" -----------------------------------------------------------
+project <- file.path(tempdir(), "escapology_study")
+dir.create(project, showWarnings = FALSE)
+rtf_dir <- file.path(project, "rtf")
+dir.create(rtf_dir, showWarnings = FALSE)
+
+widths <- c(2880L, 1920L, 1920L, 1920L)
+
+# Table 1: audience reaction, split by trick class
+write_rtf(file.path(rtf_dir, "t_reactions.rtf"), rtf_page(
+  header = c("Trick Class\\line    Trick name", "Placebo", "Dose A", "Dose B"),
+  rows = list(
+    c("Illusions", "52", "49", "51"),
+    c("    Apparition", "18", "21", "19"),
+    c("    Disappearance", "34", "28", "32"),
+    c("Escapology", "47", "44", "46"),
+    c("    Straight Jacket", "25", "23", "24"),
+    c("    Handcuffs", "22", "21", "22")
+  ), widths = widths))
+
+# Table 2: two pages, one per measured parameter
+write_rtf(file.path(rtf_dir, "t_noise.rtf"), c(
+  rtf_page(
+    header = c("Statistic", "Placebo", "Dose A", "Dose B"),
+    rows = list(c("Mean", "82.4", "88.1", "91.7"),
+                c("SD", "6.2", "5.8", "6.9"),
+                c("Range", "71-94", "76-99", "78-103")),
+    parameter = "Audience Noise (DB)", widths = widths),
+  rtf_page(
+    header = c("Statistic", "Placebo", "Dose A", "Dose B"),
+    rows = list(c("Mean", "3.1", "5.4", "7.8"),
+                c("SD", "0.9", "1.2", "1.6"),
+                c("Range", "1-6", "2-9", "3-12")),
+    parameter = "No. Fainters (n)", widths = widths)
+))
+
+write_image_rtf(file.path(rtf_dir, "f_applause.rtf"))
+
+template <- make_template(file.path(project, "report_shell.docx"),
+                          c("Table_Reactions", "Table_Noise", "Figure_Applause"))
+```
+
+## What you start with
+
+A Word document containing bookmarks where tables or figures should go:
+
+```{r}
+names(Houdini:::extract_bookmarks(template))
+```
+
+And a folder of RTF files, one per table or figure:
+
+```{r}
+list.files(rtf_dir)
+```
+
+## Looking at a table first
+
+Before wiring anything up, `houdini_preview()` renders a single RTF so you can
+see how Houdini has parsed it. It writes a self-contained HTML page and opens
+it; `browse = FALSE` just returns the path.
+
+```{r}
+preview <- houdini_preview(file.path(rtf_dir, "t_noise.rtf"), browse = FALSE)
+```
+
+The page header tells you what Houdini found:
+
+```{r, echo = FALSE, results = "asis"}
+html <- paste(readLines(preview, warn = FALSE), collapse = "\n")
+cat(regmatches(html, regexpr('<div class="sub">[^<]*</div>', html)))
+```
+
+Two pages, one per parameter, which is what makes the parameter filter below
+work. Preview accepts the same filters as a real run, so you can check a
+selection before committing it to a config:
+
+```{r}
+noise_only <- houdini_preview(
+  file.path(rtf_dir, "t_noise.rtf"),
+  parameters = "Audience Noise (DB)",
+  browse = FALSE
+)
+```
+
+## Mapping bookmarks to tables
+
+The mapping is done via an Excel document or a data frame with the same columns.
+`Bookmark` and `Dataset` are required; the rest are optional filters.
+
+```{r}
+config <- data.frame(
+  Bookmark   = c("Table_Reactions", "Table_Noise", "Figure_Applause"),
+  Dataset    = c("t_reactions.rtf", "t_noise.rtf", "f_applause.rtf"),
+  Parameters = c("", "Audience Noise (DB)", ""),
+  Levels     = c("Trick Class", "", ""),
+  stringsAsFactors = FALSE
+)
+config
+```
+
+Two filters are doing work here:
+
+- `Parameters` keeps only the *Audience Noise (DB)* page of the two-page table.
+- `Levels` keeps only top-level rows of the reactions table, dropping the
+  indented trick names beneath each class.
+
+Both accept several values separated by semicolons, e.g. `"Week 1; Week 4"`.
+
+## Generating the document
+
+```{r}
+status <- apparate(template, config, rtf_dir, quiet = TRUE)
+output <- paste0(template, "_Houdini_Output.docx")
+file.exists(output)
+```
+
+`apparate()` returns a per-row status list rather than stopping at the first
+problem so if one table throws an error the rest can still run fine:
+
+```{r}
+vapply(status, function(s) if (is.null(s$err)) "ok" else "error", character(1))
+```
+
+A failing row carries a structured error with a hint. Note this runs against a
+copy of the template: each run writes its output beside its input, so pointing
+a second run at the same template would overwrite the document just produced.
+
+```{r}
+scratch <- file.path(project, "scratch.docx")
+file.copy(template, scratch)
+
+bad <- apparate(scratch,
+                data.frame(Bookmark = "No_Such_Bookmark",
+                           Dataset  = "t_noise.rtf",
+                           stringsAsFactors = FALSE),
+                rtf_dir, quiet = TRUE)
+conditionMessage(bad[["1"]]$err)
+Houdini:::err_hint(bad[["1"]]$err)
+```
+
+## Checking what came out
+
+The generated document holds proper Word tables, not images of tables:
+
+```{r}
+doc <- xml2::read_xml(read_docx_xml(output))
+ns <- c(w = W)
+c(tables   = length(xml2::xml_find_all(doc, ".//w:tbl", ns = ns)),
+  drawings = length(xml2::xml_find_all(doc, ".//w:drawing", ns = ns)))
+```
+
+The filters took effect. Only the requested parameter survived:
+
+```{r}
+texts <- xml2::xml_text(xml2::xml_find_all(doc, ".//w:t", ns = ns))
+c("Audience Noise page kept" = any(grepl("82.4", texts)),
+  "Fainters page dropped"    = !any(grepl("3.1", texts)))
+```
+
+And the level filter kept the trick classes while dropping the individual
+tricks:
+
+```{r}
+c("Illusions kept"   = any(grepl("Illusions", texts)),
+  "Apparition dropped" = !any(grepl("Apparition", texts)))
+```
+
+## Working from Excel
+
+For anything reproducible, keep the mapping in a excel document. `Export Excel` in the app writes this format for you.
+
+```{r}
+sheet <- file.path(project, "config.xlsx")
+writexl::write_xlsx(config, sheet)
+
+from_excel <- file.path(project, "from_excel.docx")
+file.copy(template, from_excel)
+
+status <- apparate(from_excel, sheet, rtf_dir, quiet = TRUE)
+vapply(status, function(s) if (is.null(s$err)) "ok" else "error", character(1))
+```
+
+If you want to pass a data frame just pass that rather than the excel file path. When `quiet` is `FALSE`, a log is written next to the output recording every row, the filters applied, and any warnings.
+
+## Using the app
+
+`run_app()` opens the same pipeline as a Shiny app. It is the easier way to
+build a configuration in the first place: load the template and RTF folder,
+click a row to preview it, and click column headers or rows in the preview to
+exclude them.
+
+```{r, eval = FALSE}
+run_app()
+```
+
+The two workflows share a format, so the usual pattern is to build a
+configuration interactively, export it to Excel, then run it can from a script
+whenever the RTFs are regenerated or reimported back into the app.
+
+## Regenerating
+
+Re-running over a document that Houdini already produced replaces the injected
+content in place rather than adding a second copy, so it is safe to run
+repeatedly as the source RTFs change:
+
+```{r}
+again <- apparate(output, config, rtf_dir, quiet = TRUE)
+final <- paste0(output, "_Houdini_Output.docx")
+
+doc2 <- xml2::read_xml(read_docx_xml(final))
+length(xml2::xml_find_all(doc2, ".//w:tbl", ns = c(w = W)))
+```
+
+Still three pieces of content, not six.
+
+```{r, include = FALSE}
+unlink(project, recursive = TRUE)
+unlink(c(preview, noise_only))
+```
+
+## Where to go next
+
+- `?apparate` for the full set of run options
+- `?houdini_preview` for previewing a single file
+- `?parse_xl` for the recognised config columns

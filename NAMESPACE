@@ -3,6 +3,7 @@
 export("%>%")
 export(apparate)
 export(houdini_app)
+export(houdini_preview)
 export(houdini_watch)
 export(parse_xl)
 export(read_xlsx)

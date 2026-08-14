@@ -13,7 +13,10 @@ LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
     rstudioapi,
-    pins
+    pins,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 RoxygenNote: 7.3.3
 Imports: 
