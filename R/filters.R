@@ -192,7 +192,7 @@ remove_continuations <- function(combined){
   }, integer(1))
   empty <- empty[!is.na(empty)]
   cont <- vapply(seq_along(block$text[ ,1]), function(t){
-    if(grepl("(cont.)",block$text[t ,1])) return(ids[t])
+    if(grepl("\\(cont\\.\\)\\s*$",block$text[t ,1], ignore.case = TRUE, perl = TRUE)) return(ids[t])
     NA_integer_
     }, integer(1))
   cont <- cont[!is.na(cont)]
