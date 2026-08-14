@@ -49,6 +49,29 @@ test_that("filter_levels keeps only selected indents", {
   expect_identical(filter_levels(combined, NULL)$combined, combined)
 })
 
+test_that("filter_levels keeps blank separators but not partial rows", {
+  pages    <- parse_rtf(test_path("fixtures", "multi_levels.rtf"))
+  combined <- combine_pages(pages)
+
+  # A row blank in every column is a separator and survives either filter
+  blank_of <- function(b) {
+    which(!apply(nzchar(trimws(b$text)) & b$present, 1L, any))
+  }
+  expect_length(blank_of(combined$data), 1L)
+  expect_length(blank_of(filter_levels(combined, "Trick Class")$combined$data), 1L)
+  expect_length(blank_of(filter_levels(combined, "Trick name/names")$combined$data), 1L)
+
+  # A row blank only in column 1 continues the block above, so it follows that
+  # block's level rather than being kept unconditionally
+  cont <- combined
+  cont$data$text[3L, 1L] <- ""          # was an indented (level 2) row
+  kept_l1 <- filter_levels(cont, "Trick Class")$combined$data
+  expect_false(any(kept_l1$text[, 3L] == "15.2"))   # stayed with its level-2 block
+
+  kept_l2 <- filter_levels(cont, "Trick name/names")$combined$data
+  expect_true(any(kept_l2$text[, 3L] == "15.2"))
+})
+
 
 
 test_that("combine_pages concatenates data and keeps first-page headers", {

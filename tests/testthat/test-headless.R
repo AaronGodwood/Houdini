@@ -80,6 +80,21 @@ test_that("apparate accepts a data.frame config and reports row errors", {
   expect_true(file.exists(paste0(docx,"_Houdini_Output.docx")))
 })
 
+
+test_that("absolute_path recognises platform-native absolute paths",{
+  # Left alone: already absolute
+  expect_identical(absolute_path("/tmp/doc.docx"), "/tmp/doc.docx")
+  expect_identical(absolute_path("C:/Users/x/doc.docx"), "C:/Users/x/doc.docx")
+  expect_identical(absolute_path("C:\\Users\\x\\doc.docx"), "C:\\Users\\x\\doc.docx")
+  expect_identical(absolute_path("\\\\server\\share\\doc.docx"),
+                   "\\\\server\\share\\doc.docx")
+
+  # Resolved against the working directory: genuinely relative
+  expect_identical(absolute_path("doc.docx"), file.path(getwd(), "doc.docx"))
+  expect_identical(absolute_path("sub/doc.docx"), file.path(getwd(), "sub/doc.docx"))
+})
+
+
 test_that("houdini_run validates its inputs", {
   expect_error(apparate("nope.docx", data.frame(), tempdir()),
                "Word document not found: nope.docx")

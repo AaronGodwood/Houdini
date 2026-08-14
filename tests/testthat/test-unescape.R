@@ -48,3 +48,51 @@ test_that("rtf_cell_to_text strips markup and decodes escapes", {
                      label = sprintf("dispatch output for %s", deparse(case$in_)))
   }
 })
+
+test_that("cell indent comes from \\li and ignores lookalike control words", {
+  cases <- list(
+    list(in_ = "\\ql {Appirition",          want = "Appirition"),
+    list(in_ = "\\li194\\ql {Appirition",   want = "  Appirition"),
+    list(in_ = "\\li388\\ql {Deeper",       want = "    Deeper"),
+    list(in_ = "\\li0\\ql {Top level",      want = "Top level"),
+    # negative indents are not nesting
+    list(in_ = "\\li-194\\ql {Outdent",     want = "Outdent"),
+    # \linex0 is a border control word, not an indent, and must not leave
+    # its numeric tail behind in the cell text
+    list(in_ = "\\linex0\\ql {No indent",   want = "No indent"),
+    # \li inside a dropped destination group does not count
+    list(in_ = "{\\*\\bkmkstart\\li999}\\ql {Plain", want = "Plain"),
+    # a cell spanning several paragraphs sits at the shallowest indent, and
+    # must not repeat its own text once per \li (one prefix, one copy)
+    list(in_ = "\\li194 {A\\line\\li388 B", want = "  A\nB")
+  )
+  for (case in cases) {
+    expect_identical(rtf_cell_to_text_r(case$in_), case$want,
+                     label = sprintf("R output for %s", deparse(case$in_)))
+  }
+})
+
+test_that("\\line survives as a newline while source wrapping does not", {
+  expect_identical(rtf_cell_to_text_r("\\ql {First\\line Second"), "First\nSecond")
+  expect_identical(rtf_cell_to_text_r("\\ql {Wrapped\nacross"), "Wrappedacross")
+})
+
+test_that("C and R cell_to_text implementations agree", {
+  skip_if_not(.c_available(), "C fast-path not compiled")
+  cases <- c(
+    "\\ql {Appirition", "\\li194\\ql {Appirition", "\\li388\\ql {Deeper",
+    "\\li0\\ql {Top", "\\li-194\\ql {Outdent", "\\linex0\\ql {No indent",
+    "{\\*\\bkmkstart\\li999}\\ql {Plain", "\\li194 {A\\line\\line B",
+    "\\ql {First\\line Second", "\\ql {Wrapped\nacross",
+    "Mean \\'b1 SD\\cell", "{\\b Bold\\b0}\\cell", "keep\\~this\\cell",
+    "\\li194 {52", "\\ql {52", ""
+  )
+  for (case in cases) {
+    expect_identical(.Call(C_rtf_cell_to_text, case, FALSE),
+                     rtf_cell_to_text_r(case),
+                     label = sprintf("C output for %s", deparse(case)))
+    expect_identical(.Call(C_rtf_cell_to_text, case, TRUE),
+                     rtf_cell_to_text_r(case, TRUE),
+                     label = sprintf("C hide_data output for %s", deparse(case)))
+  }
+})
