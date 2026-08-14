@@ -9,7 +9,7 @@ filter_levels(combined, levels)
 \arguments{
 \item{combined}{Output of combine_pages()}
 
-\item{timelines}{Character vector of timeline values to include}
+\item{levels}{Character vector of level indent titles to include}
 }
 \description{
 Rows with no content are always kept.

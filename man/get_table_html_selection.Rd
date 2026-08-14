@@ -35,6 +35,8 @@ get_table_html_selection(
 \item{pages}{Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL}
 
 \item{row_limit}{The number of rows shown in the selection before it is truncted}
+
+\item{hide_data}{toggle to replace all data in tables with XX}
 }
 \value{
 HTML string

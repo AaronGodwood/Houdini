@@ -32,6 +32,8 @@ get_table_html_output(
 \item{levels}{Character vector of indent level titles to keep (NULL = all)}
 
 \item{pages}{Pre-parsed RTF pages (output of parse_rtf()); parsed from path if NULL}
+
+\item{hide_data}{toggle to replace all data in tables with XX}
 }
 \value{
 HTML string
