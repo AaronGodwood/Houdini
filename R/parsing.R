@@ -360,6 +360,7 @@ block_rbind_all <- function(blocks) {
 # TODO consult someone about this May cause random errors but I do feel it is unlikely
 block_categorise <- function(block){
   n_col <- block_ncol(block)
+  if(n_col == 0) return(block)
   spans <- block$colspan[ ,1]
   empty <- which(vapply(spans, function(s) s == n_col, logical(1)))
   #cont <- which(vapply(block$text[ ,1], function(t) grepl("(cont.)",t), logical(1)))

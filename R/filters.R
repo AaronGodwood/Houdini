@@ -183,6 +183,7 @@ get_levels <- function(combined){
 remove_continuations <- function(combined){
   block <- combined$data
   n_col <- block_ncol(block)
+  if(n_col == 0) return(combined)
   spans <- block$colspan[ ,1]
   ids <- block$row_id
   empty <- vapply(seq_along(spans), function(s){
