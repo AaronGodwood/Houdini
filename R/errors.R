@@ -248,6 +248,23 @@ err_excel_unreadable <- function(path, cause = NULL){
 }
 
 
+#' Injected content was edited by hand before being regenerated
+#'
+#' Informational only: the content is replaced either way, since regenerating
+#' is what the user asked for. The note exists so the overwrite is visible in
+#' the log rather than silent.
+#' @param bookmark Bookmark name whose content had changed
+warn_content_modified <- function(bookmark) {
+  houdini_warning(
+    "content_modified",
+    sprintf("Content at bookmark '%s' was edited after the last run and has been overwritten.",
+            bookmark),
+    "Edit the source RTF rather than the Word document, or remove the bookmark to keep the table as it is.",
+    list(bookmark = bookmark)
+  )
+}
+
+
 
 #
 # Filtering Warnings

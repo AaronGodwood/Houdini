@@ -144,7 +144,6 @@ open_docx <- function(docx_path) {
              error = function(e) FALSE),
     warning = function(w) invokeRestart("muffleWarning")
   )
-  unzip(docx_path, exdir = tmp)
 
   xml_path   <- file.path(tmp, "word", "document.xml")
   rels_path  <- file.path(tmp, "word", "_rels", "document.xml.rels")
@@ -251,7 +250,8 @@ inject_table <- function(session, bookmark_name, xml_string) {
     stop(err_bookmark_bad_context(bookmark_name, entry$context))
   }
 
-  insert_or_replace(session, entry$para, read_xml(xml_string), where = "on")
+  insert_or_replace(session, entry$para, read_xml(xml_string), where = "on",
+                    bookmark = bookmark_name)
   invisible(TRUE)
 }
 
@@ -375,15 +375,49 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
     target_w_emu, target_h_emu   # a:ext
   )
 
-  insert_or_replace(session, para_node, read_xml(drawing_xml), where = "on") ## similarly to above use add_xml as a guide for replacement
+  insert_or_replace(session, para_node, read_xml(drawing_xml), where = "on",
+                    bookmark = bookmark_name)
   invisible(TRUE)
 }
 
-insert_or_replace <- function(session, node, xml_block, where = "after"){
+insert_or_replace <- function(session, node, xml_block, where = "after",
+                              bookmark = NULL){
 
-  #next_bmk_id <- session$next_bmk_id
-  #session$next_bmk_id <- session$next_bmk_id + 1L
-  #name <- sprintf("_Houdini%d",next_bmk_id)
+  if (where == "on" && !is.null(bookmark)) {
+    new_hash <- content_hash(xml_block)
+
+    wrap <- find_wrapper(session$doc, bookmark)
+    if (!is.null(wrap)) {
+      # A wrapper records the hash of what Houdini last wrote. If the content
+      # sitting there now hashes differently, someone edited it by hand and
+      # this run is about to overwrite their change - worth reporting, though
+      # not worth refusing, since regenerating is the whole point.
+      if (!is.na(wrap$hash)) {
+        current <- tryCatch(
+          wrapper_content_hash(wrap),
+          error = function(e) NA_character_
+        )
+        if (!is.na(current) && !identical(current, wrap$hash)) {
+          session$modified <- c(session$modified, bookmark)
+        }
+      }
+      replace_wrapper_contents(session, wrap, xml_block, bookmark, new_hash)
+      return(invisible(TRUE))
+    }
+
+    # Pre-wrapper document: consume the old content, then fence the new
+    next_node <- xml_find_first(node, "following-sibling::*[1]")
+    if (!inherits(next_node, "xml_missing") &&
+        (xml_name(next_node) == "tbl" ||
+         !is.na(xml_child(next_node, ".//w:drawing")))) {
+      cleanup_image_rels(session, next_node)
+      xml_remove(next_node)
+    }
+
+    wrap_new_content(session, node, xml_block,
+                     wrapper_name(bookmark, new_hash))
+    return(invisible(TRUE))
+  }
 
   if(where == "on"){
     next_node <- xml_find_first(node,"following-sibling::*[1]")
@@ -391,8 +425,6 @@ insert_or_replace <- function(session, node, xml_block, where = "after"){
     if(xml_name(next_node) == "tbl" || !is.na(xml_child(next_node, ".//w:drawing"))){
       cleanup_image_rels(session, next_node)
       xml_replace(next_node,xml_block)
-      #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "before")
-      #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkEnd w:xmlns="%s" w:id="%d"/>',W_NS,next_bmk_id)), .where = "after")
       return(invisible(TRUE))
     }
 
@@ -400,9 +432,7 @@ insert_or_replace <- function(session, node, xml_block, where = "after"){
 
   }
 
-  #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkEnd w:xmlns="%s" w:id="%d"/>',W_NS,next_bmk_id)), .where = "after")
   xml_add_sibling(node,xml_block, .where = where)
-  #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "after")
 
   invisible(TRUE)
 }
@@ -478,6 +508,8 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
 
     rtf_path <- rtf_paths[[tbl_name]]
 
+    session$modified <- character()
+
     is_img <- tryCatch(
       is_image_rtf(rtf_path),
       error = function(e){
@@ -525,9 +557,15 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
         inject_table(session, bm_name, xml_str)
 
       }, error = function(e) {
-        status[[i]]$err <<- as_houdini_error(e, xml_inject_failed, bm_name)
+        status[[i]]$err <<- as_houdini_error(e, err_xml_inject_failed, bm_name)
       })
     }
+  }
+
+  # Record that this row overwrote hand-edited content (since last houdini run)
+  # Still overwrite but warn user
+  if(length(session$modified) > 0){
+    status[[i]]$warn <- c(status[[i]]$warn, list(warn_content_modified(bm_name)))
   }
 
   close_docx(session, output_path)
