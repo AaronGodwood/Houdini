@@ -236,7 +236,7 @@ build_html_selection <- function(combined,
       opacity   <- if (col_excl || row_excl) "opacity:0.3;" else ""
       raw_align <- cell_align_or_default(data$align[ri, ci], ci)
       style <- sprintf(
-        " style=\"%s%spadding:0;white-space:pre;overflow-wrap:break-word;text-align:%s\"",
+        " style=\"%s%spadding:0;white-space:pre;text-align:%s\"",
         border_style, opacity, raw_align
       )
 
@@ -268,7 +268,7 @@ build_html_selection <- function(combined,
 
   sprintf(
     paste0("<table style=\"font-family:'Times New Roman',Times,serif;",
-           "font-size:10pt;width:100%%;table-layout:fixed;border-top:2px solid black;border-collapse:collapse;user-select:none\">",
+           "font-size:10pt;border-top:2px solid black;border-collapse:collapse;user-select:none\">",
            "%s%s%s</table>"),
     colgroup, thead, tbody
   )
