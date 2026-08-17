@@ -180,6 +180,28 @@ get_levels <- function(combined){
 }
 
 
+
+# Tables get double gaps when pages get combined this removes one of those spaces
+# TODO consult someone about this May cause random errors but I do feel it is unlikely
+remove_double_blanks <- function(combined){
+  block <- combined$data
+  n_col <- block_ncol(block)
+  if(n_col == 0) return(block)
+  ids <- block$row_id
+  spans <- block$colspan[ ,1]
+  empty <- vapply(seq_along(spans), function(s){
+    if(spans[s] == n_col) return(ids[s])
+    NA_integer_
+  }, integer(1))
+  empty <- empty[!is.na(empty)]
+  two_empty <- empty[(empty + 1) %in% empty]
+  wanted_ids <- ids[!ids %in% two_empty]
+  combined$data <- block_rows_id(block, wanted_ids)
+  combined
+}
+
+# Some tables (particularly AEs) have (cont.) sections where a chunk is CONTINUED over a page
+# MW are not a fan of this so this removed them and any gaps caused by this same page break
 remove_continuations <- function(combined){
   block <- combined$data
   n_col <- block_ncol(block)

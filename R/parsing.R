@@ -353,23 +353,7 @@ block_rbind_all <- function(blocks) {
   )
 }
 
-# Tables get double gaps when pages get combined this removes one of those spaces
-# Some tables (particularly AEs) have (cont.) sections where a chunk is CONTINUED over a page
-# MW are not a fan of this so this removed them and any gaps caused by this same page break
-#
-# TODO consult someone about this May cause random errors but I do feel it is unlikely
-block_categorise <- function(block){
-  n_col <- block_ncol(block)
-  if(n_col == 0) return(block)
-  spans <- block$colspan[ ,1]
-  empty <- which(vapply(spans, function(s) s == n_col, logical(1)))
-  #cont <- which(vapply(block$text[ ,1], function(t) grepl("(cont.)",t), logical(1)))
-  two_empty <- empty[(empty + 1) %in% empty]
-  #cont_empty <- empty[((empty + 1) %in% cont | (empty + 2) %in% cont)]
-  ids <- block$row_id
-  wanted_ids <- ids[!ids %in% two_empty]# & !ids %in% cont_empty & !ids %in% cont]
-  block_rows_id(block, wanted_ids)
-}
+
 
 # -- Table Parsing
 
@@ -876,7 +860,7 @@ prepare_table <- function(pages = NULL, path = NULL,
   lvl_filtered <- filter_levels(tl_filtered$combined, levels)
   warnings <- c(warnings, lvl_filtered$warnings)
 
-  combined <- remove_continuations(lvl_filtered$combined)
+  combined <- remove_continuations(remove_double_blanks(lvl_filtered$combined))
 
   n_cols <- length(combined$col_widths_twips)
   n_data <- block_nrow(combined$data)
@@ -917,7 +901,6 @@ combine_pages <- function(pages) {
   header <- pages[[1]]$header
   footer <- pages[[1]]$footer
   data   <- block_rbind_all(lapply(pages, `[[`, "data"))
-  data <- block_categorise(data)
 
   # Column widths from the first header (or data) row
   #ref <- if (block_nrow(header) > 0L) header else data

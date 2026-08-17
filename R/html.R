@@ -307,7 +307,7 @@ get_table_html_selection <- function(path,
   tl_filtered <- filter_timelines(combine_pages(pages),timelines)
   lvl_filtered <- filter_levels(tl_filtered$combined, levels)
 
-  combined <- remove_continuations(lvl_filtered$combined)
+  combined <- remove_continuations(remove_double_blanks(lvl_filtered$combined))
 
   build_html_selection(
     combined,
