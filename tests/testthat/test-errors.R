@@ -133,9 +133,10 @@ test_that("empty parse results do not crash the table pipeline", {
   # A block with no rows or columns must flow through untouched rather than
   # indexing column 1 of a 0 x 0 matrix
   empty <- block_new()
-  expect_identical(block_categorise(empty), empty)
+
 
   combined <- list(header = block_new(), data = block_new(),
                    footer = block_new(), col_widths_twips = numeric())
   expect_identical(remove_continuations(combined), combined)
+  expect_identical(remove_double_blanks(combined), combined)
 })

@@ -186,7 +186,7 @@ get_levels <- function(combined){
 remove_double_blanks <- function(combined){
   block <- combined$data
   n_col <- block_ncol(block)
-  if(n_col == 0) return(block)
+  if(n_col == 0) return(combined)
   ids <- block$row_id
   spans <- block$colspan[ ,1]
   empty <- vapply(seq_along(spans), function(s){
