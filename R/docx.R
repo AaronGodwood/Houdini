@@ -524,7 +524,7 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
         inject_table(session, bm_name, xml_str)
 
       }, error = function(e) {
-        status[[i]]$err <<- as_houdini_error(e, xml_inject_failed, bm_name)
+        status[[i]]$err <<- as_houdini_error(e, err_xml_inject_failed, bm_name)
       })
     }
   }

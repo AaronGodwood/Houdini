@@ -281,8 +281,8 @@ warn_filter_not_found <- function(filter_name, filter_type = NULL) {
 #' @param e A condition object
 #' @param constructor A houdini_error construcor taking (context, cause)
 #' @param context First argument for the constructor (e.g. a bookmark name)
-as_houdini_error <- function(e, constuctor, context){
-  if(inherits(e, "houdini_error")) e else constuctor(context, e)
+as_houdini_error <- function(e, constructor, context){
+  if(inherits(e, "houdini_error")) e else constructor(context, e)
 }
 
 

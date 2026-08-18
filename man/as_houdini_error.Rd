@@ -4,14 +4,14 @@
 \alias{as_houdini_error}
 \title{Return \code{e} unchanged if it is already a houdini_error, otherwise wrap it}
 \usage{
-as_houdini_error(e, constuctor, context)
+as_houdini_error(e, constructor, context)
 }
 \arguments{
 \item{e}{A condition object}
 
-\item{context}{First argument for the constructor (e.g. a bookmark name)}
-
 \item{constructor}{A houdini_error construcor taking (context, cause)}
+
+\item{context}{First argument for the constructor (e.g. a bookmark name)}
 }
 \description{
 Errors raised deep in the pipeline (or by base R) carry no hint and are
