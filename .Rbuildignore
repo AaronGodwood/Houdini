@@ -4,5 +4,5 @@
 ^\.Rproj\.user$
 datasets/
 R\debug.R
-.github
+.github\*
 R/oldapp.R

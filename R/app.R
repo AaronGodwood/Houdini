@@ -215,7 +215,7 @@ houdini_app <- function() {
                 fileInput("import_excel", NULL, accept = ".xlsx",
                           buttonLabel = "Import", width = "auto")),
             downloadButton("export_excel", "Export",
-                           class = "btn-outline-secondary btn-sm"),
+                           class = "btn-outline-success btn-sm"),
             div(class = "ms-auto"),
             actionButton("clear_all", NULL, icon = icon("trash"),
                          class = "btn-outline-danger btn-sm",
