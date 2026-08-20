@@ -322,6 +322,8 @@ houdini_app <- function() {
     current_table_name <- reactiveVal(NULL)
     current_row_index  <- reactiveVal(NULL)
 
+    filter_epoch <- reactiveVal(0L)
+
     # table_info cache: table_name -> get_table_info() result
     table_info_cache <- reactiveVal(list())
 
@@ -440,23 +442,33 @@ houdini_app <- function() {
 
     load_rtf_pin <- function(pin_name) {
 
-      board <- pins::board_connect()
+      board <- tryCatch(
+        pins::board_connect(),
+        error = function(e){
+          showNotification(
+            paste("Cannot connect to Posit Connect:", conditionMessage(e)),
+            type = "error"
+          )
+          NULL
+        }
+      )
+      if(is.null(board)) return()
 
       rtf_files <- tryCatch(
         pins::pin_download(board, pin_name),
         error = function(e) {
           showNotification(
-            paste("Failed to load pin:", e$message),
+            paste("Failed to load pin:", conditionMessage(e)),
             type = "error"
           )
           return(NULL)
         }
       )
 
-      rtf_folder_path(pin_name)
 
 
-      if (length(rtf_files) == 0L || is.null(rtf_files)) {
+
+      if (is.null(rtf_files) || length(rtf_files) == 0L) {
         available_tables(character())
         showNotification(
           "No RTF files found in the selected pin.",
@@ -464,6 +476,8 @@ houdini_app <- function() {
         )
         return()
       }
+
+      rtf_folder_path(pin_name)
 
       tbl_names <- tools::file_path_sans_ext(basename(rtf_files))
       full_paths <- file.path(rtf_files)
@@ -596,11 +610,11 @@ houdini_app <- function() {
       })
 
       if(is_connect()){
-        board <- pins::board_connect()
+        board <- tryCatch(pins::board_connect(), error = function(e) NULL)
 
         output$pin_selector <- renderUI({
 
-          pins_available <- tryCatch(
+          pins_available <- if(is.null(board)) character() else tryCatch(
             pins::pin_list(board),
             error = function(e) character()
           )
@@ -707,17 +721,17 @@ houdini_app <- function() {
       output$filter_panel <- renderUI({
         info <- current_info()
         if (is.null(info) || isTRUE(info$is_image)) return(NULL)
-        # NULL means "no filter" and must stay NULL: defaulting to the full set
-        # here (and saving it back) would freeze the selection, silently dropping
-        # any parameter/timeline added when the RTF is later regenerated.
-        # An empty selectize renders its placeholder ("All parameters").
-        prev        <- table_selections()[[as.character(current_row_index())]]
+
+
+        filter_epoch()
+
+        prev        <- isolate(table_selections())[[as.character(current_row_index())]]
         prev_params   <- prev$parameters
         prev_tlines   <- prev$timelines
         prev_lvls     <- prev$levels
         prev_exc_cols <- prev$excluded_cols
         prev_exc_rows <- prev$excluded_rows
-        prev_exc_hdrs <- prev$excluded_hdrs
+        prev_exc_hdrs <- prev$excluded_header_rows
 
         div(class = "border rounded p-2 mt-1",
             div(class = "fw-semibold small mb-1",
@@ -851,6 +865,7 @@ houdini_app <- function() {
             levels               = input$sel_levels
           )
           table_selections(sels)
+          filter_epoch(isolate(filter_epoch()) + 1)
         },
         ignoreNULL = FALSE
       )
@@ -932,6 +947,9 @@ houdini_app <- function() {
   if (!tbl) return;
   applyStyles(tbl);
 
+  if(tbl.dataset.houdiniBound === "1") return;
+  tbl.dataset.houdiniBound = "1";
+
   tbl.addEventListener("click", function(e) {
     var th = e.target.closest("th[data-col]");
     var tr = e.target.closest("tr[data-row]");
@@ -958,10 +976,12 @@ houdini_app <- function() {
       # Reactive that captures the "identity" of the current table+filters
       # (drives selection pane re-render - not per-click)
       selection_pane_key <- reactive({
+        filter_epoch()
         row <- current_row_index()
-        sel <- if (!is.null(row)) table_selections()[[as.character(row)]] else NULL
+        sel <- if (!is.null(row)) isolate(table_selections())[[as.character(row)]] else NULL
         list(
           table  = current_table_name(),
+          row    = row,
           params = sel$parameters,
           tlines = sel$timelines,
           lvls   = sel$levels
@@ -997,7 +1017,7 @@ houdini_app <- function() {
         }
         info <- current_info()
         row  <- current_row_index()
-        sel  <- table_selections()[[as.character(row)]] %||% list()
+        sel  <- isolate(table_selections())[[as.character(row)]] %||% list()
 
         bits <- character()
         if (!is.null(info) && !isTRUE(info$is_image)) {
@@ -1090,6 +1110,11 @@ houdini_app <- function() {
         )
       })
 
+      output_preview_sel <- debounce(reactive({
+        row <- current_row_index()
+        table_selections()[[as.character(row)]] %||% list()
+      }), 400)
+
       # Result pane: exactly what will be injected. Driven by the debounced live
       # exclusions so it tracks clicks in the Selection pane without re-rendering
       # on every one; falls back to stored selections when the row changes.
@@ -1104,8 +1129,7 @@ houdini_app <- function() {
 
         if (isTRUE(info$is_image)) return(image_preview_ui(paths[[tbl_name]]))
 
-        row <- current_row_index()
-        sel <- table_selections()[[as.character(row)]] %||% list()
+        sel <- output_preview_sel()
 
         html_content <- tryCatch(
           get_table_html_output(
@@ -1714,7 +1738,8 @@ houdini_app <- function() {
                   output_path = file,
                   progress_cb = function(i, n, msg) {
                     incProgress(1 / n, detail = msg)
-                  }
+                  },
+                  hide_data = isTRUE(input$sel_hide_data)
                 )
               }
             ),
