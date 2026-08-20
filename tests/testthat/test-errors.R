@@ -82,7 +82,7 @@ test_that("per-row failures are structured and do not abort the run", {
     stringsAsFactors = FALSE
   )
   status <- apparate(docx, config, rtf_dir, quiet = TRUE)
-  on.exit(unlink(paste0(docx, "_Houdini_Output.docx")), add = TRUE)
+  on.exit(unlink(houdini_output_path(docx)), add = TRUE)
 
   # A corrupt RTF is attributed to the parse, not to XML generation
   expect_s3_class(status[["1"]]$err, "houdini_error_rtf_parse_failed")

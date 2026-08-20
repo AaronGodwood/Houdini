@@ -49,9 +49,9 @@ test_that("apparate injects from a config workbook end to end", {
   status <- apparate(docx, cfg_xl, rtf_dir, quiet = TRUE)
 
   expect_true(all(vapply(status, function(s) is.null(s$err), logical(1))))
-  expect_true(file.exists(paste0(docx,"_Houdini_Output.docx", collapse="")))
+  expect_true(file.exists(houdini_output_path(docx)))
 
-  doc <- read_docx_document(paste0(docx,"_Houdini_Output.docx", collapse=""))
+  doc <- read_docx_document(houdini_output_path(docx))
   expect_match(doc, "<w:tbl[ >]")
   expect_match(doc, "<w:drawing>", fixed = TRUE)
   # ExcludedColumns applied: column 2 ("N") removed
@@ -77,7 +77,7 @@ test_that("apparate accepts a data.frame config and reports row errors", {
 
   expect_null(status[["1"]]$err)
   expect_s3_class(status[["2"]]$err, "houdini_error")
-  expect_true(file.exists(paste0(docx,"_Houdini_Output.docx")))
+  expect_true(file.exists(houdini_output_path(docx)))
 })
 
 

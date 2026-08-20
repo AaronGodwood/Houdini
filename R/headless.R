@@ -16,6 +16,11 @@ split_ints <- function(x){
   if(length(v) > 0) v else NULL
 }
 
+houdini_output_path <- function(input_doc){
+  paste0(tools::file_path_sans_ext(absolute_path(input_doc)),
+         "_Houdini_Output.docx")
+}
+
 
 #' Parse a excel config into config + selections
 #'
@@ -171,6 +176,13 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
     stop("No complete Bookmark/Table rows in excel")
   }
   cfg <- cfg[keep, , drop = FALSE]
+
+  bm <- trimws(cfg$Bookmark)
+  dup <- unique(bm[duplicated(bm)])
+  if(length(dup) > 0L){
+      atop(err_bookmark_duplicate(dup[1L], keep[bm == dup[1L]]))
+  }
+
   sels <- setNames(
     lapply(keep, function(i) parsed$selections[[as.character(i)]]),
     as.character(seq_along(keep))
@@ -183,7 +195,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
 
   #runs main process and logs results
 
-  output_path <- paste0(absolute_path(input_doc), "_Houdini_Output.docx", collapse = "")
+  output_path <- houdini_output_path(input_doc)
 
   status <- process_document(input_doc, cfg, rtf_paths, sels, output_path,
                              progress_cb = cb, hide_data)
@@ -258,6 +270,7 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
                    paste0("Table     : ", with_rtf_ext(tbl_val)),
                    paste0("Parameters: ", fmt_vec(sel$parameters)),
                    paste0("Timepoints: ", fmt_vec(sel$timelines)),
+                   paste0("Levels    : ", fmt_vec(sel$levels)),
                    paste0("Excluded Columns: ", fmt_vec(sel$excluded_cols, none = "(none)")),
                    paste0("Excluded Rows: ", fmt_vec(sel$excluded_rows, none = "(none)"))
 

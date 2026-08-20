@@ -4,6 +4,7 @@
 
 xml_escape <- function(text) {
 
+  text <- gsub("[\x01-\x08\x0b\x0c\x0e-\x1f]", "", text, perl = TRUE)
   text <- gsub("&",  "&amp;",  text, fixed = TRUE)
   text <- gsub("<",  "&lt;",   text, fixed = TRUE)
   text <- gsub(">",  "&gt;",   text, fixed = TRUE)
