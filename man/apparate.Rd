@@ -17,7 +17,7 @@ apparate(
 \arguments{
 \item{input_doc}{Path to the template (or previously generated) .docx}
 
-\item{input_sheet}{Path to a config .xlsx (see [read_xlsx()]) or a
+\item{input_sheet}{Path to a config .xlsx (see \code{\link[=read_xlsx]{read_xlsx()}}) or a
 data.frame with Bookmark/Table columns plus optional filter columns}
 
 \item{file_location}{Folder containing the table .rtf files named in the config}
@@ -32,7 +32,7 @@ data.frame with Bookmark/Table columns plus optional filter columns}
 }
 \value{
 Invisibly, the per-row status list: NULL for success or a
-  houdini_error condition per failed row, keyed by config row
+houdini_error condition per failed row, keyed by config row
 }
 \description{
 Injects every configured RTF table/image into the Word document at its

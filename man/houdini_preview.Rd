@@ -46,7 +46,7 @@ that a filter selects what you expect, or inspecting a file that failed
 during a run.
 }
 \details{
-Filters accept the same values as [apparate()]'s config columns, so a
+Filters accept the same values as \code{\link[=apparate]{apparate()}}'s config columns, so a
 selection can be tried here before being committed to a workbook.
 }
 \examples{

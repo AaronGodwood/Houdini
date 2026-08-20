@@ -11,7 +11,7 @@ extract_png(path)
 }
 \value{
 list(png_bytes = raw, width_twips = integer, height_twips = integer)
-  or NULL if no PNG found
+or NULL if no PNG found
 }
 \description{
 Locates the first \code{\\{\\pict ... \\pngblip ... <hex>\\}} group, decodes the

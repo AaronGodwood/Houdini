@@ -8,4 +8,8 @@
 \description{
 Facilitates the automatic insertion of data tables & figures into documents. Can pull data from .rtf files and .sas7bdat files and will insert them as tables or images into a word doc at a specified bookmark. Bookmarks and filenames must be referenced in a provided excel document as well as any other filtering requirements.
 }
+\author{
+\strong{Maintainer}: Aaron Godwood \email{godwoodaaron@gmail.com}
+
+}
 \keyword{internal}

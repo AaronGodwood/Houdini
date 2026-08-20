@@ -182,21 +182,14 @@ get_levels <- function(combined){
 
 
 # Tables get double gaps when pages get combined this removes one of those spaces
-# TODO consult someone about this May cause random errors but I do feel it is unlikely
 remove_double_blanks <- function(combined){
   block <- combined$data
   n_col <- block_ncol(block)
   if(n_col == 0) return(combined)
-  ids <- block$row_id
   spans <- block$colspan[ ,1]
-  empty <- vapply(seq_along(spans), function(s){
-    if(spans[s] == n_col) return(ids[s])
-    NA_integer_
-  }, integer(1))
-  empty <- empty[!is.na(empty)]
-  two_empty <- empty[(empty + 1) %in% empty]
-  wanted_ids <- ids[!ids %in% two_empty]
-  combined$data <- block_rows_id(block, wanted_ids)
+  is_empty <- spans == n_col
+  drop <- is_empty & c(FALSE, utils::head(is_empty, -1L))
+  combined$data <- block_rows(block, !drop)
   combined
 }
 
@@ -207,20 +200,13 @@ remove_continuations <- function(combined){
   n_col <- block_ncol(block)
   if(n_col == 0) return(combined)
   spans <- block$colspan[ ,1]
-  ids <- block$row_id
-  empty <- vapply(seq_along(spans), function(s){
-    if(spans[s] == n_col) return(ids[s])
-    NA_integer_
-  }, integer(1))
-  empty <- empty[!is.na(empty)]
-  cont <- vapply(seq_along(block$text[ ,1]), function(t){
-    if(grepl("\\(cont\\.\\)\\s*$",block$text[t ,1], ignore.case = TRUE, perl = TRUE)) return(ids[t])
-    NA_integer_
-    }, integer(1))
-  cont <- cont[!is.na(cont)]
-  cont_empty <- empty[((empty + 1) %in% cont | (empty + 2) %in% cont)]
-  wanted_ids <- ids[!ids %in% cont_empty & !ids %in% cont]
-  combined$data <- block_rows_id(block, wanted_ids)
+  is_empty <- spans == n_col
+  is_cont <- grepl("\\(cont\\.\\)\\s*$",block$text[  ,1], ignore.case = TRUE, perl = TRUE)
+  n <- length(is_cont)
+  ahead1 <- c(is_cont[-1L],FALSE)
+  ahead2 <- c(is_cont[-seq_len(min(2L, n))], rep (FALSE, min(2L, n)))
+  drop <- is_cont | (is_empty & (ahead1 | ahead2))
+  combined$data <- block_rows(block, !drop)
   combined
 }
 

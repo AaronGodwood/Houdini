@@ -103,3 +103,84 @@ test_that("houdini_run validates its inputs", {
   expect_error(apparate(docx, data.frame(), "no-such-dir"),
                "RTF folder not found: no-such-dir")
 })
+
+
+
+make_rtf_dirs <- function() {
+  tdir <- withr::local_tempdir(.local_envir = parent.frame())
+  fdir <- withr::local_tempdir(.local_envir = parent.frame())
+  file.copy(test_path("fixtures", "multi_levels.rtf"), file.path(tdir, "t_01.rtf"))
+  file.copy(test_path("fixtures", "image.rtf"), file.path(fdir, "f_01.rtf"))
+  list(tables = tdir, figures = fdir)
+}
+
+test_that("collect_rtf_paths finds files in both folders", {
+  d <- make_rtf_dirs()
+  paths <- collect_rtf_paths(d$tables, d$figures)
+
+  expect_setequal(names(paths), c("t_01", "f_01"))
+  expect_match(paths[["f_01"]], basename(d$figures), fixed = TRUE)
+})
+
+test_that("a NULL or identical figure folder yields the table folder alone", {
+  d <- make_rtf_dirs()
+
+  expect_named(collect_rtf_paths(d$tables, NULL), "t_01")
+  expect_named(collect_rtf_paths(d$tables, d$tables), "t_01")
+})
+
+test_that("a name in both folders resolves to the table folder, with a warning", {
+  d <- make_rtf_dirs()
+  file.copy(file.path(d$tables, "t_01.rtf"), file.path(d$figures, "t_01.rtf"))
+
+  expect_warning(paths <- collect_rtf_paths(d$tables, d$figures),
+                 "present in both RTF folders")
+  expect_match(paths[["t_01"]], basename(d$tables), fixed = TRUE)
+})
+
+test_that("apparate injects a figure that lives outside the table folder", {
+  d <- make_rtf_dirs()
+  docx <- withr::local_tempfile(fileext = ".docx")
+  make_min_docx(docx, bookmarks = c("BM1", "BM2"))
+  cfg <- data.frame(Bookmark = c("BM1", "BM2"), Dataset = c("t_01", "f_01"),
+                    stringsAsFactors = FALSE)
+
+  # Without the figure folder the figure cannot be found at all
+  without <- apparate(docx, cfg, d$tables, quiet = TRUE)
+  expect_null(without[[1]]$err)
+  expect_s3_class(without[[2]]$err, "houdini_error")
+
+  with_figs <- apparate(docx, cfg, d$tables, figure_location = d$figures,
+                        quiet = TRUE)
+  expect_null(with_figs[[1]]$err)
+  expect_null(with_figs[[2]]$err)
+
+  doc <- xml2::read_xml(read_docx_document(paste0(docx, "_Houdini_Output.docx")))
+  ns <- c(w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+  expect_length(xml2::xml_find_all(doc, ".//w:tbl", ns = ns), 1)
+  expect_length(xml2::xml_find_all(doc, ".//w:drawing", ns = ns), 1)
+})
+
+test_that("a figure_location that does not exist is reported, not ignored", {
+  d <- make_rtf_dirs()
+  docx <- withr::local_tempfile(fileext = ".docx")
+  make_min_docx(docx, bookmarks = "BM1")
+  cfg <- data.frame(Bookmark = "BM1", Dataset = "t_01", stringsAsFactors = FALSE)
+
+  expect_error(
+    apparate(docx, cfg, d$tables,
+             figure_location = file.path(d$tables, "no-such-folder"),
+             quiet = TRUE),
+    "Figure folder not found"
+  )
+})
+
+test_that("an empty figure_location falls back to the table folder", {
+  d <- make_rtf_dirs()
+  docx <- withr::local_tempfile(fileext = ".docx")
+  make_min_docx(docx, bookmarks = "BM1")
+  cfg <- data.frame(Bookmark = "BM1", Dataset = "t_01", stringsAsFactors = FALSE)
+
+  status <- apparate(docx, cfg, d$tables, figure_location = "", quiet = TRUE)
+  expect_null(status[[1]]$err)
+})

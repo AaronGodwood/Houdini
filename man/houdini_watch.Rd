@@ -9,7 +9,7 @@ houdini_watch(input_doc, input_sheet, file_location, interval = 5)
 \arguments{
 \item{input_doc}{Path to the template (or previously generated) .docx}
 
-\item{input_sheet}{Path to a config .xlsx (see [read_xlsx()]) or a
+\item{input_sheet}{Path to a config .xlsx (see \code{\link[=read_xlsx]{read_xlsx()}}) or a
 data.frame with Bookmark/Table columns plus optional filter columns}
 
 \item{file_location}{Folder containing the table .rtf files named in the config}
@@ -18,6 +18,6 @@ data.frame with Bookmark/Table columns plus optional filter columns}
 }
 \description{
 Polls the RTF folder (and the config workbook, when given as a path) and
-calls [houdini_run()] whenever a file appears, disappears, or changes.
+calls \code{\link[=apparate]{apparate()}} whenever a file appears, disappears, or changes.
 Blocks until interrupted (Escape / Ctrl+C).
 }

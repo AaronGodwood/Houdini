@@ -10,8 +10,8 @@ read_xlsx(path)
 \item{path}{Path to the .xlsx file}
 }
 \value{
-list(config, selections); see [parse_xl()]
+list(config, selections); see \code{\link[=parse_xl]{parse_xl()}}
 }
 \description{
-Same format as the app's Excel export: see [parse_xl()].
+Same format as the app's Excel export: see \code{\link[=parse_xl]{parse_xl()}}.
 }

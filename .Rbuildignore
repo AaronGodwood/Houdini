@@ -2,7 +2,9 @@
 ^renv\.lock$
 ^.*\.Rproj$
 ^\.Rproj\.user$
-datasets/
-R\debug.R
-.github\*
-R/oldapp.R
+^R/datasets$
+^R/debug.R\.R$
+^\..github$
+R/oldapp.R\.R$
+^\.git$
+^\.gitignore$

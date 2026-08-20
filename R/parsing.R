@@ -49,6 +49,7 @@ rtf_unescape_r <- function(text) {
   out <- character()
   pos <- 1L
   uc  <- 1L
+  uc_seen <- FALSE
 
   repeat {
     m <- regexpr("\\\\(uc[0-9]+|u-?[0-9]+|'[0-9a-fA-F]{2})",
@@ -65,14 +66,16 @@ rtf_unescape_r <- function(text) {
 
     if (startsWith(tok, "\\uc")) {
       uc <- as.integer(substr(tok, 4L, len))
+      uc_seen <- TRUE
       if (substr(text, pos, pos) == " ") pos <- pos + 1L  # delimiter
     } else if (startsWith(tok, "\\u")) {
       cp <- as.integer(substr(tok, 3L, len))
       if (cp < 0L) cp <- cp + 65536L
       out <- c(out, intToUtf8(cp))
-      if (substr(text, pos, pos) == " ") pos <- pos + 1L  # delimiter
+      had_delim <- substr(text, pos, pos) == " "
+      if (had_delim) pos <- pos + 1L  # delimiter
       # Skip the uc fallback characters; stop early at structure we shouldn't eat
-      k <- uc
+      k <- if(had_delim && !uc_seen) 0L else uc
       while (k > 0L && pos <= n) {
         ch <- substr(text, pos, pos)
         if (ch == "\\") {
@@ -662,6 +665,13 @@ rtf_indent_prefix <- function(text){
   strrep(" ", level * SPACES_PER_INDENT_LEVEL)
 }
 
+
+is_numeric_cell <- function(text) {
+  t <- trimws(text)
+  if (!nzchar(t) || !grepl("[0-9]", t)) return(FALSE)
+  grepl("^[0-9 .,;:()<>=+/*%-]*$", t)
+}
+
 # Strip RTF markup from a cell's raw text, returning clean plain text
 rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
   # Remove nested groups (e.g. field instructions, pictures)
@@ -701,8 +711,8 @@ rtf_cell_to_text_r <- function(raw, hide_data = FALSE) {
 
   # Apply unicode/hex unescaping on what remains
   text <- paste0(indent, rtf_unescape(text))
-  if(hide_data && grepl("^[0-9]", text)){
-    return("XX")
+  if(hide_data && is_numeric_cell(text)){
+    return(paste0(indent,"XX"))
   }
   text
 }

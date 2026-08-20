@@ -220,11 +220,11 @@ open_docx <- function(docx_path) {
 #' @param session A docx session returned by open_docx()
 #' @param output_path Path to write the finished .docx
 close_docx <- function(session, output_path) {
+  on.exit(unlink(session$tmp_dir, recursive = TRUE), add = TRUE)
   write_xml(session$doc,      session$xml_path)
   write_xml(session$rels_doc, session$rels_path)
   write_xml(session$ct_doc,   session$ct_path)
   docx_rezip(session$tmp_dir, output_path)
-  unlink(session$tmp_dir, recursive = TRUE)
   invisible(output_path)
 }
 

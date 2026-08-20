@@ -116,6 +116,20 @@ static long min_left_indent(const char *s, int len){
   return best;
 }
 
+
+
+static int is_numeric_cell(const char *s){
+  int seen_digit = 0;
+  for(const char *p = s; *p; p++){
+    unsigned char c = (unsigned char)*p;
+    if (isdigit(c)) { seen_digit = 1; continue;}
+    if(isspace(c)) continue;
+    if (strchr(".,;:()<>=+/*%-", (char)c) != NULL) continue;
+    return 0;
+  }
+  return seen_digit;
+}
+
 /* Is s[i] the start of a \uN or \ucN sequence (which the unescape pass
  * decodes, so the control-word stripping passes must leave them alone)? */
 static int is_unicode_escape(const char *s, int i, int end) {
@@ -139,6 +153,7 @@ static void rtf_unescape_core(const char *s, int len, char *out) {
   int oi = 0;
   int i = 0;
   int uc = 1;
+  int uc_seen = 0;
 
   while (i < len) {
     if (s[i] == '\\' && i + 1 < len) {
@@ -152,6 +167,7 @@ static void rtf_unescape_core(const char *s, int len, char *out) {
           j++;
         }
         uc = val;
+        uc_seen = 1;
         if (j < len && s[j] == ' ') j++;  /* control word delimiter */
       i = j;
       continue;
@@ -170,10 +186,11 @@ static void rtf_unescape_core(const char *s, int len, char *out) {
         }
         if (neg) val = -val;
         if (val < 0) val += 65536;
-        if (j < len && s[j] == ' ') j++;  /* control word delimiter */
+        int had_delim = (j < len && s[j] == ' ');
+        if (had_delim) j++;  /* control word delimiter */
 
       /* Skip fallback chars; stop early at structure we mustn't eat */
-      int k = uc;
+      int k = (had_delim && !uc_seen) ? 0 : uc;
       while (k > 0 && j < len) {
         if (s[j] == '\\') {
           if (j + 1 < len && s[j + 1] == '\'') j += 4;
@@ -412,12 +429,13 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
   }
 
 
-  if (LOGICAL(hide_data)[0]) {
-    unsigned char first = (unsigned char)buf[0];
-
-    if (first != '\0' && isdigit(first)) {
-      return ScalarString(mkCharCE("XX", CE_UTF8));
-    }
+  if (LOGICAL(hide_data)[0] && is_numeric_cell(buf)) {
+    char *masked = R_alloc((size_t)indent_spaces + 3, 1);
+    if(indent_spaces > 0) memset(masked, ' ', (size_t)indent_spaces);
+    masked[indent_spaces] = 'X';
+    masked[indent_spaces + 1] = 'X';
+    masked[indent_spaces + 2] = '\0';
+    return ScalarString(mkCharCE(masked, CE_UTF8));
   }
 
   return ScalarString(mkCharCE(buf, CE_UTF8));

@@ -11,10 +11,10 @@ parse_xl(xl)
 }
 \value{
 list(config = data.frame(Bookmark, Table), selections = list keyed
-  by row index as character, matching the app's table_selections format)
+by row index as character, matching the app's table_selections format)
 }
 \description{
-Shared by the app's Excel import and [apparate()]. Requires Bookmark and
+Shared by the app's Excel import and \code{\link[=apparate]{apparate()}}. Requires Bookmark and
 Table columns (case-insensitive); recognises optional Parameters,
 Timelines, ExcludedColumns, ExcludedRows and ExcludedHeaderRows columns,
 all semicolon-separated. Any .rtf extension on Table values is stripped.

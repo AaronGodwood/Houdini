@@ -13,9 +13,9 @@ parse_rtf(path, hide_data = FALSE)
 }
 \value{
 List of page objects, each with:
-  \item{parameter}{character or NA}
-  \item{header}{block of header rows (see section 4)}
-  \item{data}{block of data rows, with stable \code{row_id}s}
+\item{parameter}{character or NA}
+\item{header}{block of header rows (see section 4)}
+\item{data}{block of data rows, with stable \code{row_id}s}
 }
 \description{
 Parse an RTF file into a list of page objects

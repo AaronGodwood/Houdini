@@ -317,7 +317,7 @@ collect_rtf_paths <- function(file_location, figure_location = NULL, warn = TRUE
 #' Watch an RTF folder and regenerate the document on every change
 #'
 #' Polls the RTF folder (and the config workbook, when given as a path) and
-#' calls [houdini_run()] whenever a file appears, disappears, or changes.
+#' calls [apparate()] whenever a file appears, disappears, or changes.
 #' Blocks until interrupted (Escape / Ctrl+C).
 #'
 #' @inheritParams apparate
