@@ -100,6 +100,4 @@ libraries:
 4. **Inject** the OOXML into the unzipped `.docx`, then rezip (`R/docx.R`).
 
 
-## License
 
-MIT. See [LICENSE.md](LICENSE.md).

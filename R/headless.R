@@ -134,8 +134,17 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
       "Check the path to the folder holding the rtf files"
       ))
   }
-  if(is.null(figure_location) || !dir.exists(figure_location)){
+
+  #default figure location to file_location if it does not exist
+  if(is.null(figure_location) || !nzchar(trimws(figure_location))){
     figure_location <- file_location
+  } else if(!dir.exists(figure_location)){
+    stop(houdini_error(
+      "rtf_folder_missing",
+      paste0("Figure folder not found: ", figure_location),
+      "Check the path to the folder holding the figure .rtf files, or leave it unset to use the table folder.",
+      list(path = figure_location)
+    ))
   }
 
   #read in documents and gets rtf filenames
@@ -151,11 +160,8 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
 
   }
 
-  rtf_files <- list.files(file_location, pattern = "\\.rtf$", ignore.case = TRUE)
-  rtf_paths <- setNames(
-    as.list(file.path(file_location, rtf_files)),
-    tools::file_path_sans_ext(rtf_files)
-  )
+
+  rtf_paths <- collect_rtf_paths(file_location, figure_location)
 
   #validates excel file and puls out filters
 
@@ -272,6 +278,37 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
   }
 
   lines
+}
+
+
+
+# Build the table-name -> path map from one or two folders
+collect_rtf_paths <- function(file_location, figure_location = NULL, warn = TRUE) {
+  from_folder <- function(dir) {
+    files <- list.files(dir, pattern = "\\.rtf$", ignore.case = TRUE)
+    setNames(as.list(file.path(dir, files)), tools::file_path_sans_ext(files))
+  }
+
+  tables <- from_folder(file_location)
+
+  same_folder <- is.null(figure_location) ||
+    normalizePath(figure_location, winslash = "/", mustWork = FALSE) ==
+    normalizePath(file_location, winslash = "/", mustWork = FALSE)
+  if (same_folder) return(tables)
+
+  figures <- from_folder(figure_location)
+
+  clashes <- intersect(names(tables), names(figures))
+  if (warn && length(clashes)) {
+    warning(sprintf(
+      "%d name%s present in both RTF folders; using the copy in %s: %s",
+      length(clashes), if (length(clashes) == 1L) "" else "s",
+      file_location, paste(clashes, collapse = ", ")
+    ), call. = FALSE)
+  }
+
+  # Table folder takes precedence on a clash.
+  c(tables, figures[setdiff(names(figures), names(tables))])
 }
 
 
