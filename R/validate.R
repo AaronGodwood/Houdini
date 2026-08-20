@@ -80,15 +80,6 @@ validate_config <- function(config, bookmarks = character(), tables = character(
       add(i, "error", conditionMessage(e), e$hint, bm, tbl)
     }
 
-    # Allowed, but usually a copy-paste slip worth surfacing
-    if (nzchar(tbl) && tbl %in% dup_tbl) {
-      add(i, "warning",
-          sprintf("Table '%s' is mapped in multiple rows: %s.",
-                  tbl, paste(which(tbl_vals == tbl), collapse = ", ")),
-          "This is allowed but unusual. Check that both bookmarks should receive the same table.",
-          bm, tbl)
-    }
-
     # Filter checks need the table to have been parsed
     ti  <- info[[tbl]]
     sel <- selections[[as.character(i)]]
