@@ -1462,132 +1462,32 @@ houdini_app <- function() {
     # Each element: list(type = "error"|"warning"|"", msg = "plain text message")
     register_validation <- function() {
       row_warnings <<- reactive({
-        df    <- config_data()
-        bm    <- available_bookmarks()
-        bmctx <- bookmarks_contexts(bm)
-        tbls  <- available_tables()
-        paths <- rtf_paths()
-        cache <- table_info_cache()
-        sels  <- table_selections()
+        df <- config_data()
 
-        # Pre-compute duplicate bookmark and table name sets (cross-row checks)
-        all_bm_vals  <- trimws(df$Bookmark)
-        all_tbl_vals <- trimws(df$Table)
-        nonempty_bms  <- all_bm_vals[nzchar(all_bm_vals)]
-        nonempty_tbls <- all_tbl_vals[nzchar(all_tbl_vals)]
-        dup_bookmarks <- unique(nonempty_bms[duplicated(nonempty_bms)])
-        dup_tables    <- unique(nonempty_tbls[duplicated(nonempty_tbls)])
+        # Same rules as houdini_validate(): one implementation in validate.R so
+        # the panel and the headless check cannot drift apart.
+        found <- validate_config(
+          config     = df,
+          bookmarks  = available_bookmarks(),
+          tables     = available_tables(),
+          selections = table_selections(),
+          info       = table_info_cache()
+        )
 
-        lapply(seq_len(nrow(df)), function(i) {
-          bm_val  <- trimws(df$Bookmark[i])
-          tbl_val <- trimws(df$Table[i])
-
-          if (!nzchar(bm_val) && !nzchar(tbl_val)) return(list(type = "", msg = "", hint = NULL))
-
-          errors   <- character()
-          warnings <- character()
-          hints    <- character()
-
-          # Half-complete row
-          if (nzchar(bm_val) && !nzchar(tbl_val)) {
-            warnings <- c(warnings, "Bookmark set but no table selected")
-            hints    <- c(hints, "Select an RTF table in the Table column for this row.")
-          }
-          if (!nzchar(bm_val) && nzchar(tbl_val)) {
-            warnings <- c(warnings, "Table set but no bookmark selected")
-            hints    <- c(hints, "Select a bookmark in the Bookmark column for this row.")
-          }
-
-          # Bookmark not in Word document
-          if (nzchar(bm_val) && length(bm) > 0L && !bm_val %in% names(bm)) {
-            e <- err_bookmark_missing(bm_val)
-            errors <- c(errors, conditionMessage(e))
-            hints  <- c(hints,  e$hint)
-          }
-
-          # Bookmark exists but sits in a table cell or text box
-          if (nzchar(bm_val) && bm_val %in% names(bm) &&
-              !identical(bmctx[[bm_val]], "body") && !is.null(bmctx[[bm_val]])) {
-            e <- err_bookmark_bad_context(bm_val, bmctx[[bm_val]])
-            errors <- c(errors, conditionMessage(e))
-            hints  <- c(hints,  e$hint)
-          }
-
-          # Duplicate bookmark across rows
-          if (nzchar(bm_val) && bm_val %in% dup_bookmarks) {
-            dup_rows <- which(all_bm_vals == bm_val)
-            e <- err_bookmark_duplicate(bm_val, dup_rows)
-            errors <- c(errors, conditionMessage(e))
-            hints  <- c(hints,  e$hint)
-          }
-
-          # Table not in RTF folder
-          if (nzchar(tbl_val) && length(tbls) > 0L && !tbl_val %in% tbls) {
-            e <- err_rtf_unreadable(tbl_val, "not found in RTF folder")
-            errors <- c(errors, conditionMessage(e))
-            hints  <- c(hints,  e$hint)
-          }
-
-          # Same RTF mapped to multiple bookmarks (warning only - may be intentional)
-          if (nzchar(tbl_val) && tbl_val %in% dup_tables) {
-            dup_rows <- which(all_tbl_vals == tbl_val)
-            warnings <- c(warnings, sprintf(
-              "Table '%s' is mapped in multiple rows: %s",
-              tbl_val, paste(dup_rows, collapse = ", ")
-            ))
-            hints <- c(hints, "This is allowed but unusual. Verify that both bookmarks should receive the same table.")
-          }
-
-          if (nzchar(tbl_val) && length(paths) > 0L && tbl_val %in% names(paths)) {
-            info <- cache[[tbl_val]]
-            sel  <- sels[[as.character(i)]]
-
-            if (!is.null(info) && !isTRUE(info$is_image)) {
-              # Only validate against a non-empty known list - if the table has no
-              # parameters/timelines detected, we can't meaningfully validate imports
-              if (!is.null(sel$parameters) && length(sel$parameters) > 0L &&
-                  length(info$parameters) > 0L) {
-                bad_p <- setdiff(sel$parameters, info$parameters)
-                if (length(bad_p) > 0L) {
-                  warnings <- c(warnings,
-                                paste0("Unknown parameter(s): ", paste(bad_p, collapse = ", ")))
-                  hints <- c(hints,
-                             "These parameter values were not found in the RTF file. They may have been renamed or removed.")
-                }
-              }
-              if (!is.null(sel$timelines) && length(sel$timelines) > 0L &&
-                  length(info$timelines) > 0L) {
-                bad_t <- setdiff(sel$timelines, info$timelines)
-                if (length(bad_t) > 0L) {
-                  warnings <- c(warnings,
-                                paste0("Unknown timeline(s): ", paste(bad_t, collapse = ", ")))
-                  hints <- c(hints,
-                             "These timeline labels were not found in the RTF file. Re-open the table and reselect timelines.")
-                }
-              }
-              if (!is.null(sel$excluded_cols) && length(sel$excluded_cols) > 0L &&
-                  info$n_cols > 0L) {
-                bad_c <- sel$excluded_cols[
-                  sel$excluded_cols < 1L | sel$excluded_cols > info$n_cols
-                ]
-                if (length(bad_c) > 0L) {
-                  e <- err_exclusion_out_of_range(bm_val, bad_c, info$n_cols)
-                  warnings <- c(warnings, conditionMessage(e))
-                  hints    <- c(hints,    e$hint)
-                }
-              }
-            }
-          }
-
-          hint_str <- if (length(hints) > 0L) paste(unique(hints), collapse = " ") else NULL
-
-          if (length(errors) > 0L)
-            return(list(type = "error",   msg = paste(errors,   collapse = "; "), hint = hint_str))
-          if (length(warnings) > 0L)
-            return(list(type = "warning", msg = paste(warnings, collapse = "; "), hint = hint_str))
-
-          list(type = "", msg = "", hint = NULL)
-        })
+        # The panel wants one entry per config row, errors outranking warnings.
+        rows <- rep(list(list(type = "", msg = "", hint = NULL)), nrow(df))
+        for (f in found) {
+          prev <- rows[[f$row]]
+          # An error already recorded here outranks any later warning
+          if (identical(prev$type, "error") && !identical(f$severity, "error")) next
+          promote  <- identical(f$severity, "error") && !identical(prev$type, "error")
+          msgs  <- if (promote || !nzchar(prev$msg)) f$message
+          else paste(prev$msg, f$message, sep = "; ")
+          hints <- if (promote || is.null(prev$hint)) f$hint
+          else paste(unique(c(prev$hint, f$hint)), collapse = " ")
+          rows[[f$row]] <- list(type = f$severity, msg = msgs, hint = hints)
+        }
+        rows
       })
 
       # Scrollable warnings panel - all rows with issues, shown below the preview

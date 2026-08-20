@@ -229,11 +229,39 @@ Two filters are doing work here:
 
 Both accept several values separated by semicolons, e.g. `"Week 1; Week 4"`.
 
+## Checking the config before you run
+
+`houdini_validate()` runs every check the app shows in its warnings panel,
+without opening the app and without writing anything. It reports the whole list
+at once rather than stopping at the first problem, which is what you want in a
+scheduled job:
+
+```{r}
+problems <- houdini_validate(template, config, rtf_dir, quiet = TRUE)
+nrow(problems)
+```
+
+A clean config returns no rows. When something is wrong you get one row per
+problem, with the config row it came from and a hint:
+
+```{r}
+broken <- config
+broken$Bookmark[2] <- "Table_Nosie"   # a typo
+houdini_validate(template, broken, rtf_dir, quiet = TRUE)[, c("row", "severity", "message")]
+```
+
+In a CI step, stop on anything that would produce a wrong document:
+
+```{r, eval = FALSE}
+problems <- houdini_validate(template, config, rtf_dir)
+if (any(problems$severity == "error")) stop("config is not ready")
+```
+
 ## Generating the document
 
 ```{r}
 status <- apparate(template, config, rtf_dir, quiet = TRUE)
-output <- paste0(template, "_Houdini_Output.docx")
+output <- sub(".docx$", "_Houdini_Output.docx", template)
 file.exists(output)
 ```
 
@@ -328,7 +356,7 @@ repeatedly as the source RTFs change:
 
 ```{r}
 again <- apparate(output, config, rtf_dir, quiet = TRUE)
-final <- paste0(output, "_Houdini_Output.docx")
+final <- sub("\\.docx$", "_Houdini_Output.docx", output)
 
 doc2 <- xml2::read_xml(read_docx_xml(final))
 length(xml2::xml_find_all(doc2, ".//w:tbl", ns = c(w = W)))
