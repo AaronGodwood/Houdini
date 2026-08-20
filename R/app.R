@@ -151,6 +151,18 @@ houdini_app <- function() {
           #           placeholder = "Or paste a folder path\u2026"),
           uiOutput("rtf_status"),
 
+          tags$details(
+            class = "mt-2",
+            tags$summary(
+              class = "form-label fw-semibold small",
+              style = "cursor:pointer;",
+              "Figure folder (optional)"
+            ),
+            uiOutput("figure_picker_btn"),
+            uiOutput("figure_folder_input"),
+            uiOutput("figure_status")
+          ),
+
         ),
 
         bslib::accordion_panel(
@@ -296,6 +308,7 @@ houdini_app <- function() {
     available_tables    <- reactiveVal(character())
     rtf_paths           <- reactiveVal(list())
     rtf_folder_path     <- reactiveVal(NULL)
+    figure_folder_path  <- reactiveVal(NULL)
 
 
     config_data <- reactiveVal(
@@ -470,6 +483,43 @@ houdini_app <- function() {
 
     # RTF FOLDER
 
+    #Rebuild the name _. path map from both table and figures folder if set
+    refresh_rtf_paths <- function() {
+      tbl_dir <- rtf_folder_path()
+      if (is.null(tbl_dir) || !dir.exists(tbl_dir)) return(invisible(NULL))
+      fig_dir <- figure_folder_path()
+      if (!is.null(fig_dir) && !dir.exists(fig_dir)) fig_dir <- NULL
+
+      clash_msg <- character()
+      paths <- withCallingHandlers(
+        collect_rtf_paths(tbl_dir, fig_dir),
+        warning = function(w) {
+          clash_msg <<- conditionMessage(w)
+          invokeRestart("muffleWarning")
+        }
+      )
+
+      if (length(paths) == 0L) {
+        available_tables(character())
+        rtf_paths(list())
+        showNotification("No RTF files found in that folder.", type = "warning")
+        return(invisible(NULL))
+      }
+
+      available_tables(names(paths))
+      rtf_paths(paths)
+      table_info_cache(list())
+      parse_cache(list())
+
+      # A name present in both folders is worth surfacing: it is how a run
+      # silently injects a stale copy of a figure.
+      if (length(clash_msg)) {
+        showNotification(clash_msg, type = "warning", duration = 10)
+      }
+      showNotification(sprintf("Found %d RTF files.", length(paths)), type = "message")
+      invisible(paths)
+    }
+
     # Shared helper: load RTF files from a validated folder path
     load_rtf_folder <- function(folder) {
       folder <- normalizePath(folder, winslash = "/", mustWork = FALSE)
@@ -478,19 +528,26 @@ houdini_app <- function() {
         return()
       }
       rtf_folder_path(folder)
-      rtf_files <- list.files(folder, pattern = "\\.rtf$", ignore.case = TRUE)
-      if (length(rtf_files) == 0L) {
-        available_tables(character())
-        showNotification("No RTF files found in that folder.", type = "warning")
+      refresh_rtf_paths()
+    }
+
+    # Figures often live apart from tables. An empty path clears the extra
+    # folder rather than erroring, so the field can be undone.
+    load_figure_folder <- function(folder) {
+      folder <- trimws(folder %||% "")
+      if (!nzchar(folder)) {
+        figure_folder_path(NULL)
+        refresh_rtf_paths()
         return()
       }
-      tbl_names  <- tools::file_path_sans_ext(rtf_files)
-      full_paths <- file.path(folder, rtf_files)
-      available_tables(tbl_names)
-      rtf_paths(setNames(as.list(full_paths), tbl_names))
-      table_info_cache(list())
-      parse_cache(list())
-      showNotification(paste("Found", length(rtf_files), "RTF files."), type = "message")
+      folder <- normalizePath(folder, winslash = "/", mustWork = FALSE)
+      if (!dir.exists(folder)) {
+        showNotification("Figure folder not found. Check the path and try again.",
+                         type = "error")
+        return()
+      }
+      figure_folder_path(folder)
+      refresh_rtf_paths()
     }
 
     register_rtf_source <- function() {
@@ -499,6 +556,43 @@ houdini_app <- function() {
         if(is_connect()) return(NULL)
         textInput("rtf_folder_manual", NULL, width = "100%",
                   placeholder = "Or paste a folder path\u2026")
+      })
+
+      output$figure_folder_input <- renderUI({
+        textInput("figure_folder_manual", NULL, width = "100%",
+                  placeholder = "Paste a figure folder path\u2026")
+      })
+
+      output$figure_picker_btn <- renderUI({
+        if (!requireNamespace("rstudioapi", quietly = TRUE)) return(NULL)
+        if (!isTRUE(tryCatch(rstudioapi::isAvailable(), error = function(e) FALSE))) return(NULL)
+        actionButton("pick_figure_folder", "Choose Figure Folder\u2026",
+                     class = "btn-outline-primary btn-sm",
+                     style = "width:100%;")
+      })
+
+      observeEvent(input$pick_figure_folder, {
+        folder <- tryCatch(
+          rstudioapi::selectDirectory(caption = "Select figure folder"),
+          error = function(e) NULL
+        )
+        if (is.null(folder) || !nzchar(folder)) return()
+        load_figure_folder(folder)
+        updateTextInput(session, "figure_folder_manual", value = folder)
+      })
+
+      # Fires on Enter. An emptied field clears the figure folder.
+      observeEvent(input$figure_folder_manual, {
+        load_figure_folder(input$figure_folder_manual)
+      }, ignoreInit = TRUE)
+
+      output$figure_status <- renderUI({
+        fig <- figure_folder_path()
+        if (is.null(fig)) return(NULL)
+        n <- length(list.files(fig, pattern = "[.]rtf$", ignore.case = TRUE))
+        div(class = "alert alert-info py-1 px-2 mb-0 mt-1 small",
+            bsicons::bs_icon("images"),
+            sprintf(" %d RTF files in figure folder", n))
       })
 
       if(is_connect()){
@@ -562,7 +656,7 @@ houdini_app <- function() {
           updateTextInput(session, "rtf_folder_manual", value = folder)
         })
 
-        # Handle manual path entry — fires on Enter (input value change)
+        # Handle manual path entry - fires on Enter (input value change)
         observeEvent(input$rtf_folder_manual, {
           path <- trimws(input$rtf_folder_manual)
           if (!nzchar(path)) return()
@@ -1410,7 +1504,7 @@ houdini_app <- function() {
             hints  <- c(hints,  e$hint)
           }
 
-          # Same RTF mapped to multiple bookmarks (warning only — may be intentional)
+          # Same RTF mapped to multiple bookmarks (warning only - may be intentional)
           if (nzchar(tbl_val) && tbl_val %in% dup_tables) {
             dup_rows <- which(all_tbl_vals == tbl_val)
             warnings <- c(warnings, sprintf(
