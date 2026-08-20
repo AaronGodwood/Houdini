@@ -180,7 +180,7 @@ apparate <- function(input_doc,input_sheet,file_location, figure_location = NULL
   bm <- trimws(cfg$Bookmark)
   dup <- unique(bm[duplicated(bm)])
   if(length(dup) > 0L){
-      atop(err_bookmark_duplicate(dup[1L], keep[bm == dup[1L]]))
+      stop(err_bookmark_duplicate(dup[1L], keep[bm == dup[1L]]))
   }
 
   sels <- setNames(
@@ -257,7 +257,7 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
              ""
   )
 
-  if(not_run) return(lines)
+
 
 
 
