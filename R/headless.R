@@ -220,21 +220,46 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
   df    <- config_data
 
 
+  valid_rows <- which(nzchar(trimws(df$Bookmark)) & nzchar(trimws(df$Table)))
+
+  n_err <- 0L
+  n_warn <- 0L
+  for(i in valid_rows){
+    st <- status[[as.character(i)]]
+    if(!is.null(st$err)) n_err <- n_err + 1
+    n_warn <- n_warn + length(st$warn)
+  }
+  n_ok <- length(valid_rows) - n_err
+
+  not_run <- is.null(status) || length(status) == 0L
+
+  outcome <- if(length(valid_rows) == 0L){
+    "No table mappings defined"
+  } else if (not_run){
+    "No documents have been generated yet"
+  } else{
+    sprintf("Run with %s Warnings and %s Errors",n_warn, n_err)
+  }
+
   lines <- character()
 
   lines <- c(lines,
              "  Houdini Document Generation Log",
              paste0("Generated : ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
              paste0("User      : ", Sys.info()[["user"]]),
+             paste0("Houdini   : ", as.character(utils::packageVersion("Houdini"))),
              paste0("Word file : ", if (!is.null(input_doc)) input_doc else "(not set)"),
-             paste0("Excel File :", if(is.character(input_sheet)) input_sheet
+             paste0("Excel File: ", if(is.character(input_sheet)) input_sheet
                                     else if (is.data.frame(input_sheet)) "(config data.frame)"
                                     else "(not set)"),
              paste0("RTF folder: ", file_location %||% "(not set)"),
+             paste0("Status    : ", outcome),
              ""
   )
 
-  valid_rows <- which(nzchar(trimws(df$Bookmark)) & nzchar(trimws(df$Table)))
+  if(not_run) return(lines)
+
+
 
   if (length(valid_rows) == 0L) {
     lines <- c(lines, "(no table mappings defined)")
