@@ -23,7 +23,7 @@ paragraph. Tables and figures are scaled to the document's text width automatica
 Along the way you can, per table:
 
 - Filter pages by **parameter** (e.g. `Parameter: Cholesterol`).
-- Filter data rows by **timeline** label (e.g. `Week 1`, `Week 4`).
+- Filter data rows by **timepoint** label (e.g. `Week 1`, `Week 4`).
 - Filter data by **indent level** (e.g. `prefered term`)
 - Interactively **exclude columns and rows** by clicking them in the preview or specifying in the config document.
 
