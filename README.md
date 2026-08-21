@@ -1,4 +1,4 @@
-# Houdini
+# Houdini <img src="man/figures/logo.png" align="right" height="139" />
 
 Programmatically insert data tables and figures into report Word documents.
 
