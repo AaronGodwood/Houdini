@@ -387,7 +387,7 @@ insert_or_replace <- function(session, node, xml_block, where = "after"){
   if(where == "on"){
     next_node <- xml_find_first(node,"following-sibling::*[1]")
 
-    if(xml_name(next_node) == "tbl" || !is.na(xml_child(next_node, ".//w:drawing"))){
+    if(xml_name(next_node) == "tbl" || length(xml_find_all(next_node, "w:r/w:drawing", ns = c(w = W_NS))) > 0){
       cleanup_image_rels(session, next_node)
       xml_replace(next_node,xml_block)
       #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "before")

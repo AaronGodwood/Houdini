@@ -365,8 +365,8 @@ block_rbind_all <- function(blocks) {
 # as.double copy) - O(length(vec)) work that turns per-row lookups over large
 # sections quadratic. Positions here are always sorted doubles, so skip the
 # checks where this R version allows it (R >= 4.3).
-fint <- if (getRversion() >= "4.3.0") {
-  function(x, vec) findInterval(x, vec)#, checkSorted = FALSE, checkNA = FALSE)
+fint <- if (getRversion() >= "4.5.0") {
+  function(x, vec) findInterval(x, vec, checkSorted = FALSE, checkNA = FALSE)
 } else {
   findInterval
 }

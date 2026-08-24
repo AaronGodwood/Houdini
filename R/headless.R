@@ -238,7 +238,7 @@ write_log <- function(input_doc, input_sheet = NULL,config_data,sels,status, fil
   } else if (not_run){
     "No documents have been generated yet"
   } else{
-    sprintf("Run with %s Warnings and %s Errors",n_warn, n_err)
+    sprintf("%s insertions with %s Warnings and %s Errors",length(valid_rows),n_warn, n_err)
   }
 
   lines <- character()

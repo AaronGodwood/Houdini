@@ -51,7 +51,7 @@ xml_cell <- function(text, align, grid_span, borders, run_pr, header = FALSE) {
     align
   )
   run  <- sprintf("<w:r>%s<w:t xml:space=\"preserve\">%s</w:t></w:r>",
-                  run_pr, xml_escape(text))
+                  run_pr, text)
   para <- sprintf("<w:p>%s%s</w:p>", para_pr, run)
   sprintf("<w:tc>%s%s</w:tc>", tc_pr, para)
 }
@@ -77,7 +77,7 @@ xml_header_row <- function(b, r, is_last_header) {
     } else ""
 
     # Last header row: always border. Upper rows: border only if cell has text.
-    has_text <- nzchar(trimws(b$text[r, ci]))
+    has_text <- nzchar(trimws(b$raw_text[r, ci]))
     sides    <- if (is_last_header || has_text) "bottom" else character()
     borders  <- cell_borders_xml(sides)
 
@@ -140,6 +140,11 @@ build_xml <- function(combined, cols = NULL, row_start = NULL, row_end = NULL,
   # Filter to selected columns
   header <- block_cols_resolve(header, cols)
   data   <- block_cols_resolve(data, cols)
+
+  header$raw_text <- header$text
+  data$raw_text   <- data$text
+  if(length(header$text)) header$text[] <- xml_escape(as.vector(header$text))
+  if(length(data$text)) data$text[] <- xml_escape(as.vector(data$text))
 
   # Column widths for the selected columns
   selected_widths <- col_widths_twips[cols]
