@@ -749,7 +749,7 @@ parse_page <- function(page_text, hide_data = FALSE){
 
   # Parse the body table and split into header rows and data rows
   body <- parse_rtf_table(body_text, hide_data = hide_data)
-  footer_tbl$colspan <- matrix(block_ncol(body))
+  footer_tbl$colspan <- matrix(block_ncol(body), nrow = max(block_nrow(footer_tbl),1), ncol = 1)
   list(
     parameter = parameter,
     header    = block_rows(body, body$is_header),
@@ -774,9 +774,20 @@ extract_parameter <- function(header_tbl) {
 
 # Extract Footnotes from the RTF footer section (everything above first blank row)
 extract_footnotes <- function(footer_tbl){
-  first_blank <- which(vapply(footer_tbl$text, function(t) t =="", logical(1)))[1]
-  if(is.na(first_blank) || first_blank > 2) return(block_new())
-  block_rows(footer_tbl,seq_len(first_blank-1))
+  # first_blank <- which(vapply(footer_tbl$text, function(t) t =="", logical(1)))[1]
+  # if(is.na(first_blank) || first_blank < 2) return(block_new())
+  # block_rows(footer_tbl,seq_len(first_blank-1))
+  n <- block_nrow(footer_tbl)
+  if(n == 0L) return(block_new())
+
+  row_blank <- vapply(seq_len(n), function(i) {
+    all(!nzchar(trimws(footer_tbl$text[i, ])))
+  }, logical(1))
+
+  first_blank <- which(row_blank)[1L]
+  last_note <- if(is.na(first_blank)) 0L else first_blank - 1L
+  if(last_note < 1L || first_blank < 2L) return(block_new())
+  block_rows(footer_tbl,seq_len(last_note))
 }
 
 

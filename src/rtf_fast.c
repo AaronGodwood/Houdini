@@ -384,7 +384,7 @@ SEXP C_rtf_cell_to_text(SEXP raw_text, SEXP hide_data) {
       }else if (buf[ri] == '\\' && ri + 1 < len) {
         /* Control symbol \<char> - skip both */
         ri += 2;
-      } else if (buf[ri] == '\n'){
+      } else if (buf[ri] == '\n' || buf[ri] == '\r'){
         ri++;
       }else {
         tmp[wi++] = buf[ri++];
