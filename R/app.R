@@ -20,20 +20,10 @@ houdini_app <- function() {
     heading_font = bslib::font_google("Inter", local = FALSE)
   )
 
-  addResourcePath(
-    "assets",
-    system.file("man/figures", package = "Houdini")
-  )
 
   # App-specific CSS. Colours come from Bootstrap variables so both themes work.
   ui_head <- function() {
     tags$head(
-      tags$title("Houdini"),
-      tags$link(
-        rel = "icon",
-        type = "image/png",
-        href = "assets/logo.png"
-      ),
       tags$style(HTML("
       /* Interactive preview: clickable headers/rows */
       .sel-pane th[data-col] { cursor: pointer; }
@@ -280,14 +270,7 @@ houdini_app <- function() {
   }
 
   ui <- bslib::page_sidebar(
-    title = tagList(
-      tags$img(
-        src = "assets/logo.png",
-        height = "24px",
-        style = "margin-right: 8px;"
-      ),
-      "Houdini"
-    ),
+    title = tagList(bsicons::bs_icon("magic"), "Houdini"),
     theme = houdini_theme,
     fillable = TRUE,
     ui_head(),
