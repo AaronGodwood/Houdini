@@ -585,29 +585,7 @@ houdini_app <- function() {
                      style = "width:100%;")
       })
 
-      observeEvent(input$pick_figure_folder, {
-        folder <- tryCatch(
-          rstudioapi::selectDirectory(caption = "Select figure folder"),
-          error = function(e) NULL
-        )
-        if (is.null(folder) || !nzchar(folder)) return()
-        load_figure_folder(folder)
-        updateTextInput(session, "figure_folder_manual", value = folder)
-      })
 
-      # Fires on Enter. An emptied field clears the figure folder.
-      observeEvent(input$figure_folder_manual, {
-        load_figure_folder(input$figure_folder_manual)
-      }, ignoreInit = TRUE)
-
-      output$figure_status <- renderUI({
-        fig <- figure_folder_path()
-        if (is.null(fig)) return(NULL)
-        n <- length(list.files(fig, pattern = "[.]rtf$", ignore.case = TRUE))
-        div(class = "alert alert-info py-1 px-2 mb-0 mt-1 small",
-            bsicons::bs_icon("images"),
-            sprintf(" %d RTF files in figure folder", n))
-      })
 
       if(is_connect()){
         board <- tryCatch(pins::board_connect(), error = function(e) NULL)
@@ -684,6 +662,30 @@ houdini_app <- function() {
                 bsicons::bs_icon("check-circle-fill"),
                 sprintf(" %d RTF files found", length(tbls)))
           }
+        })
+
+        observeEvent(input$pick_figure_folder, {
+          folder <- tryCatch(
+            rstudioapi::selectDirectory(caption = "Select figure folder"),
+            error = function(e) NULL
+          )
+          if (is.null(folder) || !nzchar(folder)) return()
+          load_figure_folder(folder)
+          updateTextInput(session, "figure_folder_manual", value = folder)
+        })
+
+        # Fires on Enter. An emptied field clears the figure folder.
+        observeEvent(input$figure_folder_manual, {
+          load_figure_folder(input$figure_folder_manual)
+        }, ignoreInit = TRUE)
+
+        output$figure_status <- renderUI({
+          fig <- figure_folder_path()
+          if (is.null(fig)) return(NULL)
+          n <- length(list.files(fig, pattern = "[.]rtf$", ignore.case = TRUE))
+          div(class = "alert alert-info py-1 px-2 mb-0 mt-1 small",
+              bsicons::bs_icon("images"),
+              sprintf(" %d RTF files in figure folder", n))
         })
       }
 
