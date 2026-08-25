@@ -819,16 +819,16 @@ houdini_app <- function() {
               )
             },
 
-            # if (info$n_hdrs > 0L) {
-            #   selectizeInput(
-            #     "preview_excluded_header_rows", "Excluded Headers:",
-            #     choices  = seq_len(info$n_hdrs),
-            #     selected = prev_exc_hdrs,
-            #     multiple = TRUE,
-            #     options  = list(plugins = list("remove_button"),
-            #                     placeholder = "No Headers Excluded")
-            #   )
-            # }
+            if (info$n_hdrs > 0L) {
+              selectizeInput(
+                "preview_excluded_header_rows", "Excluded Headers:",
+                choices  = seq_len(info$n_hdrs),
+                selected = prev_exc_hdrs,
+                multiple = TRUE,
+                options  = list(plugins = list("remove_button"),
+                                placeholder = "No Headers Excluded")
+              )
+            }
 
 
         )
@@ -1319,7 +1319,11 @@ houdini_app <- function() {
 
         hot <- rhandsontable::rhandsontable(df, rowHeaders = TRUE, selectCallback = TRUE,
                              overflow = "visible", height = 420) |>
-          hot_cols(colWidths = c(30, 170, 170))
+          hot_cols(colWidths = c(30, 170, 170)) |>
+          hot_context_menu(
+            allowRowEdit = FALSE,  # disables add/remove row options
+            allowColEdit = FALSE    # keep column editing if needed
+          )
 
         hot <- if (length(bm) > 0) {
           hot |> hot_col("Bookmark", type = "dropdown", source = c("", names(bm)), strict = FALSE)
@@ -1336,6 +1340,8 @@ houdini_app <- function() {
         # Status column last: read-only plus the isolated icon renderer
         hot <- hot |> hot_col(1, readOnly = TRUE)
         hot_renderer_one(hot, 1L, status_renderer)
+
+
       })
 
       observeEvent(input$config_table, {
