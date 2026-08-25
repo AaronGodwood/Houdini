@@ -20,9 +20,20 @@ houdini_app <- function() {
     heading_font = bslib::font_google("Inter", local = FALSE)
   )
 
+  addResourcePath(
+    "assets",
+    system.file("man/figures", package = "Houdini")
+  )
+
   # App-specific CSS. Colours come from Bootstrap variables so both themes work.
   ui_head <- function() {
     tags$head(
+      tags$title("Houdini"),
+      tags$link(
+        rel = "icon",
+        type = "image/png",
+        href = "assets/logo.png"
+      ),
       tags$style(HTML("
       /* Interactive preview: clickable headers/rows */
       .sel-pane th[data-col] { cursor: pointer; }
@@ -147,24 +158,9 @@ houdini_app <- function() {
           uiOutput("folder_picker_btn"),
           uiOutput("pin_selector"),
           uiOutput("rtf_folder_input"),
-          # textInput("rtf_folder_manual", NULL, width = "100%",
-          #           placeholder = "Or paste a folder path\u2026"),
           uiOutput("rtf_status"),
 
           uiOutput("figure_dropdown")
-
-          # tags$details(
-          #   class = "mt-2",
-          #   tags$summary(
-          #     class = "form-label fw-semibold small",
-          #     style = "cursor:pointer;",
-          #     "Figure folder (optional)"
-          #   ),
-          #   uiOuput("figure_dropdown"),
-          #   uiOutput("figure_picker_btn"),
-          #   uiOutput("figure_folder_input"),
-          #   uiOutput("figure_status")
-          # ),
 
         ),
 
@@ -177,10 +173,6 @@ houdini_app <- function() {
                          class = "btn-outline-secondary btn-sm w-100 mt-2")
         ),
 
-        # bslib::accordion_panel(
-        #   "Document map", icon = bsicons::bs_icon("list-nested"),
-        #   uiOutput("doc_map_panel")
-        # ),
 
         bslib::accordion_panel(
           "Validation", icon = bsicons::bs_icon("exclamation-triangle"),
@@ -288,7 +280,14 @@ houdini_app <- function() {
   }
 
   ui <- bslib::page_sidebar(
-    title = tagList(bsicons::bs_icon("magic"), "Houdini"),
+    title = tagList(
+      tags$img(
+        src = "assets/logo.png",
+        height = "24px",
+        style = "margin-right: 8px;"
+      ),
+      "Houdini"
+    ),
     theme = houdini_theme,
     fillable = TRUE,
     ui_head(),
