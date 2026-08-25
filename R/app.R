@@ -816,6 +816,38 @@ houdini_app <- function() {
         )
       })
 
+      observeEvent(table_selections(), {
+
+        row <- current_row_index()
+        req(row)
+
+        prev <- table_selections()[[as.character(row)]]
+        if (is.null(prev)) return()
+
+        freezeReactiveValue(input, "preview_excluded_cols")
+        freezeReactiveValue(input, "preview_excluded_rows")
+        freezeReactiveValue(input, "preview_excluded_header_rows")
+
+        updateSelectizeInput(
+          session,
+          "preview_excluded_cols",
+          selected = prev$excluded_cols %||% integer()
+        )
+
+        updateSelectizeInput(
+          session,
+          "preview_excluded_rows",
+          selected = prev$excluded_rows %||% integer()
+        )
+
+        updateSelectizeInput(
+          session,
+          "preview_excluded_header_rows",
+          selected = prev$excluded_header_rows %||% integer()
+        )
+
+      })
+
       # Reset button - shown when a row with selections is active
       output$reset_row_btn <- renderUI({
         row <- current_row_index()
