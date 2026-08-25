@@ -151,17 +151,20 @@ houdini_app <- function() {
           #           placeholder = "Or paste a folder path\u2026"),
           uiOutput("rtf_status"),
 
-          tags$details(
-            class = "mt-2",
-            tags$summary(
-              class = "form-label fw-semibold small",
-              style = "cursor:pointer;",
-              "Figure folder (optional)"
-            ),
-            uiOutput("figure_picker_btn"),
-            uiOutput("figure_folder_input"),
-            uiOutput("figure_status")
-          ),
+          uiOutput("figure_dropdown")
+
+          # tags$details(
+          #   class = "mt-2",
+          #   tags$summary(
+          #     class = "form-label fw-semibold small",
+          #     style = "cursor:pointer;",
+          #     "Figure folder (optional)"
+          #   ),
+          #   uiOuput("figure_dropdown"),
+          #   uiOutput("figure_picker_btn"),
+          #   uiOutput("figure_folder_input"),
+          #   uiOutput("figure_status")
+          # ),
 
         ),
 
@@ -572,10 +575,7 @@ houdini_app <- function() {
                   placeholder = "Or paste a folder path\u2026")
       })
 
-      output$figure_folder_input <- renderUI({
-        textInput("figure_folder_manual", NULL, width = "100%",
-                  placeholder = "Paste a figure folder path\u2026")
-      })
+
 
 
 
@@ -622,6 +622,27 @@ houdini_app <- function() {
         })
 
       }else{
+
+        output$figure_dropdown <- renderUI({
+
+          tags$details(
+            class = "mt-2",
+            tags$summary(
+              class = "form-label fw-semibold small",
+              style = "cursor:pointer;",
+              "Figure folder (optional)"
+            ),
+            uiOutput("figure_picker_btn"),
+            uiOutput("figure_folder_input"),
+            uiOutput("figure_status")
+          )
+        })
+
+
+        output$figure_folder_input <- renderUI({
+          textInput("figure_folder_manual", NULL, width = "100%",
+                    placeholder = "Paste a figure folder path\u2026")
+        })
 
         # Show native folder picker button only when inside RStudio Desktop
         # (rstudioapi is in Suggests, so check it is installed before calling it)
