@@ -577,13 +577,7 @@ houdini_app <- function() {
                   placeholder = "Paste a figure folder path\u2026")
       })
 
-      output$figure_picker_btn <- renderUI({
-        if (!requireNamespace("rstudioapi", quietly = TRUE)) return(NULL)
-        if (!isTRUE(tryCatch(rstudioapi::isAvailable(), error = function(e) FALSE))) return(NULL)
-        actionButton("pick_figure_folder", "Choose Figure Folder\u2026",
-                     class = "btn-outline-primary btn-sm",
-                     style = "width:100%;")
-      })
+
 
 
 
@@ -628,8 +622,18 @@ houdini_app <- function() {
         })
 
       }else{
+
         # Show native folder picker button only when inside RStudio Desktop
         # (rstudioapi is in Suggests, so check it is installed before calling it)
+        output$figure_picker_btn <- renderUI({
+          if (!requireNamespace("rstudioapi", quietly = TRUE)) return(NULL)
+          if (!isTRUE(tryCatch(rstudioapi::isAvailable(), error = function(e) FALSE))) return(NULL)
+          actionButton("pick_figure_folder", "Choose Figure Folder\u2026",
+                       class = "btn-outline-primary btn-sm",
+                       style = "width:100%;")
+        })
+
+
         output$folder_picker_btn <- renderUI({
           if (!requireNamespace("rstudioapi", quietly = TRUE)) return(NULL)
           if (!isTRUE(tryCatch(rstudioapi::isAvailable(), error = function(e) FALSE))) return(NULL)
