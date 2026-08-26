@@ -8,7 +8,7 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Houdini is an R package for the insertion of RTF tables and figures into Word (.docx) documents at specified bookmarks. It parses RTF output (the kind produced by SAS), lets you interactively filter and trim each table with an excel or in app configuration, and writes a fully-formatted Word document with native OOXML tables.
+A tool for the automatic insertion of RTF tables and figures into Word (.docx) documents at specified bookmarks. It parses RTF output (the kind produced by SAS), lets you interactively filter and trim each table with an excel or in app configuration, and writes a fully-formatted Word document with native OOXML tables.
 }
 \author{
 \strong{Maintainer}: Aaron Godwood \email{godwoodaaron@gmail.com}
