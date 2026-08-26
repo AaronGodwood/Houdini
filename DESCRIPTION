@@ -11,6 +11,7 @@ Description: A tool for the automatic insertion of RTF tables and figures into W
     lets you interactively filter and trim each table with an excel or in app configuration,
     and writes a fully-formatted Word document with native OOXML tables.
 License: MIT + file LICENSE
+URL: https://aarongodwood.github.io/Houdini/, https://github.com/aarongodwood/Houdini
 Encoding: UTF-8
 LazyData: true
 Suggests: 
