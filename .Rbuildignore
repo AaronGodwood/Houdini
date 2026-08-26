@@ -9,3 +9,4 @@ R/oldapp.R\.R$
 ^\.git$
 ^\.gitignore$
 ^LICENSE\.md$
+^\.github$
