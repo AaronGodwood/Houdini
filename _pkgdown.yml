@@ -9,3 +9,6 @@ home:
     documents at specified bookmarks. It parses RTF output (the kind produced by SAS),
     lets you interactively filter and trim each table with an excel or in app configuration,
     and writes a fully-formatted Word document with native OOXML tables.
+
+repo:
+  url: https://github.com/AaronGodwood/Houdini
