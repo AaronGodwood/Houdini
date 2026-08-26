@@ -2,11 +2,14 @@ Package: Houdini
 Type: Package
 Title: Automatic Table & Figure Insertion into Data Containing Documents
 Version: 0.2.0
-Authors@R: person ("Aaron", "Godwood", role = c("aut", "cre"),
-                    email = "godwoodaaron@gmail.com")
-Description: Facilitates the automatic insertion of data tables & figures into documents.
-    Can pull data from .rtf files and .sas7bdat files and will insert them as tables or images into a word doc at a specified bookmark.
-    Bookmarks and filenames must be referenced in a provided excel document as well as any other filtering requirements.
+Authors@R: c(person ("Aaron", "Godwood", role = c("aut", "cre"),
+                    email = "godwoodaaron@gmail.com"),
+             person ("Valerie", "Millar", role = "aut",
+                    email = "v.millar@moonlaketx.com"))
+Description: Houdini is an R package for the insertion of RTF tables and figures into Word (.docx)
+    documents at specified bookmarks. It parses RTF output (the kind produced by SAS),
+    lets you interactively filter and trim each table with an excel or in app configuration,
+    and writes a fully-formatted Word document with native OOXML tables.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true

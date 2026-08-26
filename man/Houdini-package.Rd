@@ -6,10 +6,17 @@
 \alias{Houdini-package}
 \title{Houdini: Automatic Table & Figure Insertion into Data Containing Documents}
 \description{
-Facilitates the automatic insertion of data tables & figures into documents. Can pull data from .rtf files and .sas7bdat files and will insert them as tables or images into a word doc at a specified bookmark. Bookmarks and filenames must be referenced in a provided excel document as well as any other filtering requirements.
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
+Houdini is an R package for the insertion of RTF tables and figures into Word (.docx) documents at specified bookmarks. It parses RTF output (the kind produced by SAS), lets you interactively filter and trim each table with an excel or in app configuration, and writes a fully-formatted Word document with native OOXML tables.
 }
 \author{
 \strong{Maintainer}: Aaron Godwood \email{godwoodaaron@gmail.com}
+
+Authors:
+\itemize{
+  \item Valerie Millar \email{v.millar@moonlaketx.com}
+}
 
 }
 \keyword{internal}
