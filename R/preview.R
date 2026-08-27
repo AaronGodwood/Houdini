@@ -32,19 +32,21 @@ preview_page <- function(title, body, subtitle = NULL) {
 
 # An embedded PNG as an <img>, sized from the RTF's declared dimensions.
 # Base64 keeps the page self-contained, matching the app's preview.
-preview_image_html <- function(path) {
-  img <- extract_png(path)
-  if (is.null(img)) {
+preview_image_html <- function(path, parameters = NULL) {
+  imgs <- extract_pngs(path, parameters = parameters)$images
+  if (length(imgs) == 0L) {
     stop(err_image_extract_failed(path, "no PNG data found"))
   }
-  w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
-  h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
-  sprintf(
-    '<div style="text-align:center"><img src="data:image/png;base64,%s" style="max-width:100%%;height:auto;%s%s"></div>',
-    base64enc::base64encode(img$png_bytes),
-    if (is.null(w_px)) "" else sprintf("width:%dpx;", w_px),
-    if (is.null(h_px)) "" else sprintf("height:%dpx;", h_px)
-  )
+  paste(vapply(imgs, function(img) {
+    w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
+    h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
+    sprintf(
+      '<div style="text-align:center"><img src="data:image/png;base64,%s" style="max-width:100%%;height:auto;%s%s"></div>',
+      base64enc::base64encode(img$png_bytes),
+      if (is.null(w_px)) "" else sprintf("width:%dpx;", w_px),
+      if (is.null(h_px)) "" else sprintf("height:%dpx;", h_px)
+    )
+  }, character(1)), collapse = "")
 }
 
 # One-line summary of what was parsed, shown under the title
@@ -113,8 +115,9 @@ houdini_preview <- function(path,
   title <- basename(path)
 
   if (is_image_rtf(path)) {
-    body <- preview_image_html(path)
-    subtitle <- "figure"
+    body <- preview_image_html(path, parameters = parameters)
+    n_fig <- length(extract_pngs(path, parameters = parameters)$images)
+    subtitle <- if (n_fig > 1L) sprintf("figure - %d pages", n_fig) else "figure"
   } else {
     pages <- parse_rtf(path, hide_data = hide_data)
     body  <- get_table_html_output(

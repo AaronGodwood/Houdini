@@ -83,7 +83,9 @@ validate_config <- function(config, bookmarks = character(), tables = character(
     # Filter checks need the table to have been parsed
     ti  <- info[[tbl]]
     sel <- selections[[as.character(i)]]
-    if (is.null(ti) || isTRUE(ti$is_image) || is.null(sel)) next
+    # Figures reach the parameter check below; the table-only checks are all
+    # guarded on fields a figure's info does not carry.
+    if (is.null(ti) || is.null(sel)) next
 
     # Validate only against a non-empty known set: a table with no parameters
     # detected cannot tell us whether a requested one is wrong.
@@ -140,8 +142,9 @@ collect_validation_facts <- function(input_doc, config, rtf_paths) {
   for (nm in wanted) {
     info[[nm]] <- tryCatch({
       path <- rtf_paths[[nm]]
-      if (isTRUE(is_image_rtf(path))) list(is_image = TRUE)
-      else table_info_from_pages(parse_rtf(path))
+      if (isTRUE(is_image_rtf(path))) {
+        list(is_image = TRUE, parameters = image_parameters(path))
+      } else table_info_from_pages(parse_rtf(path))
     }, error = function(e) NULL)
   }
 
