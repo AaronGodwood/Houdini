@@ -3,11 +3,12 @@
 #' Pins a folder of RTF files to POSIT Connect
 #'
 #' @param path the file path to the folder of .RTF files to pin
+#' @param figure_path a second optional folder path for when figures are stored separately from tables
 #' @param name the name the pin will take on POSIT Connect
 #'
 #' @return The fully qualified name of the new pin invisibly
 #' @export
-houdini_pin_folder <- function(path, name){
+houdini_pin_folder <- function(path, figure_path = NULL, name){
 
   if(!dir.exists(path)){
     stop(houdini_error(
@@ -18,7 +19,36 @@ houdini_pin_folder <- function(path, name){
     ))
   }
 
-  files <- list.files(path, full.names = TRUE)
+  files <- list.files(path ,pattern = "\\.rtf$", ignore.case = TRUE, full.names = TRUE)
+
+  same_folder <- is.null(figure_path) ||
+    normalizePath(figure_path, winslash = "/", mustWork = FALSE) ==
+    normalizePath(path, winslash = "/", mustWork = FALSE)
+  if (!same_folder){
+
+    if(!dir.exists(figure_path)){
+      stop(houdini_error(
+        "rtf_folder_missing",
+        paste0("RTF folder not found: ", figure_path),
+        "Check the path to the folder holding the rtf files",
+        list(path = path)
+      ))
+    }
+
+    figures <- list.files(figure_path, pattern = "\\.rtf$", ignore.case = TRUE, full.names = TRUE)
+    clashes <- intersect(names(files), names(figures))
+    if (length(clashes)) {
+      warning(sprintf(
+        "%d name%s present in both RTF folders; using the copy in %s: %s",
+        length(clashes), if (length(clashes) == 1L) "" else "s",
+        file_location, paste(clashes, collapse = ", ")
+      ), call. = FALSE)
+    }
+
+    files <- c(files, figures[setdiff(figures, files)])
+  }
+
+
   if(length(files) == 0L){
     stop(houdini_error(
       "rtf_folder_missing",

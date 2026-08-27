@@ -4,10 +4,12 @@
 \alias{houdini_pin_folder}
 \title{Pins a folder of RTF files to POSIT Connect}
 \usage{
-houdini_pin_folder(path, name)
+houdini_pin_folder(path, figure_path = NULL, name)
 }
 \arguments{
 \item{path}{the file path to the folder of .RTF files to pin}
+
+\item{figure_path}{a second optional folder path for when figures are stored separately from tables}
 
 \item{name}{the name the pin will take on POSIT Connect}
 }
