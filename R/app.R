@@ -362,10 +362,14 @@ houdini_app <- function() {
         cache <- table_info_cache()
         if (is.null(cache[[tbl_name]])) {
           if (isTRUE(is_image_rtf(paths[[tbl_name]]))) {
-            # Sentinel so the cache entry exists and current_info() is non-NULL
+            # Sentinel so the cache entry exists and current_info() is non-NULL.
+            # A figure RTF can hold one image per page, each with its own
+            # parameter, so offer those for filtering as tables do.
+            img_params <- tryCatch(image_parameters(paths[[tbl_name]]),
+                                   error = function(e) character())
             cache[[tbl_name]] <- list(n_cols = 0L, n_rows = 0L,
                                       col_names  = character(),
-                                      parameters = character(),
+                                      parameters = img_params,
                                       timelines  = character(),
                                       levels     = character(),
                                       is_image = TRUE)
@@ -729,7 +733,11 @@ houdini_app <- function() {
 
       output$filter_panel <- renderUI({
         info <- current_info()
-        if (is.null(info) || isTRUE(info$is_image)) return(NULL)
+        if (is.null(info)) return(NULL)
+        # Figures carry parameters but nothing else; every control below is
+        # length-guarded, so an image row shows just the parameter picker.
+
+        if (isTRUE(info$is_image) && length(info$parameters) == 0L) return(NULL)
 
 
         filter_epoch()
@@ -779,7 +787,7 @@ houdini_app <- function() {
               )
             },
 
-            if (info$n_cols > 0L) {
+            if (length(info$n_cols) > 0L && info$n_cols > 0L) {
               selectizeInput(
                 "preview_excluded_cols", "Excluded Columns:",
                 choices  = seq_len(info$n_cols),
@@ -790,7 +798,7 @@ houdini_app <- function() {
               )
             },
 
-            if (info$n_rows > 0L) {
+            if (length(info$n_rows) > 0L && info$n_rows > 0L) {
               selectizeInput(
                 "preview_excluded_rows", "Excluded Rows:",
                 choices  = seq_len(info$n_rows),
@@ -801,7 +809,7 @@ houdini_app <- function() {
               )
             },
 
-            if (info$n_hdrs > 0L) {
+            if (length(info$n_hdrs) > 0L && info$n_hdrs > 0L) {
               selectizeInput(
                 "preview_excluded_header_rows", "Excluded Headers:",
                 choices  = seq_len(info$n_hdrs),
@@ -893,7 +901,8 @@ houdini_app <- function() {
 
           row  <- isolate(current_row_index())
           info <- isolate(current_info())
-          if (is.null(row) || is.null(info) || isTRUE(info$is_image)) return()
+          if (is.null(row) || is.null(info)) return()
+          if (isTRUE(info$is_image) && length(info$parameters) == 0L) return()
 
           sels <- isolate(table_selections())
           prev <- sels[[as.character(row)]] %||% list()
@@ -1029,23 +1038,30 @@ houdini_app <- function() {
         )
       })
 
-      # Render an image RTF as a centred, scaled <img>
-      image_preview_ui <- function(path) {
-        img <- tryCatch(extract_png(path), error = function(e) NULL)
-        if (is.null(img)) {
+      # Render an image RTF as centred, scaled <img>s - one per page, so a
+      # multi-page figure previews as the full set that will be inserted.
+      image_preview_ui <- function(path, parameters = NULL) {
+        imgs <- tryCatch(extract_pngs(path, parameters = parameters)$images,
+                         error = function(e) list())
+        if (length(imgs) == 0L) {
           return(div(class = "text-danger p-3", "Could not extract image."))
         }
-        b64  <- paste0("data:image/png;base64,",
-                       base64enc::base64encode(img$png_bytes))
-        w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
-        h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
         tags$div(
           style = "text-align:center;",
-          tags$img(src = b64, style = paste0(
-            "max-width:100%;height:auto;",
-            if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
-            if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
-          ))
+          lapply(imgs, function(img) {
+            b64  <- paste0("data:image/png;base64,",
+                           base64enc::base64encode(img$png_bytes))
+            w_px <- if (!is.na(img$width_twips))  round(img$width_twips  * 96 / 1440) else NULL
+            h_px <- if (!is.na(img$height_twips)) round(img$height_twips * 96 / 1440) else NULL
+            tags$div(
+              style = "margin-bottom:0.5rem;",
+              tags$img(src = b64, style = paste0(
+                "max-width:100%;height:auto;",
+                if (!is.null(w_px)) paste0("width:", w_px, "px;") else "",
+                if (!is.null(h_px)) paste0("height:", h_px, "px;") else ""
+              ))
+            )
+          })
         )
       }
 
@@ -1107,7 +1123,10 @@ houdini_app <- function() {
                      div(class = "mt-2", "Select a row to preview its table")))
         }
 
-        if (isTRUE(info$is_image)) return(image_preview_ui(paths[[tbl_name]]))
+        if (isTRUE(info$is_image)) {
+          img_sel <- table_selections()[[as.character(current_row_index())]] %||% list()
+          return(image_preview_ui(paths[[tbl_name]], parameters = img_sel$parameters))
+        }
 
         row <- current_row_index()
         sel <- table_selections()[[as.character(row)]] %||% list()
@@ -1168,7 +1187,10 @@ houdini_app <- function() {
           return(div(class = "text-secondary text-center p-4", "No table selected"))
         }
 
-        if (isTRUE(info$is_image)) return(image_preview_ui(paths[[tbl_name]]))
+        if (isTRUE(info$is_image)) {
+          return(image_preview_ui(paths[[tbl_name]],
+                                  parameters = output_preview_sel()$parameters))
+        }
 
         sel <- output_preview_sel()
 
@@ -1714,4 +1736,3 @@ houdini_app <- function() {
   shiny::shinyApp(ui, server)
 
 }
-
