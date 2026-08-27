@@ -5,7 +5,7 @@ Pins a folder of RTF files to POSIT Connect
 ## Usage
 
 ``` r
-houdini_pin_folder(path, name)
+houdini_pin_folder(path, figure_path = NULL, name)
 ```
 
 ## Arguments
@@ -13,6 +13,11 @@ houdini_pin_folder(path, name)
 - path:
 
   the file path to the folder of .RTF files to pin
+
+- figure_path:
+
+  a second optional folder path for when figures are stored separately
+  from tables
 
 - name:
 

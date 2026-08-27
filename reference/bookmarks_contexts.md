@@ -12,7 +12,8 @@ bookmarks_contexts(bm)
 
 - bm:
 
-  The value returned by [`extract_bookmarks()`](extract_bookmarks.md)
+  The value returned by
+  [`extract_bookmarks()`](https://aarongodwood.github.io/Houdini/reference/extract_bookmarks.md)
 
 ## Value
 

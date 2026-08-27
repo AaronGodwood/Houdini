@@ -27,8 +27,10 @@ apparate(
 
 - input_sheet:
 
-  Path to a config .xlsx (see [`read_xlsx()`](read_xlsx.md)) or a
-  data.frame with Bookmark/Table columns plus optional filter columns
+  Path to a config .xlsx (see
+  [`read_xlsx()`](https://aarongodwood.github.io/Houdini/reference/read_xlsx.md))
+  or a data.frame with Bookmark/Table columns plus optional filter
+  columns
 
 - file_location:
 

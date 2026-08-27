@@ -1,6 +1,7 @@
 # Parse a excel config into config + selections
 
-Shared by the app's Excel import and [`apparate()`](apparate.md).
+Shared by the app's Excel import and
+[`apparate()`](https://aarongodwood.github.io/Houdini/reference/apparate.md).
 Requires Bookmark and Table columns (case-insensitive); recognises
 optional Parameters, Timelines, ExcludedColumns, ExcludedRows and
 ExcludedHeaderRows columns, all semicolon-separated. Any .rtf extension

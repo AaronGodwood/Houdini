@@ -8,9 +8,9 @@ it writes a finished document with Word tables at each bookmark.
 This vignette builds a small report from scratch: two tables, one
 figure, and a filter.
 
-    #> [1] "/tmp/Rtmpgr2byL/escapology_study/rtf/t_reactions.rtf"
-    #> [1] "/tmp/Rtmpgr2byL/escapology_study/rtf/t_noise.rtf"
-    #> [1] "/tmp/Rtmpgr2byL/escapology_study/rtf/f_applause.rtf"
+    #> [1] "/tmp/RtmpDL5UUQ/escapology_study/rtf/t_reactions.rtf"
+    #> [1] "/tmp/RtmpDL5UUQ/escapology_study/rtf/t_noise.rtf"
+    #> [1] "/tmp/RtmpDL5UUQ/escapology_study/rtf/f_applause.rtf"
 
 ## What you start with
 
@@ -33,9 +33,10 @@ list.files(rtf_dir)
 ## Looking at a table first
 
 Before wiring anything up,
-[`houdini_preview()`](../reference/houdini_preview.md) renders a single
-RTF so you can see how Houdini has parsed it. It writes a self-contained
-HTML page and opens it; `browse = FALSE` just returns the path.
+[`houdini_preview()`](https://aarongodwood.github.io/Houdini/reference/houdini_preview.md)
+renders a single RTF so you can see how Houdini has parsed it. It writes
+a self-contained HTML page and opens it; `browse = FALSE` just returns
+the path.
 
 ``` r
 
@@ -94,11 +95,11 @@ e.g. `"Week 1; Week 4"`.
 
 ## Checking the config before you run
 
-[`houdini_validate()`](../reference/houdini_validate.md) runs every
-check the app shows in its warnings panel, without opening the app and
-without writing anything. It reports the whole list at once rather than
-stopping at the first problem, which is what you want in a scheduled
-job:
+[`houdini_validate()`](https://aarongodwood.github.io/Houdini/reference/houdini_validate.md)
+runs every check the app shows in its warnings panel, without opening
+the app and without writing anything. It reports the whole list at once
+rather than stopping at the first problem, which is what you want in a
+scheduled job:
 
 ``` r
 
@@ -137,9 +138,9 @@ file.exists(output)
 #> [1] TRUE
 ```
 
-[`apparate()`](../reference/apparate.md) returns a per-row status list
-rather than stopping at the first problem so if one table throws an
-error the rest can still run fine:
+[`apparate()`](https://aarongodwood.github.io/Houdini/reference/apparate.md)
+returns a per-row status list rather than stopping at the first problem
+so if one table throws an error the rest can still run fine:
 
 ``` r
 
@@ -232,10 +233,11 @@ recording every row, the filters applied, and any warnings.
 
 ## Using the app
 
-[`run_app()`](../reference/run_app.md) opens the same pipeline as a
-Shiny app. It is the easier way to build a configuration in the first
-place: load the template and RTF folder, click a row to preview it, and
-click column headers or rows in the preview to exclude them.
+[`run_app()`](https://aarongodwood.github.io/Houdini/reference/run_app.md)
+opens the same pipeline as a Shiny app. It is the easier way to build a
+configuration in the first place: load the template and RTF folder,
+click a row to preview it, and click column headers or rows in the
+preview to exclude them.
 
 ``` r
 
@@ -267,9 +269,9 @@ Still three pieces of content, not six.
 
 ## Where to go next
 
-- [`?apparate`](../reference/apparate.md) for the full set of run
-  options
-- [`?houdini_preview`](../reference/houdini_preview.md) for previewing a
-  single file
-- [`?parse_xl`](../reference/parse_xl.md) for the recognised config
-  columns
+- [`?apparate`](https://aarongodwood.github.io/Houdini/reference/apparate.md)
+  for the full set of run options
+- [`?houdini_preview`](https://aarongodwood.github.io/Houdini/reference/houdini_preview.md)
+  for previewing a single file
+- [`?parse_xl`](https://aarongodwood.github.io/Houdini/reference/parse_xl.md)
+  for the recognised config columns

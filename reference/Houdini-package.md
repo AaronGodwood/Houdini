@@ -6,6 +6,14 @@ produced by SAS), lets you interactively filter and trim each table with
 an excel or in app configuration, and writes a fully-formatted Word
 document with native OOXML tables.
 
+## See also
+
+Useful links:
+
+- <https://aarongodwood.github.io/Houdini/>
+
+- <https://github.com/aarongodwood/Houdini>
+
 ## Author
 
 **Maintainer**: Aaron Godwood <godwoodaaron@gmail.com>

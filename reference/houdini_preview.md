@@ -66,9 +66,10 @@ Invisibly, the path to the HTML file
 
 ## Details
 
-Filters accept the same values as [`apparate()`](apparate.md)'s config
-columns, so a selection can be tried here before being committed to a
-workbook.
+Filters accept the same values as
+[`apparate()`](https://aarongodwood.github.io/Houdini/reference/apparate.md)'s
+config columns, so a selection can be tried here before being committed
+to a workbook.
 
 ## Examples
 

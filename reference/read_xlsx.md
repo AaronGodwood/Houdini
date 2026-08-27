@@ -1,6 +1,7 @@
 # Read a houdini xlsx workbook
 
-Same format as the app's Excel export: see [`parse_xl()`](parse_xl.md).
+Same format as the app's Excel export: see
+[`parse_xl()`](https://aarongodwood.github.io/Houdini/reference/parse_xl.md).
 
 ## Usage
 
@@ -16,4 +17,5 @@ read_xlsx(path)
 
 ## Value
 
-list(config, selections); see [`parse_xl()`](parse_xl.md)
+list(config, selections); see
+[`parse_xl()`](https://aarongodwood.github.io/Houdini/reference/parse_xl.md)
