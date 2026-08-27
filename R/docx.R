@@ -40,6 +40,13 @@ find_ancestor <- function(node, tag) {
 }
 
 
+following_sibling <- function(node) {
+  kids <- xml_children(xml_parent(node))
+  i <- match(xml_path(node), xml_path(kids))
+  if (is.na(i) || i >= length(kids)) NULL else kids[[i + 1L]]
+}
+
+
 #Classify where a bookmark sits by walking its ancestor chain in document.xml
 #Returns the first disqualifying context found e.g. it exist in a table cell ect.
 bookmark_context <- function(node) {
@@ -320,6 +327,22 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
   }
   para_node <- entry$para
 
+  drawing_xml <- image_drawing_xml(
+    session,
+    list(png_bytes = png_bytes, width_twips = width_twips, height_twips = height_twips)
+  )
+
+  insert_or_replace(session, para_node, read_xml(drawing_xml), where = "on") ## similarly to above use add_xml as a guide for replacement
+  invisible(TRUE)
+}
+
+
+# Build the <w:p> holding one image, registering its media file and
+# relationship. Shared by inject_image() and inject_images().
+image_drawing_xml <- function(session, img) {
+  width_twips  <- img$width_twips
+  height_twips <- img$height_twips
+
   # Scale to text width maintaining aspect ratio
   target_w_emu <- session$text_width_emu
   if (!is.na(width_twips) && !is.na(height_twips) && width_twips > 0L) {
@@ -334,11 +357,11 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
 
   # Capture id before add_image_relationship increments the counter
   img_id <- session$next_img_id
-  rel_id <- add_image_relationship(session, png_bytes)
+  rel_id <- add_image_relationship(session, img$png_bytes)
 
   # Minimal <w:drawing> / <wp:inline> XML
   # Namespaces declared inline so the fragment is self-contained when parsed
-  drawing_xml <- sprintf(
+  sprintf(
     '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
        <w:r>
          <w:drawing>
@@ -373,9 +396,72 @@ inject_image <- function(session, bookmark_name, png_bytes, width_twips, height_
     rel_id,                      # r:embed
     target_w_emu, target_h_emu   # a:ext
   )
+}
 
-  insert_or_replace(session, para_node, read_xml(drawing_xml), where = "on") ## similarly to above use add_xml as a guide for replacement
+
+#' Inject several PNG images, stacked, at one bookmark
+#'
+#' A figure RTF can hold one image per page. They are inserted in document
+#' order, each as its own paragraph, so the bookmark ends up with the whole
+#' set rather than only the first.
+#'
+#' @param session A docx session returned by open_docx()
+#' @param bookmark_name Name of the bookmark
+#' @param images List of list(png_bytes, width_twips, height_twips), from
+#'   extract_pngs()
+#' @return Invisibly TRUE
+inject_images <- function(session, bookmark_name, images) {
+  if (length(images) == 0L) return(invisible(FALSE))
+
+  entry <- session$jump_table[[bookmark_name]]
+  if (is.null(entry)) stop(err_bookmark_missing(bookmark_name))
+  if (entry$context != "body") stop(err_bookmark_bad_context(bookmark_name, entry$context))
+
+  # The first image replaces whatever occupies the slot (an earlier run's
+  # figure, or the placeholder paragraph); the rest chain after it. Re-running
+  # over a previous output must not leave the earlier run's extra paragraphs
+  # behind, so clear them before inserting.
+  drop_trailing_images(session, entry$para)
+
+  insert_or_replace(session, entry$para,
+                    read_xml(image_drawing_xml(session, images[[1L]])),
+                    where = "on")
+
+  # xml2 inserts a copy, so the node handed to insert_or_replace() is not the
+  # one now in the tree. Re-read it from the document before chaining siblings
+  # onto it, or the rest end up in a detached fragment.
+  prev <- following_sibling(entry$para)
+  for (img in images[-1L]) {
+    xml_add_sibling(prev, read_xml(image_drawing_xml(session, img)), .where = "after")
+    prev <- following_sibling(prev)
+  }
   invisible(TRUE)
+}
+
+
+# Paragraphs holding a single drawing that directly follow `node`, beyond the
+# first. inject_images() stacks a figure's pages as sibling paragraphs, so a
+# re-run has to remove the previous run's extras or they accumulate.
+drop_trailing_images <- function(session, node) {
+  first <- following_sibling(node)
+  if (is.null(first) || !is_image_paragraph(first)) return(invisible(FALSE))
+
+  repeat {
+    nxt <- following_sibling(first)
+    if (is.null(nxt) || !is_image_paragraph(nxt)) break
+    cleanup_image_rels(session, nxt)
+    xml_remove(nxt)
+  }
+  invisible(TRUE)
+}
+
+
+# TRUE when a node is a <w:p> whose only content is a drawing, i.e. one this
+# package injected rather than authored text.
+is_image_paragraph <- function(node) {
+  if (is.null(node) || inherits(node, "xml_missing")) return(FALSE)
+  if (xml_name(node) != "p") return(FALSE)
+  length(xml_find_all(node, "w:r/w:drawing", ns = c(w = W_NS))) > 0L
 }
 
 insert_or_replace <- function(session, node, xml_block, where = "after"){
@@ -385,9 +471,14 @@ insert_or_replace <- function(session, node, xml_block, where = "after"){
   #name <- sprintf("_Houdini%d",next_bmk_id)
 
   if(where == "on"){
-    next_node <- xml_find_first(node,"following-sibling::*[1]")
+    next_node <- following_sibling(node)
 
-    if(xml_name(next_node) == "tbl" || length(xml_find_all(next_node, "w:r/w:drawing", ns = c(w = W_NS))) > 0){
+    # A './/' descendant scan here walks into tables already injected earlier in
+    # the run, so its cost grows with each injection. A drawing in a <w:p> always
+    # sits at w:r/w:drawing, so match that path directly.
+    if(!is.null(next_node) &&
+       (xml_name(next_node) == "tbl" ||
+        length(xml_find_all(next_node, "w:r/w:drawing", ns = c(w = W_NS))) > 0L)){
       cleanup_image_rels(session, next_node)
       xml_replace(next_node,xml_block)
       #xml_add_sibling(next_node,read_xml(sprintf('<w:bookmarkStart w:xmlns="%s" w:id="%d" w:name="%s"/>',W_NS,next_bmk_id,name)), .where = "before")
@@ -488,16 +579,24 @@ process_document <- function(word_path, config, rtf_paths, selections, output_pa
     if(is.null(is_img)) next
 
     if (is_img) {
-      img <- tryCatch(
-        extract_png(rtf_path),
+      # A figure RTF can hold one image per page, each with its own parameter,
+      # so honour the row's parameter filter and insert every page that remains.
+      sel <- selections[[as.character(i)]]
+      found <- tryCatch(
+        extract_pngs(rtf_path, parameters = sel$parameters),
         error = function(e) {
           status[[i]]$err <<- err_image_extract_failed(rtf_path, e)
           NULL
         }
       )
-      if (is.null(img)) next
+      if (is.null(found)) next
+      status[[i]]$warn <- found$warnings
+      if (length(found$images) == 0L) {
+        status[[i]]$err <- err_image_extract_failed(rtf_path, "no images found in file")
+        next
+      }
       tryCatch({
-        inject_image(session, bm_name, img$png_bytes, img$width_twips, img$height_twips)
+        inject_images(session, bm_name, found$images)
 
       }, error = function(e) {
         status[[i]]$err <<- as_houdini_error(e, err_image_inject_failed, bm_name)

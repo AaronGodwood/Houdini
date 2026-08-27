@@ -364,7 +364,8 @@ block_rbind_all <- function(blocks) {
 # findInterval re-validates `vec` on every call (anyNA + is.unsorted + an
 # as.double copy) - O(length(vec)) work that turns per-row lookups over large
 # sections quadratic. Positions here are always sorted doubles, so skip the
-# checks where this R version allows it (R >= 4.3).
+# checks where this R version allows it. checkSorted/checkNA were added in
+# R 4.5.0; passing them on anything older is an "unused arguments" error.
 fint <- if (getRversion() >= "4.5.0") {
   function(x, vec) findInterval(x, vec, checkSorted = FALSE, checkNA = FALSE)
 } else {
@@ -997,10 +998,16 @@ table_info_from_pages <- function(pages) {
 #' @param path Path to the .rtf file
 #' @return TRUE if a \\pngblip group is found, FALSE otherwise
 is_image_rtf <- function(path) {
-  # Read only enough to find the marker - expected format is just an image nothing else
-  # Raw text scan suits this purpose
-  text <- rtf_read_raw(path)
-  grepl("\\\\pngblip(?![a-zA-Z])", text, perl = TRUE)
+  # Only the \pngblip marker matters here and it is plain ASCII, so skip the
+  # encoding conversion and CRLF normalisation rtf_read_raw() does - on a
+  # multi-megabyte table those cost far more than the search itself. NULs are
+  # still stripped so a marker split by them is found, matching rtf_read_raw().
+  n <- file.size(path)
+  if (is.na(n) || n <= 0) return(FALSE)
+  bytes <- readBin(path, what = "raw", n = n)
+  bytes <- bytes[bytes != as.raw(0L)]
+  if (!length(bytes)) return(FALSE)
+  grepl("\\\\pngblip(?![a-zA-Z])", rawToChar(bytes), perl = TRUE, useBytes = TRUE)
 }
 
 
@@ -1015,7 +1022,12 @@ is_image_rtf <- function(path) {
 #' @return list(png_bytes = raw, width_twips = integer, height_twips = integer)
 #'   or NULL if no PNG found
 extract_png <- function(path) {
-  text <- rtf_read_raw(path)
+  png_from_text(rtf_read_raw(path))
+}
+
+# Decode the first \pict group holding a \pngblip out of already-read RTF text.
+# Split out from extract_png() so it can be applied to a single page's text.
+png_from_text <- function(text) {
   n    <- nchar(text)
 
   # Find the first \pict group that contains \pngblip. Earlier \pict groups
@@ -1077,3 +1089,64 @@ extract_png <- function(path) {
   )
 }
 
+
+#' Parameter values carried by each page of a figure RTF
+#'
+#' The figure equivalent of the parameters in \code{table_info_from_pages()}:
+#' lets the UI offer the same parameter filter for figures as for tables.
+#'
+#' @param path Path to the .rtf file
+#' @return Character vector of unique parameter values, in document order
+image_parameters <- function(path) {
+  imgs <- extract_pngs(path)$images
+  params <- vapply(imgs, function(i) as.character(i$parameter), character(1))
+  unique(params[!is.na(params)])
+}
+
+
+#' Extract every PNG image from an RTF file, one per page
+#'
+#' A figure RTF holds one \code{\\pict} group per \code{\\sectd} page, and each
+#' page carries its own "Parameter: <value>" line in the page header, exactly as
+#' a table RTF does. Pages are returned in document order so the caller can
+#' filter them by parameter and insert what remains.
+#'
+#' @param path Path to the .rtf file
+#' @param parameters Optional character vector of parameter values to keep.
+#'   Pages whose parameter is NA are always kept, matching filter_pages().
+#' @return list(images, warnings) where images is a list of
+#'   list(png_bytes, width_twips, height_twips, parameter), possibly empty
+extract_pngs <- function(path, parameters = NULL) {
+  text  <- rtf_read_raw(path)
+  pages <- rtf_split_pages(text)
+
+  # A figure RTF without \sectd page markers is still one image.
+  if (length(pages) == 0L) pages <- text
+
+  params <- vapply(pages, function(pg) {
+    hdr <- extract_group(pg, "\\header")
+    if (is.na(hdr)) return(NA_character_)
+    extract_parameter(parse_rtf_table(hdr))
+  }, character(1))
+
+  warnings <- list()
+  keep <- rep(TRUE, length(pages))
+  if (!is.null(parameters) && length(parameters) > 0L) {
+    present <- parameters[parameters %in% params]
+    not_present <- parameters[!parameters %in% params]
+    warnings <- lapply(not_present, function(p) warn_filter_not_found(p, "Parameter"))
+    # Only apply the filter when at least one requested value exists, so a
+    # filter that matches nothing leaves the figure intact rather than blank.
+    if (length(present) > 0L) keep <- is.na(params) | params %in% present
+  }
+
+  images <- list()
+  for (i in which(keep)) {
+    img <- png_from_text(pages[[i]])
+    if (is.null(img)) next
+    img$parameter <- params[[i]]
+    images[[length(images) + 1L]] <- img
+  }
+
+  list(images = images, warnings = warnings)
+}
