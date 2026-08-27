@@ -11,4 +11,5 @@ home:
     and writes a fully-formatted Word document with native OOXML tables.
 
 repo:
-  url: https://github.com/AaronGodwood/Houdini
+  url:
+    home: https://github.com/AaronGodwood/Houdini
