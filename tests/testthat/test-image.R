@@ -51,3 +51,69 @@ test_that("hex_to_raw round-trips", {
                                     collapse = "")),
                    bytes)
 })
+
+
+
+# A figure RTF can hold one image per \sectd page, each with its own
+# "Parameter: <value>" header line. All of them are inserted unless the row's
+# parameter filter narrows the set.
+
+test_that("extract_pngs returns every page of a multi-page figure", {
+  path <- test_path("fixtures", "image_multi.rtf")
+  res <- extract_pngs(path)
+
+  expect_length(res$images, 3L)
+  expect_identical(
+    vapply(res$images, function(i) i$parameter, character(1)),
+    c("Audience Noise (DB)", "Clap Density", "No. Feinters")
+  )
+  # Each page carries its own image, not a repeat of the first
+  blobs <- vapply(res$images, function(i) paste(i$png_bytes, collapse = ""),
+                  character(1))
+  expect_length(unique(blobs), 3L)
+})
+
+
+
+test_that("extract_pngs filters figure pages by parameter", {
+  path <- test_path("fixtures", "image_multi.rtf")
+
+  one <- extract_pngs(path, "Audience Noise (DB)")
+  expect_length(one$images, 1L)
+  expect_identical(one$images[[1]]$parameter, "Audience Noise (DB)")
+
+  two <- extract_pngs(path, c("Audience Noise (DB)", "Clap Density"))
+  expect_identical(
+    vapply(two$images, function(i) i$parameter, character(1)),
+    c("Audience Noise (DB)", "Clap Density")
+  )
+
+  # A filter matching nothing leaves the figure intact and warns, rather than
+  # silently producing a blank bookmark
+  none <- extract_pngs(path, "Not A Parameter")
+  expect_length(none$images, 3L)
+  expect_length(none$warnings, 1L)
+})
+
+
+test_that("extract_pngs matches extract_png on a single-page figure", {
+  path <- test_path("fixtures", "image.rtf")
+  old <- extract_png(path)
+  new <- extract_pngs(path)$images
+
+  expect_length(new, 1L)
+  expect_identical(new[[1]]$png_bytes, old$png_bytes)
+  expect_identical(new[[1]]$width_twips, old$width_twips)
+  expect_identical(new[[1]]$height_twips, old$height_twips)
+})
+
+
+test_that("image_parameters reports a figure's parameters", {
+  expect_identical(image_parameters(test_path("fixtures", "image_multi.rtf")),
+                   c("Audience Noise (DB)", "Clap Density", "No. Feinters"))
+  # Single-page fixture has no parameter line
+  expect_length(image_parameters(test_path("fixtures", "image.rtf")), 0L)
+})
+
+
+

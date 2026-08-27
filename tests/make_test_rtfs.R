@@ -425,6 +425,36 @@ make_rtf_span_by_width <- function(path) {
   invisible(path)
 }
 
+
+
+make_rtf_image_multi <- function(path) {
+  # Three 1x1 PNGs differing in their compressed pixel data, so each page's
+  # image is distinguishable by bytes.
+  png_hex <- c(
+    "89504e470d0a1a0a0000000d494844520000000100000001080200000090012e000000000c49444154789c6260f8cf0000000200019e21bc330000000049454e44ae426082",
+    "89504e470d0a1a0a0000000d494844520000000100000001080200000090012e000000000c49444154789c62f8cfc00000000200019e21bc330000000049454e44ae426082",
+    "89504e470d0a1a0a0000000d494844520000000100000001080200000090012e000000000c49444154789c6260607800000002000160a4bc330000000049454e44ae426082"
+  )
+  params  <- c("Audience Noise (DB)", "Clap Density", "No. Feinters")
+  w_twips <- 5760L
+  h_twips <- 4320L
+
+  pages <- lapply(seq_along(params), function(i) {
+    pict <- sprintf("{\\pict\\pngblip\\picwgoal%d\\pichgoal%d\n%s\n}",
+                    w_twips, h_twips, png_hex[i])
+    paste(
+      rtf_sectd(),
+      rtf_header_section(parameter = params[i]),
+      rtf_footer_section(sprintf("Page %d", i)),
+      pict,
+      sep = "\n"
+    )
+  })
+
+  writeLines(rtf_document(pages), path, useBytes = FALSE)
+  invisible(path)
+}
+
 # ============================================================
 # MAIN: generate all fixtures
 # ============================================================
@@ -443,7 +473,8 @@ make_test_rtfs <- function(output_dir = "tests/testthat/fixtures") {
     "merged_headers.rtf"    = make_rtf_span_by_width,
     "multi_levels.rtf"      = make_rtf_levels,
     "image.rtf"             = make_rtf_image,
-    "escapes.rtf"           = make_rtf_escapes
+    "escapes.rtf"           = make_rtf_escapes,
+    "image_multi.rtf"       = make_rtf_image_multi
   )
 
   for (fname in names(files)) {
