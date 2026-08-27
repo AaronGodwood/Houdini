@@ -8,9 +8,9 @@ it writes a finished document with Word tables at each bookmark.
 This vignette builds a small report from scratch: two tables, one
 figure, and a filter.
 
-    #> [1] "/tmp/RtmpDL5UUQ/escapology_study/rtf/t_reactions.rtf"
-    #> [1] "/tmp/RtmpDL5UUQ/escapology_study/rtf/t_noise.rtf"
-    #> [1] "/tmp/RtmpDL5UUQ/escapology_study/rtf/f_applause.rtf"
+    #> [1] "/tmp/RtmpnEhNKm/escapology_study/rtf/t_reactions.rtf"
+    #> [1] "/tmp/RtmpnEhNKm/escapology_study/rtf/t_noise.rtf"
+    #> [1] "/tmp/RtmpnEhNKm/escapology_study/rtf/f_applause.rtf"
 
 ## What you start with
 
